@@ -36,5 +36,5 @@ For more details, refer to https://www.intel.com/content/www/us/en/developer/too
 
 This is production version source code.
 
-Building instructions of TDX 1.5.01 release could be found in [BUILD.md](BUILD.md).  
+Building instructions of TDX 1.5.05 release could be found in [BUILD.md](BUILD.md).  
 Build instructions might defer between releases - for other releases, refer to [Releases](https://github.com/intel/tdx-module/releases) page.
