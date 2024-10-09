@@ -35,6 +35,8 @@
 .type  tdx_seamcall_entry_point,@function
 tdx_seamcall_entry_point:
 
+    // SOPHIA: nothing known about state, assuming that VMCS stores correct information
+    // SOPHIA: VMCS set up correctly and stores old TDX execution state
     /**
      * Save all VMM GPRs on module entry to LP local data
      * Local data is located at GSBASE
@@ -56,6 +58,8 @@ tdx_seamcall_entry_point:
     movq %r14,  %gs:TDX_LOCAL_DATA_VMM_GPRS_STATE_OFFSET+112
     movq %r15,  %gs:TDX_LOCAL_DATA_VMM_GPRS_STATE_OFFSET+120
 
+    // SOPHIA: VMCS has been updated to have the VMM's GPRs
+
 	/*
 	 * clear VMM GPRs on entry to the TDX module
 	 */
@@ -74,6 +78,8 @@ tdx_seamcall_entry_point:
     xor %r13, %r13
     xor %r14, %r14
     xor %r15, %r15
+
+    // SOPHIA: registers get cleared 
 
     // Protection against speculative attacks on GPRs
     lfence

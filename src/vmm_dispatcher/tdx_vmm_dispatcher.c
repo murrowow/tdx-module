@@ -50,7 +50,10 @@ _STATIC_INLINE_ void mark_lp_as_free(void)
 void tdx_vmm_dispatcher(void)
 {
     // Must be first thing to do before accessing local/global data or sysinfo table
+    // SOPHIA: registers are not updated 
     tdx_module_local_t* local_data = init_data_fast_ref_ptrs();
+    // SOPHIA: pointers where do they go???
+
 
     TDX_LOG("Module entry start\n");
 
