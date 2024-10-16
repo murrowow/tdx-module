@@ -70,7 +70,9 @@ void tdx_vmm_dispatcher(void)
     vm_vmexit_exit_reason_t exit_reason;
     ia32_vmread(VMX_VM_EXIT_REASON_ENCODE, &exit_reason.raw);
 
+    // AHMAD: exit_reason.raw = VMCS[VMX_VM_EXIT_REASON_ENCODE]
     // SOPHIA: exit_reason reads from VMCS data on why the VMM exited like basic_reason, bus_lock_preempted, enclave_interruption, etc.
+    
     tdx_sanity_check(exit_reason.basic_reason == VMEXIT_REASON_SEAMCALL, SCEC_VMM_DISPATCHER_SOURCE, 2);
     // SOPHIA: reads exit_reason to make sure it was basic_reason of the VMM made a SEAMCALL
 
@@ -80,6 +82,7 @@ void tdx_vmm_dispatcher(void)
     tdx_leaf_and_version_t leaf_opcode;
     leaf_opcode.raw = local_data->vmm_regs.rax;
 
+    // AHMAD: leaf_opcode.raw = RAX
     // SOPHIA: gets leaf opcode which is stored in the rax register
 
     ia32_core_capabilities_t core_capabilities;
@@ -88,8 +91,10 @@ void tdx_vmm_dispatcher(void)
 
     bhb_drain_sequence(global_data);
     // SOPHIA: performs a series of jumps to clear out the branch predictor to be all taken
+
     mark_lp_as_busy();
 
+    // AHMAD: get_local_data()->lp_is_busy = true;
     // SOPHIA: local memory of the LP is marked as being busy
 
     // Save IA32_SPEC_CTRL and set speculative execution variant 4 defense
@@ -97,6 +102,8 @@ void tdx_vmm_dispatcher(void)
     // execution of a load until the addresses for all older stores are known.
     local_data->vmm_non_extended_state.ia32_spec_ctrl = ia32_rdmsr(IA32_SPEC_CTRL_MSR_ADDR);
     wrmsr_opt(IA32_SPEC_CTRL_MSR_ADDR, TDX_MODULE_IA32_SPEC_CTRL, local_data->vmm_non_extended_state.ia32_spec_ctrl);
+
+    // AHMAD: MSR = TDX_MODULE_IA32_SPEC_CTRL if needed
 
     // All IA32_DEBGCTL bits have been cleared by SEAMCALL.
     // Set IA32_DEBUGCTL.ENABLE_UNCORE_PMI to the VMM's value, all other bits remain 0.
@@ -106,6 +113,7 @@ void tdx_vmm_dispatcher(void)
     local_data->ia32_debugctl_value.en_uncore_pmi = debugctl.en_uncore_pmi;
     wrmsr_opt(IA32_DEBUGCTL_MSR_ADDR, local_data->ia32_debugctl_value.raw, debugctl.raw);
 
+    // AHMAD: MSR = {0, VMCS[VMX_GUEST_IA32_DEBUGCTLMSR_FULL_ENCODE].en_uncore_pmi} if needed
     // SOPHIA: write to Debug MSR the IA32_DEBGCTL bits
 
     // SOPHIA: LAM is Linear Address Mapping?
@@ -130,6 +138,9 @@ void tdx_vmm_dispatcher(void)
             ia32_wrmsr(IA32_LAM_ENABLE_MSR_ADDR, 0);
         }
     }
+
+    // AHMAD: if LAM is supported, ia32_lam_enable  = ia32_rdmsr(IA32_LAM_ENABLE_MSR_ADDR), else ia32_lam_enable = 0
+    // AHMAD: if LAM enable, MSR = 0
     // SOPHIA: if LAM is supported, write to the MSR the current state
     if ((leaf_opcode.reserved0 != 0) || (leaf_opcode.reserved1 != 0))
     {
@@ -727,6 +738,7 @@ EXIT:
 void tdx_vmm_post_dispatching(void)
 {
     advance_guest_rip();
+    // AHMAD: RIP_new = RIP_current + VM_EXIT_INSTRUCTION_LENGTH
     // SOPHIA: add VM-Exit Instruction Length VMCS field offset to Guest RIP of current active VMCS
 
     tdx_module_local_t* local_data_ptr = get_local_data();
@@ -735,6 +747,7 @@ void tdx_vmm_post_dispatching(void)
     // Restore IA32_SPEC_CTRL
     wrmsr_opt(IA32_SPEC_CTRL_MSR_ADDR, local_data_ptr->vmm_non_extended_state.ia32_spec_ctrl,
                                        TDX_MODULE_IA32_SPEC_CTRL);
+    // AHMAD: SPEC_CTRL_MSR = local_data_ptr->vmm_non_extended_state.ia32_spec_ctrl if needed
 
     // SOPHIA: restore the LAM state if it was saved and disabled
     // If simplified LAM was saved & disabled, restore its state
@@ -742,9 +755,11 @@ void tdx_vmm_post_dispatching(void)
     {
         ia32_wrmsr(IA32_LAM_ENABLE_MSR_ADDR, local_data_ptr->vmm_non_extended_state.ia32_lam_enable);
     }
+    // AHMAD: LAM_ENABLE_MSR = local_data_ptr->vmm_non_extended_state.ia32_lam_enable if enabled
 
     // SOPHIA: mark the current LP as being free
     mark_lp_as_free();
+    // AHMAD: get_local_data()->lp_is_busy = false
 
     // Check that we have no mapped keyholes left
     tdx_sanity_check(local_data_ptr->keyhole_state.total_ref_count == 0, SCEC_KEYHOLE_MANAGER_SOURCE, 20);
@@ -753,6 +768,7 @@ void tdx_vmm_post_dispatching(void)
 
     // SOPHIA: Restore GPRs and SEAMRET back to the VMM
     tdx_seamret_to_vmm(); // Restore GPRs and SEAMRET
+    // AHMAD: VMM GPRs = LP local data
 
     // Shouldn't reach here:
     tdx_sanity_check(0, SCEC_VMM_DISPATCHER_SOURCE, 0);
