@@ -50,30 +50,44 @@ _STATIC_INLINE_ void mark_lp_as_free(void)
 void tdx_vmm_dispatcher(void)
 {
     // Must be first thing to do before accessing local/global data or sysinfo table
-    // SOPHIA: registers are not updated 
+    /* SOPHIA: local_data->local_data_fast_ref_ptr = NULL
+              local_data->sysinfo_table = NULL
+              local_data->global_data_fast_ref_ptr = NULL 
+    */
     tdx_module_local_t* local_data = init_data_fast_ref_ptrs();
-    // SOPHIA: pointers where do they go???
 
+    /* SOPHIA: local_data->local_data_fast_ref_ptr = address of local_data
+              local_data->sysinfo_table = address of sysinfo_table
+              local_data->global_data_fast_ref_ptr = address of global_data after region of local_data 
+    */
 
     TDX_LOG("Module entry start\n");
 
+    /* SOPHIA: prints out statement that TDX Module has been entered */
     vm_vmexit_exit_reason_t exit_reason;
     ia32_vmread(VMX_VM_EXIT_REASON_ENCODE, &exit_reason.raw);
 
+    /* SOPHIA: exit_reason reads from VMCS data on why the VMM exited like basic_reason, bus_lock_preempted, enclave_interruption, etc.  */
     tdx_sanity_check(exit_reason.basic_reason == VMEXIT_REASON_SEAMCALL, SCEC_VMM_DISPATCHER_SOURCE, 2);
+    /* SOPHIA: reads exit_reason to make sure it was basic_reason of the VMM made a SEAMCALL*/
 
     tdx_module_global_t * global_data = get_global_data();
+    /* SOPHIA: global_data = address of global_data after region of local_data */
     // Get leaf code from RAX in local data (saved on entry)
     tdx_leaf_and_version_t leaf_opcode;
     leaf_opcode.raw = local_data->vmm_regs.rax;
+
+    /* SOPHIA: gets leaf opcode which is stored in the rax register */
 
     ia32_core_capabilities_t core_capabilities;
 
     TDX_LOG("leaf_opcode = 0x%llx\n", leaf_opcode);
 
     bhb_drain_sequence(global_data);
-
+    /* SOPHIA: performs a series of jumps to clear out the branch predictor*/
     mark_lp_as_busy();
+
+    /* SOPHIA: local memory of the LP is marked as being busy*/
 
     // Save IA32_SPEC_CTRL and set speculative execution variant 4 defense
     // using Speculative Store Bypass Disable (SSBD), which delays speculative
@@ -89,6 +103,9 @@ void tdx_vmm_dispatcher(void)
     local_data->ia32_debugctl_value.en_uncore_pmi = debugctl.en_uncore_pmi;
     wrmsr_opt(IA32_DEBUGCTL_MSR_ADDR, local_data->ia32_debugctl_value.raw, debugctl.raw);
 
+    /* SOPHIA: write to Debug MSR the IA32_DEBGCTL bits */
+
+    /* SOPHIA: LAM is Linear Address Mapping? */
     // If simplified LAM is supported, save & disable its state
     if (local_data->lp_is_init)
     {
@@ -99,6 +116,8 @@ void tdx_vmm_dispatcher(void)
         core_capabilities.raw = ia32_rdmsr(IA32_CORE_CAPABILITIES);
     }
 
+    /* SOPHIA: restore lp data if it has already been initialized, otherwise read the MSR (model specific register) ?*/
+
     local_data->vmm_non_extended_state.ia32_lam_enable = 0;
     if (core_capabilities.lam_supported != 0)
     {
@@ -108,7 +127,7 @@ void tdx_vmm_dispatcher(void)
             ia32_wrmsr(IA32_LAM_ENABLE_MSR_ADDR, 0);
         }
     }
-
+    /* SOPHIA : if LAM is supported, write to the MSR the current state */
     if ((leaf_opcode.reserved0 != 0) || (leaf_opcode.reserved1 != 0))
     {
         TDX_ERROR("Leaf and version not supported 0x%llx\n", leaf_opcode.raw);
@@ -116,6 +135,8 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RAX);
         goto EXIT;
     }
+
+    /* SOPHIA : error check to make sure reserved bits in the opcode are not written to something else incorrectly */
 
     // Only a few functions have multiple versions
     if (leaf_opcode.version > 0)
@@ -136,6 +157,7 @@ void tdx_vmm_dispatcher(void)
                 goto EXIT;
         }
     }
+    /* SOPHIA: if there is a version, check to make sure that it is a one of a specific subset of operations */
 
     if (SYS_SHUTDOWN == global_data->global_state.sys_state)
     {
@@ -147,6 +169,7 @@ void tdx_vmm_dispatcher(void)
             goto EXIT;
         }
     }
+    /* SOPHIA : check for errors associated with shutting down and not having the corresponding TDX shutdown opcode */
 
     // Check if module is in ready state, if not
     // only some leaf functions are allowed to run
@@ -170,7 +193,7 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = TDX_SYS_NOT_READY;
         goto EXIT;
     }
-
+    /* SOPHIA: checks on module ready state, if not fully ready, only some leaf operations will be allowed so need to error out for the other cases */
     // switch over leaf opcodes
     switch (leaf_opcode.leaf)
     {
@@ -680,8 +703,9 @@ void tdx_vmm_dispatcher(void)
     }
     }
 
+    /* SOPHIA: big switch statement to cover all the possible leaf statements */
     tdx_sanity_check(local_data->vmm_regs.rax != UNINITIALIZE_ERROR, SCEC_VMM_DISPATCHER_SOURCE, 1);
-
+    /* SOPHIA: check to make sure the result is valid (not an uninitialized error)*/
     IF_RARE (local_data->reset_avx_state)
     {
         // Current IPP crypto lib uses SSE state only (XMM's), so we only clear them
@@ -693,25 +717,30 @@ EXIT:
     // No return after calling the post dispatching operations
     // Eventually call SEAMRET
     tdx_vmm_post_dispatching();
+    /* SOPHIA: Perform cleanup after the SEAMCALL instruction has been done */
 }
 
 
 void tdx_vmm_post_dispatching(void)
 {
     advance_guest_rip();
+    /* SOPHIA: add VM-Exit Instruction Length VMCS field offset to Guest RIP of current active VMCS */
 
     tdx_module_local_t* local_data_ptr = get_local_data();
 
+    /* SOPHIA: write to IA32_SPEC_CTRL_MSR_ADDR with new ia32_spec_ctrl from the local_data_ptr if its different from TDX_MODULE_IA32_SPEC_CTRL */
     // Restore IA32_SPEC_CTRL
     wrmsr_opt(IA32_SPEC_CTRL_MSR_ADDR, local_data_ptr->vmm_non_extended_state.ia32_spec_ctrl,
                                        TDX_MODULE_IA32_SPEC_CTRL);
 
+    /* SOPHIA: restore the LAM state if it was saved and disabled */
     // If simplified LAM was saved & disabled, restore its state
     if (local_data_ptr->vmm_non_extended_state.ia32_lam_enable != 0)
     {
         ia32_wrmsr(IA32_LAM_ENABLE_MSR_ADDR, local_data_ptr->vmm_non_extended_state.ia32_lam_enable);
     }
 
+    /* SOPHIA: mark the current LP as being free */
     mark_lp_as_free();
 
     // Check that we have no mapped keyholes left
@@ -719,6 +748,7 @@ void tdx_vmm_post_dispatching(void)
 
     TDX_LOG("tdx_vmm_post_dispatching - preparing to do SEAMRET\n");
 
+    /* SOPHIA: Restore GPRs and SEAMRET back to the VMM */
     tdx_seamret_to_vmm(); // Restore GPRs and SEAMRET
 
     // Shouldn't reach here:

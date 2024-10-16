@@ -79,7 +79,7 @@ tdx_seamcall_entry_point:
     xor %r14, %r14
     xor %r15, %r15
 
-    // SOPHIA: registers get cleared 
+    // all GPRs have been cleared to 0
 
     // Protection against speculative attacks on GPRs
     lfence
