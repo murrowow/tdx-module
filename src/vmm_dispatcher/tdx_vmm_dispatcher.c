@@ -87,7 +87,7 @@ void tdx_vmm_dispatcher(void)
     TDX_LOG("leaf_opcode = 0x%llx\n", leaf_opcode);
 
     bhb_drain_sequence(global_data);
-    // SOPHIA: performs a series of jumps to clear out the branch predictor
+    // SOPHIA: performs a series of jumps to clear out the branch predictor to be all taken
     mark_lp_as_busy();
 
     // SOPHIA: local memory of the LP is marked as being busy
