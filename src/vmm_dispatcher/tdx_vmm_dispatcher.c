@@ -20,6 +20,17 @@
 //                                                                               
 // SPDX-License-Identifier: MIT
 
+
+
+/** 
+     * SOPHIA: tdx_seamcall_entry_point.S
+     * SOPHIA: TDX instruction setup
+     * SOPHIA: TDX instruction valid instruction check 
+     * SOPHIA: TDX instruction execution
+     * SOPHIA: TDX instruction close
+     * SOPHIA: tdx_seamret_to_vmm.S
+*/
+
 /**
  * @file tdx_vmm_dispatcher.c
  * @brief VMM dispatcher and return sequence
@@ -49,6 +60,7 @@ _STATIC_INLINE_ void mark_lp_as_free(void)
 
 void tdx_vmm_dispatcher(void)
 {
+    // SOPHIA: TDX instruction setup START
     // Must be first thing to do before accessing local/global data or sysinfo table
     /** 
      * SOPHIA: local_data->local_data_fast_ref_ptr = NULL
@@ -114,7 +126,7 @@ void tdx_vmm_dispatcher(void)
     wrmsr_opt(IA32_DEBUGCTL_MSR_ADDR, local_data->ia32_debugctl_value.raw, debugctl.raw);
 
     // AHMAD: MSR = {0, VMCS[VMX_GUEST_IA32_DEBUGCTLMSR_FULL_ENCODE].en_uncore_pmi} if needed
-    // SOPHIA: write to Debug MSR the IA32_DEBGCTL bits
+    //SOPHIA: write to Debug MSR the IA32_DEBGCTL bits
 
     // SOPHIA: LAM is Linear Address Mapping?
     // If simplified LAM is supported, save & disable its state
@@ -138,10 +150,14 @@ void tdx_vmm_dispatcher(void)
             ia32_wrmsr(IA32_LAM_ENABLE_MSR_ADDR, 0);
         }
     }
-
+    // SOPHIA: TDX instruction setup END
+    
     // AHMAD: if LAM is supported, ia32_lam_enable  = ia32_rdmsr(IA32_LAM_ENABLE_MSR_ADDR), else ia32_lam_enable = 0
     // AHMAD: if LAM enable, MSR = 0
     // SOPHIA: if LAM is supported, write to the MSR the current state
+
+    // SOPHIA: TDX instruction valid instruction check START
+
     if ((leaf_opcode.reserved0 != 0) || (leaf_opcode.reserved1 != 0))
     {
         TDX_ERROR("Leaf and version not supported 0x%llx\n", leaf_opcode.raw);
@@ -208,6 +224,10 @@ void tdx_vmm_dispatcher(void)
         goto EXIT;
     }
     // SOPHIA: checks on module ready state, if not fully ready, only some leaf operations will be allowed so need to error out for the other cases
+    // SOPHIA: TDX instruction valid instruction check END
+
+    // SOPHIA: TDX instruction execution START
+    // SOPHIA: big switch statement to cover all the possible leaf statements
     // switch over leaf opcodes
     switch (leaf_opcode.leaf)
     {
@@ -715,9 +735,12 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RAX);
         break;
     }
-    }
+}
 
-    // SOPHIA: big switch statement to cover all the possible leaf statements
+
+    // SOPHIA: TDX instruction execution END
+
+    // SOPHIA: TDX instruction close START
     tdx_sanity_check(local_data->vmm_regs.rax != UNINITIALIZE_ERROR, SCEC_VMM_DISPATCHER_SOURCE, 1);
     // SOPHIA: check to make sure the result is valid (not an uninitialized error)
     IF_RARE (local_data->reset_avx_state)
@@ -727,11 +750,13 @@ void tdx_vmm_dispatcher(void)
         local_data->reset_avx_state = false;
     }
 
+
+    // SOPHIA: TDX instruction close END
 EXIT:
     // No return after calling the post dispatching operations
     // Eventually call SEAMRET
+    // SOPHIA: Perform cleanup after the SEAMCALL instruction has been complete
     tdx_vmm_post_dispatching();
-    // SOPHIA: Perform cleanup after the SEAMCALL instruction has been done
 }
 
 
