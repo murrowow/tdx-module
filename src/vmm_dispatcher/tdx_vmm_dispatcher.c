@@ -61,7 +61,9 @@ _STATIC_INLINE_ void mark_lp_as_free(void)
 void tdx_vmm_dispatcher(void)
 {
     // SOPHIA: TDX instruction setup START
-    // AHMAD: PRECONDITION - No state (local or global data) has been retrieved for the TDX
+    // AHMAD: PRECONDITION - No TDX state (local or global data) has been retrieved.
+    // AHMAD: local data refers data tied to a specfic LP excecution context and it lives in a secure section of memory only accessed by the LP
+    // AHMAD: global data refers to data that is shared across all LPs and lives in a secure memory region only accessible by the excecuting LPs  
 
     // Must be first thing to do before accessing local/global data or sysinfo table
     /** 
@@ -153,19 +155,17 @@ void tdx_vmm_dispatcher(void)
         }
     }
     // SOPHIA: TDX instruction setup END
-    // AHMAD: POSTCONDITION - local and global data is retrieved
-    // AHMAD: POSTCONDITION - Branch predictor is cleared
-    // AHMAD: POSTCONDITION - IA32_SPEC_CTRL register is saved and speculation defenses are applied
-    // AHMAD: POSTCONDITION - debug control register is restored 
+    // AHMAD: POSTCONDITION - relevant local and global data is retrieved (explained in precondition)
+    // AHMAD: POSTCONDITION - Branch predictor is cleared. Branch predictor is part of the hardware and not secure so flushing occurs to mitigate speculative execution attacks 
+    // AHMAD: POSTCONDITION - IA32_SPEC_CTRL register is saved to local data and speculation defenses are applied. This is a hardware register not specific to TDX
+    // AHMAD: POSTCONDITION - IA32_DEBUGCTL MSR is restored based on VMM data. This is a hardware register not specific to the TDX
 
     // AHMAD: if LAM is supported, ia32_lam_enable  = ia32_rdmsr(IA32_LAM_ENABLE_MSR_ADDR), else ia32_lam_enable = 0
     // AHMAD: if LAM enable, MSR = 0
     // SOPHIA: if LAM is supported, write to the MSR the current state
 
     // SOPHIA: TDX instruction valid instruction check START
-    // AHMAD: PRECONDITION - local data, global data, VM exit reason is intitialized
-    // AHMAD: PRECONDITION - access to current system state
-    // AHMAD: PRECONDITION - leaf opcode is retrieved
+    // AHMAD: PRECONDITION - local data and global data is retrieved
 
     if ((leaf_opcode.reserved0 != 0) || (leaf_opcode.reserved1 != 0))
     {
@@ -234,10 +234,11 @@ void tdx_vmm_dispatcher(void)
     }
     // SOPHIA: checks on module ready state, if not fully ready, only some leaf operations will be allowed so need to error out for the other cases
     // SOPHIA: TDX instruction valid instruction check END
-    // AHMAD: POSTCONDITION - If validation check fails, error is logged, dispatcher exists early, error code is set in RAX
+    // AHMAD: POSTCONDITION - All data remains unchanged through this section of code assuming no error (only reach here if no error)
 
     // SOPHIA: TDX instruction execution START
-    // AHMAD: PRECONDTION - have valid instruction and system setup
+    // AHMAD: PRECONDITION - The SEAMCALL instruction has passed validation, and the system (hardware and firmware) is in a valid and secure state.
+
     // SOPHIA: big switch statement to cover all the possible leaf statements
     // switch over leaf opcodes
     switch (leaf_opcode.leaf)
@@ -750,11 +751,12 @@ void tdx_vmm_dispatcher(void)
 
 
     // SOPHIA: TDX instruction execution END
-    // AHMAD: POSTCONDITION - relevant SEAMCALL is fully excecuted and information/errors are logged as needed
-    // AHMAD: POSTCONDITION - result of excecution is in RAX
+    // AHMAD: POSTCONDITION - The SEAMCALL leaf operation is fully excecuted.
+    // AHMAD: POSTCONDITION - The result of the operation (success or failure) is stored in the RAX register (hardware register) for further handling.
 
     // SOPHIA: TDX instruction close START
-    // AHMAD: PRECONDITION - result is stored in RAX
+    // AHMAD: PRECONDITION - A valid result or error code has been stored in RAX (hardware register)
+
     tdx_sanity_check(local_data->vmm_regs.rax != UNINITIALIZE_ERROR, SCEC_VMM_DISPATCHER_SOURCE, 1);
     // SOPHIA: check to make sure the result is valid (not an uninitialized error)
     IF_RARE (local_data->reset_avx_state)
@@ -766,7 +768,7 @@ void tdx_vmm_dispatcher(void)
 
 
     // SOPHIA: TDX instruction close END
-    // AHMAD: POSTCONDITION - result in RAX is valid
+    // AHMAD: POSTCONDITION - A valid result or error code has been stored in RAX (hardware register)
 EXIT:
     // No return after calling the post dispatching operations
     // Eventually call SEAMRET
@@ -777,7 +779,7 @@ EXIT:
 
 void tdx_vmm_post_dispatching(void)
 {
-    // AHMAD: PRECONDITION - TDX instruction has fully completed and a valid result was obtained or an error occured
+    // AHMAD: PRECONDITION - TDX instruction has fully completed and a valid result or error code has been stored in RAX (hardware register)
     advance_guest_rip();
     // AHMAD: RIP_new = RIP_current + VM_EXIT_INSTRUCTION_LENGTH
     // SOPHIA: add VM-Exit Instruction Length VMCS field offset to Guest RIP of current active VMCS
@@ -811,10 +813,10 @@ void tdx_vmm_post_dispatching(void)
     tdx_seamret_to_vmm(); // Restore GPRs and SEAMRET
     // AHMAD: VMM GPRs = LP local data
 
-    // AHMAD: POSTCONDITION - RIP is advanced to continue execution
-    // AHMAD: POSTCONDITION - original saved state is restored
-    // AHMAD: POSTCONDITION - keyholes are cleaned up
-    // AHMAD: POSTCONDITION - control is handed back to VMM and GPRs are restored
+    // AHMAD: POSTCONDITION - RIP (hardware register) is advanced to continue execution
+    // AHMAD: POSTCONDITION - original saved hardware state is restored
+    // AHMAD: POSTCONDITION - keyholes in local data are cleaned up
+    // AHMAD: POSTCONDITION - control is handed back to VMM and GPRs are restored from the LP local data
 
     // Shouldn't reach here:
     tdx_sanity_check(0, SCEC_VMM_DISPATCHER_SOURCE, 0);
