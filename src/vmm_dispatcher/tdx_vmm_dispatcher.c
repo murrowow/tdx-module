@@ -49,7 +49,7 @@
 #include "metadata_handlers/metadata_generic.h"
 
 _STATIC_INLINE_ void mark_lp_as_busy(void)
-{
+{ 
     get_local_data()->lp_is_busy = true;
 }
 
@@ -256,6 +256,11 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_mng_add_cx(local_data->vmm_regs.rcx, local_data->vmm_regs.rdx);
         break;
     }
+    // AHMAD: PRECONDITION - All inputs (target_tdr_pa, target_page_pa, and source_page_pa) are valid memory addresses in allowed memory range
+    // AHMAD: PRECONDITION - gpa_page_info contains valid GPA mappings and levels consistent with expected memory hierarchy levels.
+    // AHMAD: PRECONDITION - TDR and TDCS structures should be initialized and unlocked
+    // AHMAD: PRECONDITION - The TDR page metadata in PAMT must be PT_TDR. The target page metadata in PAMT must be PT_NDA.
+    // AHMAD: PRECONDITION - There should not already be a mapping for page_gpa in the SEPT.
     case TDH_MEM_PAGE_ADD_LEAF:
     {
         page_info_api_input_t gpa_page_info;
@@ -266,6 +271,12 @@ void tdx_vmm_dispatcher(void)
                                                local_data->vmm_regs.r9);
         break;
     }
+    // AHMAD: POSTCONDITION - page_gpa should be uniquely mapped in the SEPT. The SEPT entry should be in the SEPT_PRESENT state and its permissions should match those specified in SEPT_PERMISSIONS_RWX.
+    // AHMAD: POSTCONDITION - The data in the source page should match the data in the new TD page.
+    // AHMAD: POSTCONDITION - All locks acquired during execution should be released.
+    // AHMAD: POSTCONDITION - PAMT entry is PT_REG page type and the TDR physical address is its OWNER.
+    // AHMAD: POSTCONDITION - TDR.CHLDCNT is incremented.
+    // AHMAD: POSTCONDITION - TD measurements are updated with the API string and page GPA
     case TDH_MEM_SEPT_ADD_LEAF:
     {
         page_info_api_input_t sept_level_and_gpa;
@@ -361,6 +372,10 @@ void tdx_vmm_dispatcher(void)
                                                     local_data->vmm_regs.r8);
         break;
     }
+    // AHMAD: PRECONDITION - The TDR and TDCS structures are initialized and unlocked.
+    // AHMAD: PRECONDITION - All provided physical addresses (tdr_pa, sept_page_pa, split_page_pa) must be in a valid memory region.
+    // AHMAD: PRECONDITION - split_page_sept_entry_ptr must point to an entry in leaf state
+    // AHMAD: PRECONDITION - The PAMT entry for split_page_pa must be valid and in a state that allows demotion
     case TDH_MEM_PAGE_DEMOTE_LEAF:
     {
         page_info_api_input_t page_info;
@@ -371,6 +386,12 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_mem_page_demote(page_info, target_tdr_and_flags);
         break;
     }
+    // AHMAD: POSTCONDITION - Demoted SEPT entry is set to SEPT_PRESENT (if it was SEPT_BLOCKED) or SEPT_PENDING (if it was SEPT_PENDING_BLOCKED) non-leaf entry pointing to the new Secure EPT page.
+    // AHMAD: POSTCONDITION - The PAMT entry associated with sept_page_pa[0] is updated to indicate that tdr_pa is its OWNER, and its pt type is set to PT_EPT
+    // AHMAD: POSTCONDITION - All locks and keyhole mappings acquired are released.
+    // AHMAD: POSTCONDITION - If required, TLB entries associated with the removed page are flushed.
+    // AHMAD: POSTCONDITION - TDR.CHLDCNT is incremented
+    // AHMAD: POSTCONDITION - For each L2 Secure EPT page in sept_page_pa, if required, the respective L2 SEPT entry is initialized as a non-leaf entry, and the aliased flag in the L1 SEPT entry is updated as needed
     case TDH_VP_ENTER_LEAF:
     {
         local_data->vmm_regs.rax = tdh_vp_enter(local_data->vmm_regs.rcx);
@@ -401,6 +422,10 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_mng_key_freeid(local_data->vmm_regs.rcx);
         break;
     }
+    // AHMAD: PRECONDITION - All inputs are valid memory addresses in allowed memory range
+    // AHMAD: PRECONDITION - TDR and TDCS structures should be initialized and unlocked
+    // AHMAD: PRECONDITION - Each entry in the PAMT must be in a valid state, with PT_TDR for the TDR page and PT_REG for the pages being promoted.
+    // AHMAD: PRECONDITION - The SEPT entry at page_gpa is already mapped at the appropriate level and can be promoted.
     case TDH_MEM_PAGE_PROMOTE_LEAF:
     {
         page_info_api_input_t page_info;
@@ -409,6 +434,12 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_mem_page_promote(page_info, local_data->vmm_regs.rdx, leaf_opcode.version);
         break;
     }
+    // AHMAD: POSTCONDITION - The corresponding 512 physical pages into a single larger physical page.
+    // AHMAD: POSTCONDITION - In the PAMT, the small pages are set to PT_NDA and the parent page is set to PT_REG
+    // AHMAD: POSTCONDITION - All locks and keyhole mappings acquired are released.
+    // AHMAD: POSTCONDITION - If required, TLB entries associated with the removed page are flushed.
+    // AHMAD: POSTCONDITION - TDR.CHLDCNT is decremented
+    // AHMAD: POSTCONDITION - Any aliases in L2 SEPT mappings for this page are removed.
     case TDH_PHYMEM_PAGE_RDMD_LEAF:
     {
         local_data->vmm_regs.rax = tdh_phymem_page_rdmd(local_data->vmm_regs.rcx);
@@ -438,6 +469,10 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_phymem_page_reclaim(local_data->vmm_regs.rcx);
         break;
     }
+    // AHMAD: PRECONDITION - All inputs are valid memory addresses within allowed memory range.
+    // AHMAD: PRECONDITION - The TDR and TDCS structures are initialized and unlocked.
+    // AHMAD: PRECONDITION - The TDR page metadata in PAMT should be PT_TDR, and the page to be removed in PAMT should be PT_REG.
+    // AHMAD: PRECONDITION - page_gpa must be mapped in the SEPT at the correct entry level and must be in a removable state.
     case TDH_MEM_PAGE_REMOVE_LEAF:
     {
         page_info_api_input_t page_info;
@@ -446,6 +481,12 @@ void tdx_vmm_dispatcher(void)
         local_data->vmm_regs.rax = tdh_mem_page_remove(page_info, local_data->vmm_regs.rdx);
         break;
     }
+    // AHMAD: POSTCONDITION - The SEPT entry at page_gpa should be marked as SEPT_FREE.
+    // AHMAD: POSTCONDITION - Any aliases in L2 SEPT mappings for this page are cleared.    
+    // AHMAD: POSTCONDITION - TDR.CHLDCNT is decremented by the number of pages removed.
+    // AHMAD: POSTCONDITION - PAMT entry for the removed page is updated to PT_NDA.
+    // AHMAD: POSTCONDITION - All locks and keyhole mappings acquired are released.
+    // AHMAD: POSTCONDITION - If required, TLB entries associated with the removed page are flushed.
     case TDH_MEM_SEPT_REMOVE_LEAF:
     {
         page_info_api_input_t sept_page_info;

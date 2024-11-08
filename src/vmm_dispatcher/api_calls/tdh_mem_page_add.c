@@ -19,7 +19,44 @@
 // OR OTHER DEALINGS IN THE SOFTWARE.                                            
 //                                                                               
 // SPDX-License-Identifier: MIT
+api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
+                           uint64_t target_tdr_pa,
+                           uint64_t target_page_pa,
+                           uint64_t source_page_pa)
+{
+    // Local data for return values
+    tdx_module_local_t  * local_data_ptr = get_local_data();
+    // TDR related variables
+    pa_t                  tdr_pa;                    // TDR physical address
+    tdr_t               * tdr_ptr;                   // Pointer to the TDR page (linear address)
+    pamt_block_t          tdr_pamt_block;            // TDR PAMT block
+    pamt_entry_t        * tdr_pamt_entry_ptr;        // Pointer to the TDR PAMT entry
+    bool_t                tdr_locked_flag = false;   // Indicate TDR is locked
 
+    tdcs_t              * tdcs_ptr = NULL;           // Pointer to the TDCS structure (Multi-page)
+
+    // GPA and SEPT related variables
+    pa_t                  page_gpa = {.raw = 0};        // Target page GPA
+    page_info_api_input_t gpa_mappings = gpa_page_info; // GPA and level
+    ia32e_sept_t        * page_sept_entry_ptr = NULL;   // SEPT entry of the page
+    ia32e_sept_t          page_sept_entry_copy;         // Cached SEPT entry of the page
+    ept_level_t           page_level_entry = gpa_mappings.level; // SEPT entry level of the page
+
+    // New TD private page variables
+    pa_t                  td_page_pa;                // Physical address of the new TD page
+    void                * td_page_ptr;               // Pointer to the new TD page
+    pamt_block_t          td_page_pamt_block;        // TD page PAMT block
+    pamt_entry_t        * td_page_pamt_entry_ptr;    // Pointer to the TD page PAMT entry
+    bool_t                td_page_locked_flag = false;   // Indicate TD page is locked
+
+    // Source page variables
+    pa_t                  source_pa;                 // Physical address of the source page
+    void                * source_page_ptr = NULL;    // Pointer to the source page
+
+    uint128_t             xmms[16];                  // SSE state backup for crypto
+    sha384_128B_block_t   sha_update_block = {.block_qword_buffer = {0}};
+    crypto_api_error      sha_error_code;
+    api_error_type        return_val = UNINITIALIZE_ERROR;
 /**
  * @file tdh_mem_page_add
  * @brief TDHMEMPAGEADD API handler
