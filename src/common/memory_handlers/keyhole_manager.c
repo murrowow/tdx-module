@@ -379,6 +379,7 @@ void free_la(void* la)
     return;
 }
 
+// SOPHIA: 
 void* map_continuous_pages(uint64_t* pa_array, uint16_t array_size, mapping_type_t mapping_type,
                            uint16_t starting_static_keyhole)
 {

@@ -42,18 +42,24 @@
 #include "td_dispatcher/vm_exits/td_vmexit.h"
 #include "virt_msr_helpers.h"
 
+// SOPHIA: uses PCONFIG for programming key and encryption mode associated with particular HKID
+// SOPHIA: Fails in case of key table entry (KET) being busy, not enough entropy, or unknown error
 api_error_code_e program_mktme_keys(uint16_t hkid)
 {
 	mktme_key_program_t mktme_key_program;
 	api_error_code_e    return_val = UNINITIALIZE_ERROR;
 	uint64_t            pconfig_return_code;
 
-	basic_memset_to_zero(&mktme_key_program, sizeof(mktme_key_program_t));
+	// SOPHIA: set the entire mktime_key_program memory region to be 0
+    basic_memset_to_zero(&mktme_key_program, sizeof(mktme_key_program_t));
 
 	// set the command, hkid as keyid and encryption algorithm
 	mktme_key_program.keyid_ctrl.command = MKTME_KEYID_SET_KEY_RANDOM;
     mktme_key_program.keyid = hkid;
 
+    // SOPHIA: sets the encryption algorithm to AES_XTS with 128 or 256 bits
+    // SOPHIA: depending on mcheck initialization either with or without integrity
+    // SOPHIA TODO: WHAT EXACTLY IS WITH OR WITHOUT INTEGRITY?????
     if (get_sysinfo_table()->mcheck_fields.tdx_without_integrity)
     {
         if (get_global_data()->plt_common_config.ia32_tme_activate.algs_aes_xts_256)
@@ -78,8 +84,11 @@ api_error_code_e program_mktme_keys(uint16_t hkid)
     }
 
 	// Execute the PCONFIG instruction with the updated struct and return
+    // SOPHIA: issue PCONFIG command to program MKTME keys
 	pconfig_return_code = ia32_mktme_key_program(&mktme_key_program);
 
+    // SOPHIA: handle different MKTME error codes
+    // SOPHIA: Key encryption table (KET) busy, not enough entropy, or unexpected FATAL ERROR
     if (pconfig_return_code != MKTME_PROG_SUCCESS)
     {
         TDX_ERROR("pconfig_return_code = %llx\n", pconfig_return_code);
@@ -107,6 +116,7 @@ EXIT:
     return return_val;
 }
 
+// SOPHIA: sets nbytes bytes in memory (starting at address dst) to the value val
 void basic_memset(uint64_t dst, uint64_t dst_bytes, uint8_t val, uint64_t nbytes)
 {
     tdx_sanity_check (dst_bytes >= nbytes, SCEC_HELPERS_SOURCE, 2);
@@ -118,11 +128,14 @@ void basic_memset(uint64_t dst, uint64_t dst_bytes, uint8_t val, uint64_t nbytes
                     :"memory", "cc");
 }
 
+// SOPHIA: set nbytes of memory starting from dst address to 0
 void basic_memset_to_zero(void * dst, uint64_t nbytes)
 {
     basic_memset((uint64_t)dst, nbytes, 0, nbytes);
 }
 
+// SOPHIA: copies size bytes of data from the source address src to the destination address dst in chunks of 64B
+// SOPHIA: all inputs must be 64-byte aligned and uses a memory fence to ensure all mem ops done before continuing
 void cache_aligned_copy_direct(uint64_t src, uint64_t dst, uint64_t size)
 {
     uint64_t i = 0;
@@ -139,6 +152,7 @@ void cache_aligned_copy_direct(uint64_t src, uint64_t dst, uint64_t size)
     mfence();
 }
 
+// SOPHIA: check that the nonshared metadata is well formed/valid and give pointer to pamt_entry
 api_error_code_e non_shared_hpa_metadata_check_and_lock(
         pa_t hpa,
         lock_type_t lock_type,
@@ -189,6 +203,7 @@ api_error_code_e non_shared_hpa_metadata_check_and_lock(
     return TDX_SUCCESS;
 }
 
+// SOPHIA: assign the HKID value associated from the TD from the TDR page
 pa_t assign_hkid_to_hpa(tdr_t* tdr_p, pa_t hpa)
 {
     uint16_t hkid;
@@ -208,6 +223,7 @@ pa_t assign_hkid_to_hpa(tdr_t* tdr_p, pa_t hpa)
     return set_hkid_to_pa(hpa, hkid);
 }
 
+// SOPHIA: check the shared host physical address is valid (ie. valid format, in the right memory region)
 api_error_code_e shared_hpa_check(pa_t hpa, uint64_t size)
 {
     // 1) Check that no bits above MAX_PA are set
@@ -241,6 +257,7 @@ api_error_code_e shared_hpa_check(pa_t hpa, uint64_t size)
     return TDX_SUCCESS;
 }
 
+// SOPHIA: check that shared host physical address is power of two aligned
 api_error_code_e shared_hpa_check_with_pwr_2_alignment(pa_t hpa, uint64_t size)
 {
     if (!is_addr_aligned_pwr_of_2(hpa.raw, size))
@@ -251,6 +268,8 @@ api_error_code_e shared_hpa_check_with_pwr_2_alignment(pa_t hpa, uint64_t size)
     return shared_hpa_check(hpa, size);
 }
 
+// SOPHIA: check to make sure non-shared host physical address is power of two aligned
+// SOPHIA: also makes sure tht no HKID bits are 0
 api_error_code_e hpa_check_with_pwr_2_alignment(pa_t hpa, uint64_t size)
 {
     // 1) Check  page alignment
@@ -274,6 +293,7 @@ api_error_code_e hpa_check_with_pwr_2_alignment(pa_t hpa, uint64_t size)
     return TDX_SUCCESS;
 }
 
+// SOPHIA: checks metadata and valid field of a 4k page hpa and then assigns an HKID to the hpa
 api_error_type check_lock_and_map_explicit_private_4k_hpa(
         pa_t hpa,
         uint64_t operand_id,
@@ -303,6 +323,7 @@ api_error_type check_lock_and_map_explicit_private_4k_hpa(
     return TDX_SUCCESS;
 }
 
+// SOPHIA: check validity of the TDR adddress and assign a HKID to it
 api_error_type check_lock_and_map_explicit_tdr(
         pa_t tdr_hpa,
         uint64_t operand_id,
@@ -319,6 +340,7 @@ api_error_type check_lock_and_map_explicit_tdr(
             lock_type, expected_pt, pamt_block, pamt_entry, is_locked, (void**)tdr_p);
 }
 
+// SOPHIA: check tdr is valid and assign an hkid to it if it is
 api_error_type othertd_check_lock_and_map_explicit_tdr(
         pa_t tdr_hpa,
         uint64_t operand_id,
@@ -357,6 +379,8 @@ api_error_type othertd_check_lock_and_map_explicit_tdr(
     return TDX_SUCCESS;
 }
 
+// SOPHIA: checks to make sure that the private host physical address is power of 2 aligned
+// SOPHIA: also checks to make sure that the non_shared_hpa_metadata is correct and locks it
 api_error_type check_and_lock_explicit_private_hpa(
         pa_t hpa,
         uint64_t operand_id,
@@ -391,7 +415,7 @@ api_error_type check_and_lock_explicit_private_hpa(
     return TDX_SUCCESS;
 }
 
-
+// SOPHIA: locks a private hpa page that is of size 4KB
 api_error_type check_and_lock_explicit_4k_private_hpa(
         pa_t hpa,
         uint64_t operand_id,
@@ -417,6 +441,7 @@ api_error_type check_and_lock_explicit_4k_private_hpa(
     return TDX_SUCCESS;
 }
 
+// SOPHIA: checks that hpa is valid and locks a range of addresses
 api_error_type check_and_lock_free_range_hpa(
         pa_t hpa,
         uint64_t operand_id,
@@ -454,7 +479,7 @@ api_error_type check_and_lock_free_range_hpa(
     return TDX_SUCCESS;
 }
 
-
+// SOPHIA: lock and map the tdr
 api_error_type lock_and_map_implicit_tdr(
         pa_t tdr_pa,
         uint64_t operand_id,
