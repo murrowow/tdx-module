@@ -57,6 +57,7 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
     sha384_128B_block_t   sha_update_block = {.block_qword_buffer = {0}};
     crypto_api_error      sha_error_code;
     api_error_type        return_val = UNINITIALIZE_ERROR;
+} 
 /**
  * @file tdh_mem_page_add
  * @brief TDHMEMPAGEADD API handler

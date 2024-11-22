@@ -28,16 +28,16 @@
 #ifndef SRC_COMMON_HELPERS_TDX_LOCKS_H_
 #define SRC_COMMON_HELPERS_TDX_LOCKS_H_
 
-#include "tdx_basic_types.h"
-#include "tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
 
-#include "accessors/ia32_accessors.h"
-#include "debug/tdx_debug.h"
-#include "helpers/error_reporting.h"
-#include "service_td.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/ia32_accessors.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/service_td.h"
 
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "tdx_api_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
 
 typedef enum
 {

@@ -27,12 +27,12 @@
 #ifndef SRC_COMMON_METADATA_HANDLERS_METADATA_GENERIC_H_
 #define SRC_COMMON_METADATA_HANDLERS_METADATA_GENERIC_H_
 
-#include "tdx_basic_types.h"
-#include "tdx_basic_defs.h"
-#include "tdx_api_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "data_structures/tdx_tdvps.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/td_control_structures.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
 
 typedef enum
 {

@@ -35,18 +35,18 @@
  * @file tdx_vmm_dispatcher.c
  * @brief VMM dispatcher and return sequence
  */
-#include "vmm_dispatcher/tdx_vmm_dispatcher.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/vt_accessors.h"
-#include "accessors/data_accessors.h"
-#include "x86_defs/vmcs_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "data_structures/tdx_global_data.h"
-#include "data_structures/tdx_local_data.h"
-#include "tdx_vmm_api_handlers.h"
-#include "debug/tdx_debug.h"
-#include "helpers/helpers.h"
-#include "metadata_handlers/metadata_generic.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/vmm_dispatcher/tdx_vmm_dispatcher.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/ia32_accessors.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/vt_accessors.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/data_accessors.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/vmcs_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_global_data.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_local_data.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_vmm_api_handlers.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/helpers.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/metadata_handlers/metadata_generic.h"
 
 _STATIC_INLINE_ void mark_lp_as_busy(void)
 { 

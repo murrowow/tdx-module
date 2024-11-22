@@ -28,15 +28,15 @@
 #ifndef SRC_COMMON_DATA_STRUCTURES_TDX_TDVPS_H_
 #define SRC_COMMON_DATA_STRUCTURES_TDX_TDVPS_H_
 
-#include "tdx_basic_types.h"
-#include "tdx_basic_defs.h"
-#include "tdx_api_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
 
-#include "x86_defs/x86_defs.h"
-#include "x86_defs/msr_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/msr_defs.h"
 
-#include "helpers/error_reporting.h"
-#include "debug/tdx_debug.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
 
 #define MAX_VCPUS           0xFFFF
 

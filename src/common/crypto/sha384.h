@@ -28,8 +28,8 @@
 #define __SHA384_H_INCLUDED__
 
 
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
 
 typedef int32_t crypto_api_error;
 #define SIZE_OF_SHA384_BLOCK_IN_QWORD 16

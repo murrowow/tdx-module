@@ -28,12 +28,12 @@
 #ifndef SRC_COMMON_MEMORY_HANDLERS_PAMT_MANAGER_H_
 #define SRC_COMMON_MEMORY_HANDLERS_PAMT_MANAGER_H_
 
-#include "tdx_basic_types.h"
-#include "helpers/tdx_locks.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_global_data.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/tdx_locks.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_global_data.h"
 
-#include "auto_gen/tdx_error_codes_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
 
 /**
  * @brief Enum for page type in PAMT

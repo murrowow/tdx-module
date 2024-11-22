@@ -27,11 +27,11 @@
 #ifndef SRC_COMMON_HELPERS_SERVICE_TD_H_
 #define SRC_COMMON_HELPERS_SERVICE_TD_H_
 
-#include "tdx_basic_types.h"
-#include "tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
 
-#include "x86_defs/x86_defs.h"
-#include "debug/tdx_debug.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
 
 #define SERVTD_TYPE_MIGTD         0
 #define SERVTD_TYPE_MAX_TYPE      SERVTD_TYPE_MIGTD

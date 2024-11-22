@@ -26,10 +26,10 @@
 #ifndef __TDX_API_DEFS_H_INCLUDED__
 #define __TDX_API_DEFS_H_INCLUDED__
 
-#include "tdx_basic_types.h"
-#include "tdx_basic_defs.h"
-#include "crypto/sha384.h"
-#include "auto_gen/cpuid_configurations_defines.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/crypto/sha384.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/cpuid_configurations_defines.h"
 
 #pragma pack(push)
 #pragma pack(1)

@@ -28,9 +28,8 @@
 #ifndef SRC_COMMON_X86_DEFS_X86_DEFS_H_
 #define SRC_COMMON_X86_DEFS_X86_DEFS_H_
 
-
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
 
 #define SPR_A0_FMS          0x806F0
 #define SPR_B0_FMS          0x806F1
