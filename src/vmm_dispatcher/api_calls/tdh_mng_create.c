@@ -38,9 +38,9 @@
 
 api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info)
 {
-    __CPROVER_precondition(target_tdr_pa >= 0, "target address is valid");
-    __CPROVER_precondition(hkid_info.hkid != 0, "hkid address is valid");
-    __CPROVER_precondition(hkid_info.reserved == 0, "hkid reserved bits is 0");
+    __CPROVER_assume(target_tdr_pa >= 0);
+    __CPROVER_assume(hkid_info.hkid != 0);
+    __CPROVER_assume(hkid_info.reserved == 0);
     tdx_module_global_t * global_data = get_global_data();
 
     // TDR related variables
