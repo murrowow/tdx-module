@@ -28,8 +28,8 @@
 #define __TDX_VMM_DISPATCHER_H_INCLUDED__
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
 
 /**

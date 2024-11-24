@@ -28,10 +28,10 @@
 #ifndef __TD_VMCS_INIT_H_INCLUDED__
 #define __TD_VMCS_INIT_H_INCLUDED__
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/td_control_structures.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/data_structures/tdx_tdvps.h"
 
 
 #define VMCS_TSC_OFFSET_BIT_LOCATION                 3

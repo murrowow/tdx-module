@@ -28,8 +28,8 @@
 #ifndef SRC_COMMON_DATA_STRUCTURES_LOADER_DATA_H_
 #define SRC_COMMON_DATA_STRUCTURES_LOADER_DATA_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_api_defs.h"
 
 #define STACK_CANARY_OFFSET 0x28
 

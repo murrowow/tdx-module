@@ -28,12 +28,12 @@
 #define __TDX_LOCAL_DATA_H_INCLUDED__
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_local_data_offsets.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/td_control_structures.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/pamt_manager.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/data_structures/tdx_local_data_offsets.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/data_structures/tdx_tdvps.h"
+#include "src/common/memory_handlers/pamt_manager.h"
 
 /**
  * @struct lp_info_t

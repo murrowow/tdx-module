@@ -28,14 +28,14 @@
 #ifndef SRC_COMMON_ACCESSORS_IA32_ACCESSORS_H_
 #define SRC_COMMON_ACCESSORS_IA32_ACCESSORS_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/helpers/error_reporting.h"
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/mktme.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/mktme.h"
+#include "src/common/x86_defs/x86_defs.h"
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/exception_handling/exception_handling_consts.h"
+#include "src/common/exception_handling/exception_handling_consts.h"
 
 /**
  * @brief Invalidate TLB entries by calling INVLPG instruction

@@ -28,8 +28,8 @@
 #ifndef SRC_COMMON_X86_DEFS_MKTME_H_
 #define SRC_COMMON_X86_DEFS_MKTME_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
 
 // Programming Status for MKTME_KEY_PROGRAM

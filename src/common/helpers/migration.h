@@ -29,14 +29,14 @@
 #ifndef SRC_COMMON_HELPERS_MIGRATION_H_
 #define SRC_COMMON_HELPERS_MIGRATION_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/ia32_accessors.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/crypto/aes_gcm.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/debug/tdx_debug.h"
+#include "src/common/helpers/error_reporting.h"
+#include "src/common/crypto/aes_gcm.h"
+#include "src/common/data_structures/tdx_tdvps.h"
 
 
 /*********************************************

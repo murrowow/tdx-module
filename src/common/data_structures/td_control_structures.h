@@ -28,17 +28,17 @@
 #ifndef SRC_COMMON_DATA_STRUCTURES_TD_CONTROL_STRUCTURES_H_
 #define SRC_COMMON_DATA_STRUCTURES_TD_CONTROL_STRUCTURES_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/tdx_locks.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/migration.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/service_td.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/crypto/sha384.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/crypto/aes_gcm.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_global_data.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/op_state_lookup.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/pamt_manager.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "src/common/helpers/tdx_locks.h"
+#include "src/common/helpers/migration.h"
+#include "src/common/helpers/service_td.h"
+#include "src/common/crypto/sha384.h"
+#include "src/common/crypto/aes_gcm.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/data_structures/tdx_tdvps.h"
+#include "include/auto_gen/op_state_lookup.h"
+#include "src/common/memory_handlers/pamt_manager.h"
 
 #define NUM_RTMRS          4
 

@@ -28,8 +28,8 @@
 #ifndef SRC_COMMON_DEBUG_TDX_DEBUG_H_
 #define SRC_COMMON_DEBUG_TDX_DEBUG_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
 #ifdef DEBUGFEATURE_TDX_DBG_TRACE
 

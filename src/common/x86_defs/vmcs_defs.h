@@ -28,8 +28,8 @@
 #define SRC_COMMON_X86_DEFS_VMCS_DEFS_H_
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
 
 
 #define TD_VMCS_SIZE _4KB

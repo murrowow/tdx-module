@@ -29,8 +29,8 @@
 #define SRC_COMMON_MEMORY_HANDLERS_KEYHOLE_MANAGER_H_
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
 #define UNDEFINED_IDX                0xFFFF
 #define UNDEFINED_IDX_BYTE           0xFF

@@ -28,18 +28,18 @@
 #ifndef SRC_COMMON_HELPERS_HELPERS_H_
 #define SRC_COMMON_HELPERS_HELPERS_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/data_accessors.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/vt_accessors.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/keyhole_manager.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/pamt_manager.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/td_vmcs_init.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_tdvps.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/vt_accessors.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/data_structures/td_vmcs_init.h"
+#include "src/common/data_structures/tdx_tdvps.h"
+#include "src/common/helpers/error_reporting.h"
 
 #define PRIVATE_ONLY true
 #define PRIVATE_OR_SHARED false

@@ -30,7 +30,7 @@
 
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
+#include "include/tdx_api_defs.h"
 
 
 

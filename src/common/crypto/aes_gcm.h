@@ -26,8 +26,8 @@
 #ifndef __AES_GCM_H_INCLUDED__
 #define __AES_GCM_H_INCLUDED__
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
 typedef int32_t aes_gcm_api_error;
 

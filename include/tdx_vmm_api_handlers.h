@@ -28,8 +28,8 @@
 #define __TDX_VMM_API_HANDLERS_H_INCLUDED__
 
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/service_td.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/helpers/service_td.h"
 
 /**
  * @brief Add a 4KB private page to a TD.

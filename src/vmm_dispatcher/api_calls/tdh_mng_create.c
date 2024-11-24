@@ -24,16 +24,16 @@
  * @file tdh_mng_create
  * @brief TDHMNGCREATE API handler
  */
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_vmm_api_handlers.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/td_control_structures.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/keyhole_manager.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/memory_handlers/pamt_manager.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/helpers.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/data_accessors.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/ia32_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/ia32_accessors.h"
 
 
 api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info)

@@ -28,14 +28,14 @@
 #ifndef SRC_COMMON_ACCESSORS_VT_ACCESSORS_H_
 #define SRC_COMMON_ACCESSORS_VT_ACCESSORS_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/vmcs_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/accessors/ia32_accessors.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/error_reporting.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/tdx_error_codes_defs.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/helpers/error_reporting.h"
+#include "include/tdx_api_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
 
 typedef uint64_t vmcs_ptr_t;
 

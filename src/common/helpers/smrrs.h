@@ -30,7 +30,7 @@
 #ifndef SRC_COMMON_HELPERS_SMRRS_H_
 #define SRC_COMMON_HELPERS_SMRRS_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
+#include "include/tdx_basic_types.h"
 
 #define MTRR_CAP_MSR_ADDR 0xFE
 

@@ -27,17 +27,17 @@
 #ifndef __TDX_GLOBAL_DATA_H_INCLUDED__
 #define __TDX_GLOBAL_DATA_H_INCLUDED__
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/tdx_locks.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/helpers/smrrs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_api_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/msr_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/vmcs_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/x86_defs/x86_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/auto_gen/cpuid_configurations_defines.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/crypto/sha384.h"
+#include "src/common/helpers/tdx_locks.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/helpers/smrrs.h"
+#include "src/common/debug/tdx_debug.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/x86_defs/msr_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "include/auto_gen/cpuid_configurations_defines.h"
+#include "src/common/crypto/sha384.h"
 
 #define AES_XTS_128                BIT(0)
 #define AES_XTS_128_WITH_INTEGRITY BIT(1)

@@ -28,7 +28,7 @@
 #ifndef SRC_COMMON_HELPERS_ERROR_REPORTING_H_
 #define SRC_COMMON_HELPERS_ERROR_REPORTING_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/debug/tdx_debug.h"
+#include "src/common/debug/tdx_debug.h"
 
 void tdx_report_error_and_halt(uint32_t source_id, uint32_t code);
 

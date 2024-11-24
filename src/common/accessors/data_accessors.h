@@ -28,11 +28,11 @@
 #ifndef SRC_COMMON_ACCESSORS_DATA_ACCESSORS_H_
 #define SRC_COMMON_ACCESSORS_DATA_ACCESSORS_H_
 
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_defs.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/include/tdx_basic_types.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_local_data.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/tdx_global_data.h"
-#include "/Users/sz7155/Documents/TDX/tdx-module/src/common/data_structures/loader_data.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/data_structures/loader_data.h"
 
 //****************************************************************************************
 // Optimized accessors to SEAM module data structures - always use those in the code
