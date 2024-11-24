@@ -1,1 +1,1 @@
-cbmc src/vmm_dispatcher/api_calls/tdh_mng_create.c --show-properties -I $PWD
+cbmc src/vmm_dispatcher/api_calls/tdh_mng_create.c -I $PWD --function tdh_mng_create
