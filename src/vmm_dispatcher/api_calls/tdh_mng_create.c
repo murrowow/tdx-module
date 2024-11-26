@@ -38,9 +38,12 @@
 
 api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info)
 {
-    __CPROVER_assume(target_tdr_pa >= 0);
-    __CPROVER_assume(hkid_info.hkid != 0);
-    __CPROVER_assume(hkid_info.reserved == 0);
+    //__CPROVER_assume(target_tdr_pa >= 0);
+    //__CPROVER_assume(&hkid_info->hkid != NULL);
+    //__CPROVER_assume(hkid_info.reserved == 0);
+    //__CPROVER_precondition(pamt_entry_p->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
+    //__CPROVER_precondition("value of HKID must be in the range configured for TDX")
+    //__CPROVER_precondition("KOT of the specified HKID must be marked as HKID_FREE");
     tdx_module_global_t * global_data = get_global_data();
 
     // TDR related variables
@@ -157,4 +160,12 @@ EXIT:
     __CPROVER_postcondition(target_tdr_pa >= 0, "target address is valid");
     __CPROVER_postcondition(hkid_info.hkid != 0, "hkid address is valid");
     __CPROVER_postcondition(hkid_info.reserved == 0, "hkid reserved bits is 0");
+
+    //__CPROVER_postcondition(zero out the TDR page contents using direct write);
+    //__CPROVER_postcondition(Initialize the key management fields);
+    //__CPROVER_postcondition(Initialize the state variables);
+    //__CPROVER_postcondition(Initialize the TD management fields);
+    //__CPROVER_postcondition(initialize the TD preserving fields handoff version and current SEAMDB entry index/nonce pair );
+    //__CPROVER_postcondition(MARK KOT entry for the specified HKID as HKID_ASSIGNED);
+    //__CPROVER_postcondition(Intialize the TDR page metadata in PAMT);
 }
