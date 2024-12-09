@@ -25,22 +25,29 @@
  * @brief Common TDX API flow helper functions
  */
 
-#include "helpers.h"
-#include "x86_defs/mktme.h"
-#include "x86_defs/vmcs_defs.h"
-#include "tdx_api_defs.h"
-#include "auto_gen/cpuid_configurations.h"
-#include "auto_gen/msr_config_lookup.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/x86_defs/mktme.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "include/tdx_api_defs.h"
+#include "include/auto_gen/cpuid_configurations.h"
+#include "include/auto_gen/msr_config_lookup.h"
 
-#include "accessors/ia32_accessors.h"
-#include "accessors/vt_accessors.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "data_structures/td_vmcs_init.h"
-#include "td_transitions/td_exit.h"
-#include "td_dispatcher/tdx_td_dispatcher.h"
-#include "td_dispatcher/vm_exits/td_vmexit.h"
-#include "virt_msr_helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/vt_accessors.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/data_structures/td_vmcs_init.h"
+#include "src/td_transitions/td_exit.h"
+#include "src/td_dispatcher/tdx_td_dispatcher.h"
+#include "src/td_dispatcher/vm_exits/td_vmexit.h"
+#include "src/common/helpers/virt_msr_helpers.h"
+
+#include "src/common/helpers/helpers.h"
+
+bool_t return_true(void)
+{
+    return true; 
+}
 
 // SOPHIA: uses PCONFIG for programming key and encryption mode associated with particular HKID
 // SOPHIA: Fails in case of key table entry (KET) being busy, not enough entropy, or unknown error

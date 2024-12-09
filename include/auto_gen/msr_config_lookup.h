@@ -30,8 +30,8 @@
 
 
 
-#include "tdx_api_defs.h"
-#include "helpers/helpers.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/helpers/helpers.h"
 
 
 #define MAX_NUM_MSR_LOOKUP 135

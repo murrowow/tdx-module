@@ -30,9 +30,9 @@
 
 
 
-#include "tdx_api_defs.h"
-#include "data_structures/tdx_global_data.h"
-#include "auto_gen/cpuid_configurations_defines.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "include/auto_gen/cpuid_configurations_defines.h"
 
 
 /**

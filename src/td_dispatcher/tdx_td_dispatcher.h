@@ -28,13 +28,13 @@
 #define __TDX_TD_DISPATCHER_H_INCLUDED__
 
 
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
-#include "x86_defs/vmcs_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_tdvps.h"
-#include "td_transitions/td_exit_stepping.h"
-#include "data_structures/tdx_local_data.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_tdvps.h"
+#include "src/td_transitions/td_exit_stepping.h"
+#include "src/common/data_structures/tdx_local_data.h"
 
 
 /**

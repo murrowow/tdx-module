@@ -49,6 +49,8 @@
 
 #define QUADWORDS_IN_256b 4
 
+bool_t return_true(void);
+
 _STATIC_INLINE_ bool_t is_equal_256bit(uint256_t a, uint256_t b)
 {
     return (((a.qwords[0] ^ b.qwords[0]) | (a.qwords[1] ^ b.qwords[1]) |
@@ -173,6 +175,9 @@ _STATIC_INLINE_ uint64_t align_gpa_on_level(
 
 _STATIC_INLINE_ bool_t is_private_hkid(uint16_t hkid)
 {
+    __CPROVER_assume(get_global_data() != NULL); // , "global data has been configured correctly");
+    __CPROVER_assume(get_global_data()->private_hkid_min != NULL);
+    __CPROVER_assume(get_global_data()->private_hkid_max != NULL);
     return ((uint32_t)hkid >= get_global_data()->private_hkid_min &&
             (uint32_t)hkid <= get_global_data()->private_hkid_max);
 }
@@ -575,6 +580,7 @@ api_error_code_e hpa_check_with_pwr_2_alignment(pa_t hpa, uint64_t size);
  *
  * @return Error code that states the reason of failure
  */
+ 
 api_error_type check_lock_and_map_explicit_tdr(
         pa_t tdr_hpa,
         uint64_t operand_id,

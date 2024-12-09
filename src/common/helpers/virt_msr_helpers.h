@@ -28,16 +28,16 @@
 #ifndef SRC_COMMON_HELPERS_VIRT_MSR_HELPERS_H_
 #define SRC_COMMON_HELPERS_VIRT_MSR_HELPERS_H_
 
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
 
-#include "x86_defs/x86_defs.h"
-#include "x86_defs/msr_defs.h"
-#include "x86_defs/vmcs_defs.h"
-#include "accessors/data_accessors.h"
-#include "data_structures/td_control_structures.h"
-#include "error_reporting.h"
-#include "helpers.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/msr_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/helpers/error_reporting.h"
+#include "src/common/helpers/helpers.h"
 
 // Calculate the value of virtual IA32_VMX_BASIC
 _STATIC_INLINE_ ia32_vmx_basic_t calc_virt_ia32_vmx_basic(void)

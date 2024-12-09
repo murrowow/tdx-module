@@ -28,10 +28,10 @@
 #ifndef SRC_COMMON_MEMORY_HANDLERS_SEPT_MANAGER_H_
 #define SRC_COMMON_MEMORY_HANDLERS_SEPT_MANAGER_H_
 
-#include "x86_defs/x86_defs.h"
-#include "auto_gen/sept_state_lookup.h"
-#include "data_structures/tdx_local_data.h"
-#include "helpers/helpers.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "include/auto_gen/sept_state_lookup.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/helpers/helpers.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////////

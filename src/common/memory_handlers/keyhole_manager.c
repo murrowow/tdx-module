@@ -25,12 +25,12 @@
  * @brief Keyhole manager implementation
  */
 
-#include "keyhole_manager.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_local_data.h"
-#include "data_structures/loader_data.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/data_structures/loader_data.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
 
 _STATIC_INLINE_ uint64_t la_from_keyhole_idx(uint16_t keyhole_idx)
 {

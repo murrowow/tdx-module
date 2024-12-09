@@ -29,9 +29,9 @@
 #ifndef SRC_TD_TRANSITIONS_TD_EXIT_H_
 #define SRC_TD_TRANSITIONS_TD_EXIT_H_
 
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "common/x86_defs/x86_defs.h"
-#include "data_structures/tdx_tdvps.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_tdvps.h"
 
 #define IA32_DEBUGCTLMSR_BTF                   BIT(1)
 #define IA32_DEBUGCTLMSR_FREEZE_PERFMON_ON_PMI BIT(12)

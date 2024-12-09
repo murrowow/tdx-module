@@ -29,7 +29,7 @@
 #define _AUTO_GEN_SEPT_STATE_LOOKUP_H_
 
 
-#include "tdx_api_defs.h"
+#include "include/tdx_api_defs.h"
 
 
 #define MAX_SEAMCALL_LEAF 128

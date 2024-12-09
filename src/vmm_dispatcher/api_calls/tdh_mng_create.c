@@ -35,15 +35,22 @@
 #include "src/common/accessors/data_accessors.h"
 #include "src/common/accessors/ia32_accessors.h"
 
+// SOPHIA: prove helper files
+// SOPHIA: THis is the first step in the TD setup process
+
+#include "helpers/cbmc_helper.h"
 
 api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info)
 {
-    //__CPROVER_assume(target_tdr_pa >= 0);
-    //__CPROVER_assume(&hkid_info->hkid != NULL);
-    //__CPROVER_assume(hkid_info.reserved == 0);
-    //__CPROVER_precondition(pamt_entry_p->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
-    //__CPROVER_precondition("value of HKID must be in the range configured for TDX")
-    //__CPROVER_precondition("KOT of the specified HKID must be marked as HKID_FREE");
+    __CPROVER_assume(target_tdr_pa != 0);
+    __CPROVER_assume(hkid_info.hkid != 0);
+    __CPROVER_assume(hkid_info.reserved == 0);
+
+    //__CPROVER_precondition(true, 'TDX module initialized correctly')
+    __CPROVER_precondition(get_pamt_entry(target_tdr_pa, hkid_info)->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
+    __CPROVER_precondition(1==2, "Test fails");
+    //__CPROVER_precondition(true, "value of HKID must be in the range configured for TDX");
+    //__CPROVER_precondition(true, "KOT of the specified HKID must be marked as HKID_FREE");
     tdx_module_global_t * global_data = get_global_data();
 
     // TDR related variables
@@ -81,6 +88,8 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
                                                  &tdr_pamt_entry_ptr,
                                                  &tdr_locked_flag,
                                                  &tdr_ptr);
+    
+
     if (return_val != TDX_SUCCESS)
     {
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);

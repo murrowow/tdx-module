@@ -25,11 +25,11 @@
  * @brief PAMT manager implementation
  */
 
-#include "pamt_manager.h"
-#include "data_structures/tdx_global_data.h"
-#include "keyhole_manager.h"
-#include "accessors/data_accessors.h"
-#include "helpers/helpers.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/helpers/helpers.h"
 
 bool_t pamt_get_block(pa_t pa, pamt_block_t* pamt_block)
 {
