@@ -1,2 +1,2 @@
-FILES="src/common/memory_handlers/keyhole_manager.c src/common/memory_handlers/pamt_manager.c src/common/helpers/helpers.c"
-cbmc src/vmm_dispatcher/api_calls/tdh_mng_create.c $FILES -I $PWD --function tdh_mng_create --depth 10 > log.txt
+FILES="src/common/memory_handlers/keyhole_manager.c src/common/memory_handlers/pamt_manager.c src/common/helpers/helpers.c helpers/cbmc_helper.c"
+cbmc src/vmm_dispatcher/api_calls/tdh_mng_create.c $FILES -I $PWD --function tdh_mng_create --depth 150 --trace > log.txt
