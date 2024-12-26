@@ -42,14 +42,6 @@
 
 api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info)
 {
-    __CPROVER_assume(target_tdr_pa != 0);
-    __CPROVER_assume(hkid_info.hkid != 0);
-    __CPROVER_assume(hkid_info.reserved == 0);
-
-    //__CPROVER_precondition(true, 'TDX module initialized correctly')
-    //__CPROVER_assert(get_pamt_entry(target_tdr_pa, hkid_info)->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
-    //__CPROVER_precondition(true, "value of HKID must be in the range configured for TDX");
-    //__CPROVER_precondition(true, "KOT of the specified HKID must be marked as HKID_FREE");
     tdx_module_global_t * global_data = get_global_data();
 
     // TDR related variables
@@ -67,73 +59,83 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     tdr_pa.raw = target_tdr_pa;
     td_hkid = hkid_info.hkid;
 
+    __CPROVER_assert(false, "this should fail and it does"); 
+
+    // SOPHIA: not sure if this is correct or not then
+    uint64_t seamrr_base = ia32_rdmsr(IA32_SEAMRR_BASE_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK; 
+    uint64_t seamrr_size = ia32_rdmsr(IA32_SEAMRR_MASK_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK;
+    seamrr_size = mask_to_size(seamrr_size);
+    __CPROVER_assert((td_hkid >= seamrr_base) && (td_hkid < seamrr_base + seamrr_size), "value of HKID must be in the range configured for TDX");
+    //__CPROVER_assert(get_pamt_entry(target_tdr_pa, hkid_info)->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
+    //__CPROVER_assert(global_data->kot.entries[td_hkid].state == KOT_STATE_HKID_FREE, "KOT of the specified HKID must be marked as HKID_FREE");
+
     // Verify HKID
-    if ((hkid_info.reserved != 0) || !is_private_hkid(td_hkid))
-    {
-        TDX_ERROR("HKID %d is not a private HKID\n", td_hkid);
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-        goto EXIT;
-    }
+    // if ((hkid_info.reserved != 0) || !is_private_hkid(td_hkid))
+    // {
+    //     TDX_ERROR("HKID %d is not a private HKID\n", td_hkid);
+    //     return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+    //     goto EXIT;
+    // }
 
-    /**
-     * Check TDR (explicit access, opaque semantics, exclusive lock).
-     */
 
-    return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-                                                 OPERAND_ID_RCX,
-                                                 TDX_RANGE_RW,
-                                                 TDX_LOCK_EXCLUSIVE,
-                                                 PT_NDA,
-                                                 &tdr_pamt_block,
-                                                 &tdr_pamt_entry_ptr,
-                                                 &tdr_locked_flag,
-                                                 &tdr_ptr);
+    // /**
+    //  * Check TDR (explicit access, opaque semantics, exclusive lock).
+    //  */
 
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+    //                                              OPERAND_ID_RCX,
+    //                                              TDX_RANGE_RW,
+    //                                              TDX_LOCK_EXCLUSIVE,
+    //                                              PT_NDA,
+    //                                              &tdr_pamt_block,
+    //                                              &tdr_pamt_entry_ptr,
+    //                                              &tdr_locked_flag,
+    //                                              &tdr_ptr);
 
-    __CPROVER_assert(get_pamt_entry(target_tdr_pa, hkid_info)->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
-    // Acquire exclusive access to KOT
-    if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS)
-    {
-        TDX_ERROR("Failed to acquire lock on KOT\n");
-        return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
-        goto EXIT;
-    }
-    kot_locked_flag = true;
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
 
-    // Protection against speculation attacks with out-of-bound td_hkid user input value
-    lfence();
+    // // Acquire exclusive access to KOT
+    // if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to acquire lock on KOT\n");
+    //     return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
+    //     goto EXIT;
+    // }
+    // kot_locked_flag = true;
 
-    // Check the provided HKID entry in KOT
-    if (global_data->kot.entries[td_hkid].state != KOT_STATE_HKID_FREE)
-    {
-        TDX_ERROR("Given HKID %d is not free in KOT\n", td_hkid);
-        return_val = TDX_HKID_NOT_FREE;
-        goto EXIT;
-    }
+    // // Protection against speculation attacks with out-of-bound td_hkid user input value
+    // lfence();
 
-    // Clear the content of the TDR page using direct writes
-    zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    // // Check the provided HKID entry in KOT
+    // if (global_data->kot.entries[td_hkid].state != KOT_STATE_HKID_FREE)
+    // {
+    //     TDX_ERROR("Given HKID %d is not free in KOT\n", td_hkid);
+    //     return_val = TDX_HKID_NOT_FREE;
+    //     goto EXIT;
+    // }
 
-    /**
-     * Initialize the TD Management and Key Management Fields.
-     * Fields which are initialized to zero are implicitly zero'd in the
-     * previous state.
-     */
-    // Generate a random 256-bit TD_UUID
-    if (!generate_256bit_random(&tdr_ptr->management_fields.td_uuid))
-    {
-        TDX_ERROR("Failed to generate random 256-bit UUID number\n");
-        return_val = TDX_RND_NO_ENTROPY;
-        goto EXIT;
-    }
+    // // Clear the content of the TDR page using direct writes
+    // zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
+
+    // /**
+    //  * Initialize the TD Management and Key Management Fields.
+    //  * Fields which are initialized to zero are implicitly zero'd in the
+    //  * previous state.
+    //  */
+    // // Generate a random 256-bit TD_UUID
+    // if (!generate_256bit_random(&tdr_ptr->management_fields.td_uuid))
+    // {
+    //     TDX_ERROR("Failed to generate random 256-bit UUID number\n");
+    //     return_val = TDX_RND_NO_ENTROPY;
+    //     goto EXIT;
+    // }
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
-
+    __CPROVER_assert(false, "this should fail and it does not"); 
     // Mark the HKID entry in the KOT as assigned
     global_data->kot.entries[td_hkid].state = (uint8_t)KOT_STATE_HKID_ASSIGNED;
 
@@ -166,14 +168,8 @@ EXIT:
         free_la(tdr_ptr);
     }
     return return_val;
-    __CPROVER_postcondition(target_tdr_pa >= 0, "target address is valid");
-    __CPROVER_postcondition(hkid_info.hkid != 0, "hkid address is valid");
-    __CPROVER_postcondition(hkid_info.reserved == 0, "hkid reserved bits is 0");
-
-    int * p = NULL; 
-    __CPROVER_assert(p != NULL, "why does this not fail");
-
-    //__CPROVER_postcondition(zero out the TDR page contents using direct write);
+    
+    //__CPROVER_postcondition(tdr_ptr->zero out the TDR page contents using direct write);
     //__CPROVER_postcondition(Initialize the key management fields);
     //__CPROVER_postcondition(Initialize the state variables);
     //__CPROVER_postcondition(Initialize the TD management fields);
