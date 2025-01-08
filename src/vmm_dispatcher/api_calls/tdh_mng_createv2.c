@@ -59,6 +59,17 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     tdr_pa.raw = target_tdr_pa;
     td_hkid = hkid_info.hkid;
 
+    //__CPROVER_assert(false, "this should fail and it does"); 
+
+    // SOPHIA: not sure if this is correct or not then
+    //uint64_t seamrr_base = ia32_rdmsr(IA32_SEAMRR_BASE_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK; 
+    //uint64_t seamrr_size = ia32_rdmsr(IA32_SEAMRR_MASK_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK;
+    //seamrr_size = mask_to_size(seamrr_size);
+    //__CPROVER_assert(false, "this should fail and it doesn't");
+    //__CPROVER_assert((td_hkid >= ia32_rdmsr(IA32_SEAMRR_BASE_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK) && (td_hkid < ia32_rdmsr(IA32_SEAMRR_BASE_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK + mask_to_size(ia32_rdmsr(IA32_SEAMRR_MASK_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK)), "value of HKID must be in the range configured for TDX");
+    //__CPROVER_assert(get_pamt_entry(target_tdr_pa, hkid_info)->pt == PT_NDA, "TDR page metadata in PAMT is correct (PT must be PT_NDA)");
+    //__CPROVER_assert(global_data->kot.entries[td_hkid].state == KOT_STATE_HKID_FREE, "KOT of the specified HKID must be marked as HKID_FREE");
+
     // Verify HKID
     if ((hkid_info.reserved != 0) || !is_private_hkid(td_hkid))
     {
@@ -159,4 +170,11 @@ EXIT:
     }
     return return_val;
     
+    //__CPROVER_postcondition(tdr_ptr->zero out the TDR page contents using direct write);
+    //__CPROVER_postcondition(Initialize the key management fields);
+    //__CPROVER_postcondition(Initialize the state variables);
+    //__CPROVER_postcondition(Initialize the TD management fields);
+    //__CPROVER_postcondition(initialize the TD preserving fields handoff version and current SEAMDB entry index/nonce pair );
+    //__CPROVER_postcondition(MARK KOT entry for the specified HKID as HKID_ASSIGNED);
+    //__CPROVER_postcondition(Intialize the TDR page metadata in PAMT); 
 }
