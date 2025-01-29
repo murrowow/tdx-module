@@ -1,0 +1,48 @@
+CBMC version 6.4.1 (cbmc-6.4.1) 64-bit arm64 macos
+Type-checking ex1
+Type-checking ex2
+Type-checking ex3
+Generating GOTO Program
+Adding CPROVER library (arm64)
+Removal of function pointers and virtual functions
+Generic Property Instrumentation
+Starting Bounded Model Checking
+Passing problem to propositional reduction
+converting SSA
+Running propositional reduction
+SAT checker: instance is SATISFIABLE
+Building error trace
+
+** Results:
+ex1.c function main
+[main.assertion.1] line 5 global variable value is correct: SUCCESS
+[main.assertion.2] line 10 global variable value is correct: FAILURE
+
+Trace for main.assertion.2:
+
+State 12 file ex1.c function main line 4 thread 0
+----------------------------------------------------
+  global_var=1 (00000000 00000000 00000000 00000001)
+
+State 15 file ex2.c function test2 line 4 thread 0
+----------------------------------------------------
+  global_var=2 (00000000 00000000 00000000 00000010)
+
+State 19 file ex3.c function test3 line 4 thread 0
+----------------------------------------------------
+  global_var=3 (00000000 00000000 00000000 00000011)
+
+State 21 file ex1.c function main line 8 thread 0
+----------------------------------------------------
+  global_var=-2147483648 (10000000 00000000 00000000 00000000)
+HELLO SOPHIA global_var: -2147483648
+
+Violated property:
+  file ex1.c function main line 10 thread 0
+  global variable value is correct
+  global_var == 3
+
+
+
+** 1 of 2 failed (2 iterations)
+VERIFICATION FAILED
