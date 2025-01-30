@@ -19,6 +19,14 @@
 uint64_t seamrr_base = 0x0; 
 uint64_t seamrr_top = 0xFFFFFFFF;
 
+int table_size = 100; 
+
+//KOT entry table
+kot_entry_t kot_table[100];
+
+//PAMT TABLE
+pamt_entry_t pamt[100];
+
 void driver_main(void); 
 
 #endif 
