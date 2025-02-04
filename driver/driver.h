@@ -16,17 +16,28 @@
 #include "stdio.h"
 #include "stdint.h"
 
+typedef enum{
+    BOOTUP = 0,
+    MID_SETUP = 1
+} driver_flag;
+
+#define hkid_size 0x1 << 16
+
+// some kind of flag to give to the driver
+driver_flag flag = BOOTUP; 
+
 uint64_t seamrr_base = 0x0; 
 uint64_t seamrr_top = 0xFFFFFFFF;
 
-int table_size = 100; 
+int table_size = hkid_size; 
 
 //KOT entry table
-kot_entry_t kot_table[100];
+uint8_t kot_state_table[hkid_size];
+int kot_lock;
 
 //PAMT TABLE
-pamt_entry_t pamt[100];
+pamt_entry_t pamt[hkid_size];
 
-void driver_main(void); 
+void driver_main(driver_flag); 
 
 #endif 
