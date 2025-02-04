@@ -20,12 +20,12 @@ void driver_main(driver_flag flag) {
 
         __CPROVER_assert(get_global_data()->private_hkid_max == seamrr_top, "why does this fail");
     
-        // init the kot table
-        // for (int i = 0; i < table_size; i++) {
-        //     kot_table[i].state = KOT_STATE_HKID_FREE;
-        //     pamt[i].pt = PT_NDA; 
-        // }
-        // kot_lock = false; 
+        init the kot table
+        for (int i = 0; i < table_size; i++) {
+            kot_table[i] = KOT_STATE_HKID_FREE;
+            pamt[i].pt = PT_NDA; 
+        }
+        kot_lock = false; 
 
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", seamrr_base, seamrr_top));
     }
