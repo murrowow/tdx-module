@@ -1,2 +1,2 @@
 FILES="src/common/memory_handlers/keyhole_manager.c src/common/memory_handlers/pamt_manager.c src/common/helpers/helpers.c helpers/cbmc_helper.c"
-cbmc driver/driver.c --function driver_main $FILES -I "$PWD" --unwind 10 --trace > driver_log.txt
+cbmc driver/driver.c --function driver_main $FILES -I "$PWD" --trace > driver_log.txt

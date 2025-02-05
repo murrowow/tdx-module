@@ -16,28 +16,52 @@
 #include "stdio.h"
 #include "stdint.h"
 
+#define hkid_size 0x1 << 16
+
+// flags that control what state the hardware will be set to
 typedef enum{
     BOOTUP = 0,
     MID_SETUP = 1
 } driver_flag;
 
-#define hkid_size 0x1 << 16
+// flag that controls what hardware is being written to
+typedef enum{
+    KOT = 0,
+    PAMT = 1
+}hardware_flag; 
+
+struct hardware_states
+{
+    // KOT_STATE_HKID_FREE 
+    // KOT_STATE_HKID_ASSIGNED
+    // KOT_STATE_HKID_FLUSHED 
+    // KOT_STATE_HKID_RESERVED  
+   unsigned kot_state : 2;   
+
+    // PT_NDA
+    // PT_RSVD
+    // PT_REG
+    // PT_TDR
+    // PT_TDCX 
+    // PT_TDVPR
+    // reserved = 7
+    // PT_EPT
+   unsigned pamt_state : 4;
+};
 
 // some kind of flag to give to the driver
-driver_flag flag = BOOTUP; 
+driver_flag flag; 
 
 uint64_t seamrr_base = 0x0; 
 uint64_t seamrr_top = 0xFFFFFFFF;
 
-int table_size = hkid_size; 
-
 //KOT entry table
-uint8_t kot_state_table[hkid_size];
-int kot_lock;
+struct hardware_states tables[hkid_size];
+char kot_lock;
 
 //PAMT TABLE
-pamt_entry_t pamt[hkid_size];
 
 void driver_main(driver_flag); 
+void write(void *, void *, int);
 
 #endif 
