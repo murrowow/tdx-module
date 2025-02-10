@@ -67,27 +67,30 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // SOPHIA: assertions that the checks we do pass
     driver_main(0); 
     __CPROVER_assume((td_hkid >= seamrr_base) && (td_hkid <= seamrr_top)); //hkid within valid bounds
+    
     /**
      * Check TDR (explicit access, opaque semantics, exclusive lock).
      */
 
-    return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-                                                 OPERAND_ID_RCX,
-                                                 TDX_RANGE_RW,
-                                                 TDX_LOCK_EXCLUSIVE,
-                                                 PT_NDA,
-                                                 &tdr_pamt_block,
-                                                 &tdr_pamt_entry_ptr,
-                                                 &tdr_locked_flag,
-                                                 &tdr_ptr);
+    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+    //                                              OPERAND_ID_RCX,
+    //                                              TDX_RANGE_RW,
+    //                                              TDX_LOCK_EXCLUSIVE,
+    //                                              PT_NDA,
+    //                                              &tdr_pamt_block,
+    //                                              &tdr_pamt_entry_ptr,
+    //                                              &tdr_locked_flag,
+    //                                              &tdr_ptr);
 
     // if (return_val != TDX_SUCCESS)
     // {
     //     TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
     //     goto EXIT;
     // }
-    //__CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); // the pamt table is PT_NDA
+    
 
+    tdr_pamt_entry_ptr = &(tables[td_hkid & hkid_mask].pamt_entry);
+    __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
     // Acquire exclusive access to KOT
     // if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS)
@@ -97,7 +100,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     //     goto EXIT;
     // }
     // Sophia: not sure if this exclusive lock is important or not?
-    //__CPROVER_assume(acquire_sharex_lock_ex(&global_data->kot.lock) == LOCK_RET_SUCCESS);
+    // __CPROVER_assume(acquire_sharex_lock_ex(&global_data->kot.lock) == LOCK_RET_SUCCESS);
     // kot_locked_flag = true;
 
     // Protection against speculation attacks with out-of-bound td_hkid user input value
@@ -162,6 +165,7 @@ EXIT:
 //         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
 //         free_la(tdr_ptr);
 //     }
+
 return return_val;
     
 }

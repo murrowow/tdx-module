@@ -1,4 +1,5 @@
 #include "driver/driver.h"
+#include "stdlib.h"
 
 void write(void *address, void *val, int structure) {
     *(int*)address = (int)val;
@@ -26,7 +27,7 @@ void driver_main(driver_flag flag) {
         //init the kot table
         for (int i = 0; i < hkid_size; i++) {
             tables[i].kot_state = KOT_STATE_HKID_FREE;
-            tables[i].pamt_state = PT_NDA; 
+            tables[i].pamt_entry.pt = PT_NDA; 
         }
         kot_lock = false; 
 
