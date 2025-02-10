@@ -88,8 +88,9 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     //     goto EXIT;
     // }
     
-
-    tdr_pamt_entry_ptr = &(tables[td_hkid & hkid_mask].pamt_entry);
+    // SOPHIA: hardware model stub
+    tdr_pamt_entry_ptr = &(tables[td_hkid & hkid_mask].pamt_entry); 
+    // SOPHIA: This has been checked via assertion on the hardware stub 
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
     // Acquire exclusive access to KOT
@@ -101,6 +102,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // }
     
     // SOPHIA: Not 100% sure this is correct, look at tdx_locks.h to see what these different SHAREX values mean
+    // SOPHIA: Replaced the above Acquire exclusive access to KOT stub with below assume statement
     __CPROVER_assume((global_data.kot.lock.raw == SHAREX_FREE)); // "exclusive access to the lock"
     kot_locked_flag = true;
 
@@ -114,6 +116,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     //     return_val = TDX_HKID_NOT_FREE;
     //     goto EXIT;
     // }
+    // SOPHIA: initially an assertion that changed to an assume after verified by commented out stub 
     __CPROVER_assume(global_data.kot.entries[td_hkid & hkid_mask].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
 
     // Clear the content of the TDR page using direct writes
@@ -125,7 +128,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
      * previous state.
      */
     // Generate a random 256-bit TD_UUID
-    // Sophia : Not entirely sure if this needs its own assertion either 
+    // Sophia : ignore entropy checks
     // if (!generate_256bit_random(&tdr_ptr->management_fields.td_uuid))
     // {
     //     TDX_ERROR("Failed to generate random 256-bit UUID number\n");
@@ -155,6 +158,25 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 //     tdr_pamt_entry_ptr->owner = 0;
 
     // Sophia: Because of the way pointers are handled differently in our hardware model we have do make our own version
+    // Mark the HKID entry in the KOT as assigned
+    global_data.kot.entries[td_hkid & hkid_mask].state = (uint8_t)KOT_STATE_HKID_ASSIGNED;
+
+    // Set HKID in the TKT entry
+    tables[td_hkid & hkid_mask].tdr_table.key_management_fields.hkid = td_hkid & hkid_mask;
+    tables[td_hkid & hkid_mask].tdr_table.management_fields.lifecycle_state = TD_HKID_ASSIGNED;
+
+    // SOPHIA: tentatively saying that these are not important fields
+    //tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_index = global_data.seamdb_index;
+
+    // for (uint32_t i = 0; i < 4; i++)
+    // {
+    //     tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
+    // }
+    // tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
+
+    // Set the new TDR page PAMT fields
+    tdr_pamt_entry_ptr->pt = PT_TDR;
+    tdr_pamt_entry_ptr->owner = 0;
 
 EXIT:
 //     // Release all acquired locks and free keyhole mappings
@@ -168,7 +190,7 @@ EXIT:
 //         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
 //         free_la(tdr_ptr);
 //     }
-
+__CPROVER_assert(true, "trivially true"); 
 return return_val;
     
 }

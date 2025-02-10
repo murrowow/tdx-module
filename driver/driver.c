@@ -7,11 +7,7 @@ void write(void *address, void *val, int structure) {
 
 void driver_main(driver_flag flag) {
     if (flag == BOOTUP) {
-        // init the secure memory region to be something random
-        // __CPROVER_havoc_object(&seamrr_base); 
-        // __CPROVER_havoc_object(&seamrr_top); 
-        // __CPROVER_assume((seamrr_base > 0x00000000) && (seamrr_base < 0xFFFFFFFF)); 
-        // __CPROVER_assume((seamrr_top > seamrr_base) && (seamrr_top < 0xFFFFFFFF)); 
+
     
         // init global data
         __CPROVER_havoc_object(&global_data.private_hkid_min);
