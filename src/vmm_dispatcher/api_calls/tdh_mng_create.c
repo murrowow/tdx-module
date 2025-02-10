@@ -66,7 +66,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 
     // SOPHIA: assertions that the checks we do pass
     driver_main(0); 
-    __CPROVER_assume((td_hkid >= seamrr_base) && (td_hkid <= seamrr_top)); //hkid within valid bounds
+    __CPROVER_assume((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)); //hkid within valid bounds
     
     /**
      * Check TDR (explicit access, opaque semantics, exclusive lock).
@@ -93,30 +93,31 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
     // Acquire exclusive access to KOT
-    // if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS)
+    // if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS) //&global_data.kot.lock
     // {
     //     TDX_ERROR("Failed to acquire lock on KOT\n");
     //     return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
     //     goto EXIT;
     // }
-    // Sophia: not sure if this exclusive lock is important or not?
-    // __CPROVER_assume(acquire_sharex_lock_ex(&global_data->kot.lock) == LOCK_RET_SUCCESS);
-    // kot_locked_flag = true;
+    
+    // SOPHIA: Not 100% sure this is correct, look at tdx_locks.h to see what these different SHAREX values mean
+    __CPROVER_assume((global_data.kot.lock.raw == SHAREX_FREE)); // "exclusive access to the lock"
+    kot_locked_flag = true;
 
     // Protection against speculation attacks with out-of-bound td_hkid user input value
-    //lfence();
+    lfence();
 
     // Check the provided HKID entry in KOT
-    // if (global_data->kot.entries[td_hkid].state != KOT_STATE_HKID_FREE)
+    // if (global_data->kot.entries[td_hkid & hkid_mask].state != KOT_STATE_HKID_FREE)
     // {
     //     TDX_ERROR("Given HKID %d is not free in KOT\n", td_hkid);
     //     return_val = TDX_HKID_NOT_FREE;
     //     goto EXIT;
     // }
-    //__CPROVER_assume(global_data->kot.entries[td_hkid].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
+    __CPROVER_assume(global_data.kot.entries[td_hkid & hkid_mask].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
 
     // Clear the content of the TDR page using direct writes
-    //zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
 
     /**
      * Initialize the TD Management and Key Management Fields.
@@ -152,6 +153,8 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 //     // Set the new TDR page PAMT fields
 //     tdr_pamt_entry_ptr->pt = PT_TDR;
 //     tdr_pamt_entry_ptr->owner = 0;
+
+    // Sophia: Because of the way pointers are handled differently in our hardware model we have do make our own version
 
 EXIT:
 //     // Release all acquired locks and free keyhole mappings

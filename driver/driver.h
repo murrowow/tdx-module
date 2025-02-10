@@ -16,7 +16,8 @@
 #include "stdio.h"
 #include "stdint.h"
 
-#define n 2
+// from tdx_global_data.h the max number of hkids is 2048 
+#define n 11
 #define hkid_size 0x1 << n
 #define hkid_mask (0x1U << n) - 1
 
@@ -34,35 +35,19 @@ typedef enum{
 
 struct hardware_states
 {
-    // KOT_STATE_HKID_FREE 
-    // KOT_STATE_HKID_ASSIGNED
-    // KOT_STATE_HKID_FLUSHED 
-    // KOT_STATE_HKID_RESERVED  
-   unsigned kot_state : 2;   
-
-    // PT_NDA
-    // PT_RSVD
-    // PT_REG
-    // PT_TDR
-    // PT_TDCX 
-    // PT_TDVPR
-    // reserved = 7
-    // PT_EPT
-   //unsigned pamt_state : 4;
    pamt_entry_t pamt_entry; 
 };
+
 
 // some kind of flag to give to the driver
 driver_flag flag; 
 
-uint64_t seamrr_base = 0x0; 
-uint64_t seamrr_top = 0xFFFFFFFF;
+// global_data pointer 
+// private_hkid_min and private_hkid_max
+tdx_module_global_t global_data;
 
-pamt_entry_t pamt; 
-
-//KOT entry table
+//pamt entry table
 struct hardware_states tables[hkid_size];
-//struct pamt_entry_t pamt_table[hkid_size]; 
 
 char kot_lock;
 

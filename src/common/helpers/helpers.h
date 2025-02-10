@@ -175,9 +175,6 @@ _STATIC_INLINE_ uint64_t align_gpa_on_level(
 
 _STATIC_INLINE_ bool_t is_private_hkid(uint16_t hkid)
 {
-    __CPROVER_assume(get_global_data() != NULL);
-    __CPROVER_assume(get_global_data()->private_hkid_max != NULL);
-    __CPROVER_assume(get_global_data()->private_hkid_min != NULL);
     return ((uint32_t)hkid >= get_global_data()->private_hkid_min &&
             (uint32_t)hkid <= get_global_data()->private_hkid_max);
 }
