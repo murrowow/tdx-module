@@ -51,6 +51,10 @@ struct hardware_states tables[hkid_size];
 
 char kot_lock;
 
+uint32_t pkg_bitmap = 0;
+
+uint32_t pkg = 0;
+
 //PAMT TABLE
 
 void driver_main(driver_flag); 

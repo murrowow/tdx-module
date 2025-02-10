@@ -24,26 +24,27 @@
  * @file tdh_mng_key_config
  * @brief TDHKEYCONFIG API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "x86_defs/mktme.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
-#include "accessors/ia32_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/mktme.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/ia32_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 {
-    // global data
-    tdx_module_global_t * global_data = get_global_data();
+    // // global data
+    // tdx_module_global_t * global_data = get_global_data();
 
-    // Local data
-    tdx_module_local_t  * local_data = get_local_data();
+    // // Local data
+    // tdx_module_local_t  * local_data = get_local_data();
 
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
@@ -54,47 +55,61 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
+    driver_main(1);
 
-    tdr_pa.raw = target_tdr_pa;
+    uint64_t pa;
+    __CPROVER_havoc_object(&pa); 
+    __CPROVER_assume(tables[pa].pamt_entry.pt == PT_TDR);
+    tdr_pa.raw = pa;
+
+   
+    // tdr_pa.raw = target_tdr_pa;
 
     // Check,lock and map the TDR page
-    return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-                                                 OPERAND_ID_RCX,
-                                                 TDX_RANGE_RW,
-                                                 TDX_LOCK_EXCLUSIVE,
-                                                 PT_TDR,
-                                                 &tdr_pamt_block,
-                                                 &tdr_pamt_entry_ptr,
-                                                 &tdr_locked_flag,
-                                                 &tdr_ptr);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+    //                                              OPERAND_ID_RCX,
+    //                                              TDX_RANGE_RW,
+    //                                              TDX_LOCK_EXCLUSIVE,
+    //                                              PT_TDR,
+    //                                              &tdr_pamt_block,
+    //                                              &tdr_pamt_entry_ptr,
+    //                                              &tdr_locked_flag,
+    //                                              &tdr_ptr);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
 
-    //Verify TDR is not in fatal state
-    if (tdr_ptr->management_fields.fatal)
-    {
-        TDX_ERROR("TDR is in fatal state.\n");
-        return_val = TDX_TD_FATAL;
-        goto EXIT;
-    }
-    // Verify LIFECYCLE_STATE
-    if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
-    {
-        TDX_ERROR("TDR HKID state is not assigned. lifecycle_state = %d\n", tdr_ptr->management_fields.lifecycle_state);
-        return_val = TDX_LIFECYCLE_STATE_INCORRECT;
-        goto EXIT;
-    }
+    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw].pamt_entry);
+    __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
 
-    // Check if the key is already configured
-    if (tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(local_data->lp_info.pkg)))
-    {
-        TDX_ERROR("Key is already configured for this package\n");
-        return_val = TDX_KEY_CONFIGURED;
-        goto EXIT;
-    }
+    // //Verify TDR is not in fatal state
+    // if (tdr_ptr->management_fields.fatal)
+    // {
+    //     TDX_ERROR("TDR is in fatal state.\n");
+    //     return_val = TDX_TD_FATAL;
+    //     goto EXIT;
+    // }
+    __CPROVER_assume(tdr_ptr->management_fields.fatal == false);
+
+    // // Verify LIFECYCLE_STATE
+    // if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
+    // {
+    //     TDX_ERROR("TDR HKID state is not assigned. lifecycle_state = %d\n", tdr_ptr->management_fields.lifecycle_state);
+    //     return_val = TDX_LIFECYCLE_STATE_INCORRECT;
+    //     goto EXIT;
+    // }
+    __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_HKID_ASSIGNED);
+
+    // // Check if the key is already configured
+    // if (tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(local_data->lp_info.pkg)))
+    // {
+    //     TDX_ERROR("Key is already configured for this package\n");
+    //     return_val = TDX_KEY_CONFIGURED;
+    //     goto EXIT;
+    // }
+    __CPROVER_assume(!(tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(pkg))));
 
     /** Try to configure the key on the package using a CPU-generated key.
      * This operation acquires an exclusive lock on KET (encryption engine tables)
@@ -112,21 +127,32 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     // ALL_CHECKS_PASSED:  The instruction is guaranteed to succeed
 
     // Set the configuration indication for the current package
-    tdr_ptr->key_management_fields.pkg_config_bitmap |= BIT(local_data->lp_info.pkg);
+    // tdr_ptr->key_management_fields.pkg_config_bitmap |= BIT(local_data->lp_info.pkg);
+    tdr_ptr->key_management_fields.pkg_config_bitmap |= BIT(pkg);
 
-    // Check whether the TD keys have been configured on all packages
-    if (tdr_ptr->key_management_fields.pkg_config_bitmap == (uint64_t)global_data->pkg_config_bitmap)
+    // // Check whether the TD keys have been configured on all packages
+    // if (tdr_ptr->key_management_fields.pkg_config_bitmap == (uint64_t)global_data->pkg_config_bitmap)
+    // {
+    //     tdr_ptr->management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
+    // }
+
+    if (tdr_ptr->key_management_fields.pkg_config_bitmap == pkg_bitmap)
     {
         tdr_ptr->management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
     }
 
+    __CPROVER_assert(tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(pkg)), "current package configured");
+    __CPROVER_assert(((tdr_ptr->key_management_fields.pkg_config_bitmap == pkg_bitmap) && (tdr_ptr->management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
+                    || (!(tdr_ptr->key_management_fields.pkg_config_bitmap == pkg_bitmap) && !(tdr_ptr->management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)),
+                    "correctly adjusts lifecycle state if keys are configured on all packages");
+
 EXIT:
-    // Release all acquired locks and free keyhole mappings
-    if (tdr_locked_flag)
-    {
-        pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-        free_la(tdr_ptr);
-    }
+    // // Release all acquired locks and free keyhole mappings
+    // if (tdr_locked_flag)
+    // {
+    //     pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+    //     free_la(tdr_ptr);
+    // }
 
     return return_val;
 }
