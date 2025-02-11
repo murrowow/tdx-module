@@ -179,18 +179,26 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     tdr_pamt_entry_ptr->owner = 0;
 
 EXIT:
-//     // Release all acquired locks and free keyhole mappings
-//     if (kot_locked_flag)
-//     {
-//         release_sharex_lock_ex(&global_data->kot.lock);
-//     }
+    // Release all acquired locks and free keyhole mappings
+    // if (kot_locked_flag)
+    // {
+    //     release_sharex_lock_ex(&global_data->kot.lock);
+    // }
 
-//     if (tdr_locked_flag)
-//     {
-//         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-//         free_la(tdr_ptr);
-//     }
-__CPROVER_assert(true, "trivially true"); 
+    // if (tdr_locked_flag)
+    // {
+    //     pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+    //     free_la(tdr_ptr);
+    // }
+
+    // __CPROVER_assume((global_data.kot.lock.raw == SHAREX_FREE)); // "exclusive access to the lock"
+    // if (kot_locked_flag)
+    // {
+    //     __CPROVER_assert((global_data.kot.lock.raw == SHAREX_FREE), "idk what the result of this will be"); // "exclusive access to the lock"
+    // }
+
+    __CPROVER_assert(tables[td_hkid & hkid_mask].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
+    __CPROVER_assert(global_data.kot.entries[td_hkid & hkid_mask].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
 return return_val;
     
 }
