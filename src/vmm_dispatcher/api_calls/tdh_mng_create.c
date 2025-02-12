@@ -120,7 +120,9 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     __CPROVER_assume(global_data.kot.entries[td_hkid & hkid_mask].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
 
     // Clear the content of the TDR page using direct writes
-    zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    //zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    // SOPHIA: set the tdr data memory to be 0
+    tables[td_hkid & hkid_mask].tdr_mem = 0; 
 
     /**
      * Initialize the TD Management and Key Management Fields.
@@ -199,6 +201,7 @@ EXIT:
 
     __CPROVER_assert(tables[td_hkid & hkid_mask].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
     __CPROVER_assert(global_data.kot.entries[td_hkid & hkid_mask].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
+    __CPROVER_assert(tables[td_hkid & hkid_mask].tdr_mem == 0, "memory at tdr correctly zeroed out");
 return return_val;
     
 }
