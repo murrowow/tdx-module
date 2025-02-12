@@ -59,6 +59,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     uint64_t pa;
     __CPROVER_havoc_object(&pa); 
+    __CPROVER_assume(pa >= 0 && pa < hkid_size);
     __CPROVER_assume(tables[pa].pamt_entry.pt == PT_TDR);
     tdr_pa.raw = pa;
 
