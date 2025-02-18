@@ -29,8 +29,9 @@ void driver_main(driver_flag flag) {
             tables[i].pamt_entry.pt = (temp % 2) ? PT_NDA : PT_TDR;
         }
 
-        __CPROVER_havoc_object(&pkg);
-        __CPROVER_havoc_object(&pkg_bitmap);
-        __CPROVER_assume(pkg_bitmap & BIT(pkg) != 0);
+        __CPROVER_havoc_object(&local_data.lp_info.pkg);
+        __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < 32);
+        __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
+        __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
     }
 }

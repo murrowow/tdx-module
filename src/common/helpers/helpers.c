@@ -53,7 +53,6 @@ bool_t return_true(void)
 // SOPHIA: Fails in case of key table entry (KET) being busy, not enough entropy, or unknown error
 api_error_code_e program_mktme_keys(uint16_t hkid)
 {
-    return TDX_SUCCESS;
 	mktme_key_program_t mktme_key_program;
 	api_error_code_e    return_val = UNINITIALIZE_ERROR;
 	uint64_t            pconfig_return_code;

@@ -48,14 +48,13 @@ driver_flag flag;
 // private_hkid_min and private_hkid_max
 tdx_module_global_t global_data;
 
+// local_data pointer
+tdx_module_local_t  local_data;
+
 //pamt entry table
 struct hardware_states tables[hkid_size];
 
 char kot_lock;
-
-uint32_t pkg_bitmap = 0;
-
-uint32_t pkg = 0;
 
 //PAMT TABLE
 
