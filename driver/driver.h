@@ -59,6 +59,5 @@ char kot_lock;
 //PAMT TABLE
 
 void driver_main(driver_flag); 
-void write(void *, void *, int);
 
 #endif 

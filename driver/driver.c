@@ -1,10 +1,6 @@
 #include "driver/driver.h"
 #include "stdlib.h"
 
-void write(void *address, void *val, int structure) {
-    *(int*)address = (int)val;
-}
-
 void driver_main(driver_flag flag) {
     if (flag == BOOTUP) {
 
