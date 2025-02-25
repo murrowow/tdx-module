@@ -16,6 +16,7 @@
 #include "stdio.h"
 #include "stdint.h"
 
-api_error_type TD_setup();
+void TD_setup();
+void TDX_bootup(); 
 
 #endif 

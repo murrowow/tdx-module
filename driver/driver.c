@@ -10,12 +10,13 @@ void driver_main(driver_flag flag) {
         __CPROVER_havoc_object(&global_data.private_hkid_max); 
         __CPROVER_assume((global_data.private_hkid_min > 0x00000000) && (global_data.private_hkid_min < 0xFFFFFFFF)); 
         __CPROVER_assume((global_data.private_hkid_max > global_data.private_hkid_min) && (global_data.private_hkid_max < 0xFFFFFFFF)); 
+        
         //init the kot table
         for (int i = 0; i < hkid_size; i++) {
             global_data.kot.entries[i].state = KOT_STATE_HKID_FREE;
             tables[i].pamt_entry.pt = PT_NDA; 
         }
-        kot_lock = false; 
+        global_data.kot.lock.raw = SHAREX_FREE; 
 
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     } else if (flag == MID_SETUP) {

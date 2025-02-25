@@ -72,6 +72,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
      * Check TDR (explicit access, opaque semantics, exclusive lock).
      */
 
+    // SOPHIA: TODO check if there is an unlock after the page table walk 
     // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
     //                                              OPERAND_ID_RCX,
     //                                              TDX_RANGE_RW,
@@ -94,20 +95,19 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
     // Acquire exclusive access to KOT
-    // if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS) //&global_data.kot.lock
+    // if(acquire_sharex_lock_ex(&global_data.kot.lock) != LOCK_RET_SUCCESS) //&global_data->kot.lock
     // {
     //     TDX_ERROR("Failed to acquire lock on KOT\n");
     //     return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
     //     goto EXIT;
     // }
     
-    // SOPHIA: Not 100% sure this is correct, look at tdx_locks.h to see what these different SHAREX values mean
-    // SOPHIA: Replaced the above Acquire exclusive access to KOT stub with below assume statement
-    __CPROVER_assume((global_data.kot.lock.raw == SHAREX_FREE)); // "exclusive access to the lock"
-    kot_locked_flag = true;
-
+    // SOPHIA: Set the lock to be SHAREX_EXCLUSIVE_LOCK
+    // SOPHIA: Need to be in SHAREX_FREE state 
+    global_data.kot.lock.raw = (global_data.kot.lock.raw == SHAREX_FREE) ? SHAREX_EXCLUSIVE_LOCK : SHAREX_FREE; 
+    __CPROVER_assume(global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK); // "exclusive access to the lock"
     // Protection against speculation attacks with out-of-bound td_hkid user input value
-    lfence();
+    // lfence();
 
     // Check the provided HKID entry in KOT
     // if (global_data->kot.entries[td_hkid & hkid_mask].state != KOT_STATE_HKID_FREE)
@@ -139,25 +139,24 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // }
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
+    // // Mark the HKID entry in the KOT as assigned
+    // global_data->kot.entries[td_hkid].state = (uint8_t)KOT_STATE_HKID_ASSIGNED;
 
-    // Mark the HKID entry in the KOT as assigned
-//     global_data->kot.entries[td_hkid].state = (uint8_t)KOT_STATE_HKID_ASSIGNED;
+    // // Set HKID in the TKT entry
+    // tdr_ptr->key_management_fields.hkid = td_hkid;
+    // tdr_ptr->management_fields.lifecycle_state = TD_HKID_ASSIGNED;
 
-//     // Set HKID in the TKT entry
-//     tdr_ptr->key_management_fields.hkid = td_hkid;
-//     tdr_ptr->management_fields.lifecycle_state = TD_HKID_ASSIGNED;
+    // tdr_ptr->td_preserving_fields.seamdb_index = global_data->seamdb_index;
 
-//     tdr_ptr->td_preserving_fields.seamdb_index = global_data->seamdb_index;
+    // for (uint32_t i = 0; i < 4; i++)
+    // {
+    //     tdr_ptr->td_preserving_fields.seamdb_nonce.qwords[i] = global_data->seamdb_nonce.qwords[i];
+    // }
+    // tdr_ptr->td_preserving_fields.handoff_version = global_data->module_hv;
 
-//     for (uint32_t i = 0; i < 4; i++)
-//     {
-//         tdr_ptr->td_preserving_fields.seamdb_nonce.qwords[i] = global_data->seamdb_nonce.qwords[i];
-//     }
-//     tdr_ptr->td_preserving_fields.handoff_version = global_data->module_hv;
-
-//     // Set the new TDR page PAMT fields
-//     tdr_pamt_entry_ptr->pt = PT_TDR;
-//     tdr_pamt_entry_ptr->owner = 0;
+    // // Set the new TDR page PAMT fields
+    // tdr_pamt_entry_ptr->pt = PT_TDR;
+    // tdr_pamt_entry_ptr->owner = 0;
 
     // Sophia: Because of the way pointers are handled differently in our hardware model we have do make our own version
     // Mark the HKID entry in the KOT as assigned
@@ -168,13 +167,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     tables[td_hkid & hkid_mask].tdr_table.management_fields.lifecycle_state = TD_HKID_ASSIGNED;
 
     // SOPHIA: tentatively saying that these are not important fields
-    //tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_index = global_data.seamdb_index;
+    tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_index = global_data.seamdb_index;
 
-    // for (uint32_t i = 0; i < 4; i++)
-    // {
-    //     tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
-    // }
-    // tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
+    for (uint32_t i = 0; i < 4; i++)
+    {
+        tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
+    }
+    tables[td_hkid & hkid_mask].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
 
     // Set the new TDR page PAMT fields
     tdr_pamt_entry_ptr->pt = PT_TDR;
@@ -202,6 +201,7 @@ EXIT:
     __CPROVER_assert(tables[td_hkid & hkid_mask].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
     __CPROVER_assert(global_data.kot.entries[td_hkid & hkid_mask].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
     __CPROVER_assert(tables[td_hkid & hkid_mask].tdr_mem == 0, "memory at tdr correctly zeroed out");
-return return_val;
+    __CPROVER_assert(1 == 2, "this should fail");
+    return return_val;
     
 }

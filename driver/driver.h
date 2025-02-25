@@ -12,6 +12,8 @@
 #include "src/common/accessors/data_accessors.h"
 #include "src/common/accessors/ia32_accessors.h"
 #include "src/vmm_dispatcher/tdx_vmm_dispatcher.h"
+#include "driver/api_calls/api_calls.h"
+#include "driver/flows/flows.h"
 
 #include "stdio.h"
 #include "stdint.h"
