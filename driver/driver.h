@@ -20,8 +20,8 @@
 
 // from tdx_global_data.h the max number of hkids is 2048 
 #define n 1
-#define hkid_size 0x1 << n
-#define hkid_mask (0x1U << n) - 1
+#define HKID_SIZE 0x1 << n
+#define HKID_MASK (0x1U << n) - 1
 
 // flags that control what state the hardware will be set to
 typedef enum{
@@ -54,7 +54,7 @@ tdx_module_global_t global_data;
 tdx_module_local_t  local_data;
 
 //pamt entry table
-struct hardware_states tables[hkid_size];
+struct hardware_states tables[HKID_SIZE];
 
 char kot_lock;
 

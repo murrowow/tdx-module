@@ -12,7 +12,7 @@ void driver_main(driver_flag flag) {
         __CPROVER_assume((global_data.private_hkid_max > global_data.private_hkid_min) && (global_data.private_hkid_max < 0xFFFFFFFF)); 
         
         //init the kot table
-        for (int i = 0; i < hkid_size; i++) {
+        for (int i = 0; i < HKID_SIZE; i++) {
             global_data.kot.entries[i].state = KOT_STATE_HKID_FREE;
             tables[i].pamt_entry.pt = PT_NDA; 
         }
@@ -21,7 +21,7 @@ void driver_main(driver_flag flag) {
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     } else if (flag == MID_SETUP) {
         int temp;
-        for (int i = 0; i < hkid_size; i++) {
+        for (int i = 0; i < HKID_SIZE; i++) {
             __CPROVER_havoc_object(&temp);
             tables[i].pamt_entry.pt = (temp % 2) ? PT_NDA : PT_TDR;
         }
