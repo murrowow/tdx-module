@@ -15,6 +15,7 @@ void driver_main(driver_flag flag) {
         for (int i = 0; i < HKID_SIZE; i++) {
             global_data.kot.entries[i].state = KOT_STATE_HKID_FREE;
             tables[i].pamt_entry.pt = PT_NDA; 
+            tables[i].tdr_lock = false; 
         }
         global_data.kot.lock.raw = SHAREX_FREE; 
 

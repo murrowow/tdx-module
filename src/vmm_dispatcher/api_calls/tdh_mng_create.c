@@ -91,7 +91,8 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // }
     
     // SOPHIA: hardware model stub
-    tdr_pamt_entry_ptr = &(tables[td_hkid & HKID_MASK].pamt_entry); 
+    tdr_pamt_entry_ptr = &(tables[td_hkid & HKID_MASK].pamt_entry);
+    tables[td_hkid & HKID_MASK].tdr_lock = true; 
     // SOPHIA: This has been checked via assertion on the hardware stub 
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
@@ -105,6 +106,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     
     // SOPHIA: Set the lock to be SHAREX_EXCLUSIVE_LOCK
     // SOPHIA: Need to be in SHAREX_FREE state 
+    // SOPHIA: If these following two lines are commented out, for some reason it runs really quicky and everything passes????
     global_data.kot.lock.raw = (global_data.kot.lock.raw == SHAREX_FREE) ? SHAREX_EXCLUSIVE_LOCK : SHAREX_FREE; 
     kot_locked_flag = (global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK);
     __CPROVER_assume(global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK); // "exclusive access to the lock"
@@ -173,11 +175,11 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // SOPHIA: tentatively saying that these are not important fields
     tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.seamdb_index = global_data.seamdb_index;
 
-    // for (uint32_t i = 0; i < 4; i++)
-    // {
-    //     tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
-    // }
-    // tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
+    for (uint32_t i = 0; i < 4; i++)
+    {
+        tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
+    }
+    tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
 
     // Set the new TDR page PAMT fields
     tdr_pamt_entry_ptr->pt = PT_TDR;
@@ -190,6 +192,11 @@ EXIT:
     //     release_sharex_lock_ex(&global_data->kot.lock);
     // }
 
+    if (kot_locked_flag)
+    {
+        //release_sharex_lock_ex(&global_data->kot.lock);
+        global_data.kot.lock.raw = SHAREX_FREE; 
+    }
 
     // if (tdr_locked_flag)
     // {
@@ -197,15 +204,12 @@ EXIT:
     //     free_la(tdr_ptr);
     // }
 
-    // __CPROVER_assume((global_data.kot.lock.raw == SHAREX_FREE)); // "exclusive access to the lock"
-    // if (kot_locked_flag)
-    // {
-    //     __CPROVER_assert((global_data.kot.lock.raw == SHAREX_FREE), "idk what the result of this will be"); // "exclusive access to the lock"
-    // }
+    tables[td_hkid & HKID_MASK].tdr_lock = false; 
 
-    // __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
-    // __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
-    // __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
+    __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
+    __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
+    __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
+    __CPROVER_assert(global_data.kot.lock.raw == SHAREX_FREE, "KOT should not be locked");
     __CPROVER_assert(1 == 2, "this should fail");
     return return_val;
     

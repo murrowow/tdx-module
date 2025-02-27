@@ -40,6 +40,7 @@ struct hardware_states
    pamt_entry_t pamt_entry; 
    tdr_t tdr_table; 
    uint8_t tdr_mem; 
+   bool_t tdr_lock; 
 };
 
 
