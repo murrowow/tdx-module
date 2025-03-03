@@ -1,4 +1,5 @@
 #include "driver/driver.h"
+#include "driver/flows/flows.h"
 #include "stdlib.h"
 
 void driver_main(driver_flag flag) {
@@ -32,4 +33,5 @@ void driver_main(driver_flag flag) {
         __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
         __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
     }
+    TD_setup();
 }
