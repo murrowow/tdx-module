@@ -57,7 +57,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     driver_main(1);
 
-    __CPROVER_assume(tables[target_tdr_pa & hkid_mask].pamt_entry.pt == PT_TDR);
+    __CPROVER_assume(tables[target_tdr_pa & HKID_MASK].pamt_entry.pt == PT_TDR);
     tdr_pa.raw = target_tdr_pa;
    
     // tdr_pa.raw = target_tdr_pa;
@@ -78,7 +78,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     //     goto EXIT;
     // }
 
-    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & hkid_mask].pamt_entry);
+    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
 
     // //Verify TDR is not in fatal state
@@ -88,7 +88,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     //     return_val = TDX_TD_FATAL;
     //     goto EXIT;
     // }
-    __CPROVER_assume(!tables[tdr_pa.raw & hkid_mask].tdr_table.management_fields.fatal);
+    __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
 
     // // Verify LIFECYCLE_STATE
     // if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
@@ -97,7 +97,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     //     return_val = TDX_LIFECYCLE_STATE_INCORRECT;
     //     goto EXIT;
     // }
-    __CPROVER_assume(tables[tdr_pa.raw & hkid_mask].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED);
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED);
 
     // // Check if the key is already configured
     // if (tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(local_data->lp_info.pkg)))
@@ -106,7 +106,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     //     return_val = TDX_KEY_CONFIGURED;
     //     goto EXIT;
     // }
-    __CPROVER_assume(!(tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))));
+    __CPROVER_assume(!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))));
 
     /** Try to configure the key on the package using a CPU-generated key.
      * This operation acquires an exclusive lock on KET (encryption engine tables)
@@ -125,7 +125,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     // Set the configuration indication for the current package
     // tdr_ptr->key_management_fields.pkg_config_bitmap |= BIT(local_data->lp_info.pkg);
-    tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap |= (BIT(local_data.lp_info.pkg));
+    tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap |= (BIT(local_data.lp_info.pkg));
 
     // // Check whether the TD keys have been configured on all packages
     // if (tdr_ptr->key_management_fields.pkg_config_bitmap == (uint64_t)global_data->pkg_config_bitmap)
@@ -133,14 +133,15 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     //     tdr_ptr->management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
     // }
 
-    if (tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap == (uint64_t)global_data.pkg_config_bitmap)
+    if (tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == (uint64_t)global_data.pkg_config_bitmap)
     {
-        tables[tdr_pa.raw & hkid_mask].tdr_table.management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
     }
 
-    __CPROVER_assert(tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)), "current package configured");
-    __CPROVER_assert(((tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[tdr_pa.raw & hkid_mask].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
-                    || (!(tables[tdr_pa.raw & hkid_mask].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[tdr_pa.raw & hkid_mask].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)),
+    __CPROVER_assert(false, "false");
+    __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)), "current package configured");
+    __CPROVER_assert(((tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
+                    || (!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)),
                     "correctly adjusts lifecycle state if keys are configured on all packages");
 
 EXIT:

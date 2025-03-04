@@ -35,14 +35,48 @@ typedef enum{
     PAMT = 1
 }hardware_flag; 
 
+typedef struct tdr_small_s
+{
+    struct {
+        bool_t fatal;
+
+        unsigned num_tdcx : 2;
+        unsigned chldcnt : 2;
+        td_lifecycle_state_t  lifecycle_state;
+        struct {
+            unsigned val : 2;
+        }  tdcx_pa[MAX_NUM_TDCS_PAGES];
+    } management_fields;
+
+    struct {
+        unsigned hkid : 1; 
+        unsigned pkg_config_bitmap : 2;
+    } key_management_fields;
+
+    struct {
+        unsigned handoff_version : 2;
+        unsigned seamdb_index : 2;
+        uint256_t seamdb_nonce;
+
+        struct {
+          unsigned val : 2;  
+        } reserved[16];
+    } td_preserving_fields;
+
+} tdr_small_t;
+
 struct hardware_states
 {
    pamt_entry_t pamt_entry; 
-   tdr_t tdr_table; 
+   tdr_small_t  tdr_table; 
    uint8_t tdr_mem; 
-   bool_t tdr_lock; 
+   bool_t tdr_lock;
+   
+//    pamt_entry_t tdcx_pamt_entry;
+//    tdcs_t tdcx_table;
+//    uint8_t tdcx_mem;
+//    bool_t tdcx_lock;
 };
-
 
 // some kind of flag to give to the driver
 driver_flag flag; 

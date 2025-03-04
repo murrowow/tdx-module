@@ -4,8 +4,6 @@
 
 void driver_main(driver_flag flag) {
     if (flag == BOOTUP) {
-
-    
         // init global data
         __CPROVER_havoc_object(&global_data.private_hkid_min);
         __CPROVER_havoc_object(&global_data.private_hkid_max); 
@@ -22,12 +20,6 @@ void driver_main(driver_flag flag) {
 
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     } else if (flag == MID_SETUP) {
-        int temp;
-        for (int i = 0; i < HKID_SIZE; i++) {
-            __CPROVER_havoc_object(&temp);
-            tables[i].pamt_entry.pt = (temp % 2) ? PT_NDA : PT_TDR;
-        }
-
         __CPROVER_havoc_object(&local_data.lp_info.pkg);
         __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < 32);
         __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
