@@ -19,7 +19,7 @@
 #include "stdint.h"
 
 // from tdx_global_data.h the max number of hkids is 2048 
-#define n 1
+#define n 3
 #define HKID_SIZE 0x1 << n
 #define HKID_MASK (0x1U << n) - 1
 
@@ -40,26 +40,26 @@ typedef struct tdr_small_s
     struct {
         bool_t fatal;
 
-        unsigned num_tdcx : 2;
-        unsigned chldcnt : 2;
+        unsigned num_tdcx : HKID_SIZE;
+        unsigned chldcnt : HKID_SIZE;
         td_lifecycle_state_t  lifecycle_state;
         struct {
-            unsigned val : 2;
+            unsigned val : HKID_SIZE;
         }  tdcx_pa[MAX_NUM_TDCS_PAGES];
     } management_fields;
 
     struct {
-        unsigned hkid : 1; 
-        unsigned pkg_config_bitmap : 2;
+        unsigned hkid : n; 
+        unsigned pkg_config_bitmap : HKID_SIZE;
     } key_management_fields;
 
     struct {
-        unsigned handoff_version : 2;
-        unsigned seamdb_index : 2;
+        unsigned handoff_version : HKID_SIZE;
+        unsigned seamdb_index : HKID_SIZE;
         uint256_t seamdb_nonce;
 
         struct {
-          unsigned val : 2;  
+          unsigned val : HKID_SIZE;  
         } reserved[16];
     } td_preserving_fields;
 

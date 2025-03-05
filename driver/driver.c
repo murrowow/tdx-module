@@ -16,7 +16,7 @@ void driver_main(driver_flag flag) {
             tables[i].pamt_entry.pt = PT_NDA; 
             tables[i].tdr_lock = false; 
         }
-        global_data.kot.lock.raw = SHAREX_FREE; 
+        //global_data.kot.lock.raw = SHAREX_FREE; 
 
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     } else if (flag == MID_SETUP) {

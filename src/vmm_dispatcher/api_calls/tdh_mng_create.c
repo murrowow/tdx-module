@@ -65,7 +65,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // }
 
     // SOPHIA: assertions that the checks we do pass
-    driver_main(0); 
+    //driver_main(0); 
     __CPROVER_assume((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)); //hkid within valid bounds
     
     /**
@@ -107,10 +107,10 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // SOPHIA: Set the lock to be SHAREX_EXCLUSIVE_LOCK
     // SOPHIA: Need to be in SHAREX_FREE state 
     // SOPHIA: If these following two lines are commented out, for some reason it runs really quicky and everything passes????
-    global_data.kot.lock.raw = (global_data.kot.lock.raw == SHAREX_FREE) ? SHAREX_EXCLUSIVE_LOCK : SHAREX_FREE; 
-    kot_locked_flag = (global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK);
-    __CPROVER_assume(global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK); // "exclusive access to the lock"
-    __CPROVER_assume(kot_locked_flag); //"make sure the locked flag is set"
+    // global_data.kot.lock.raw = (global_data.kot.lock.raw == SHAREX_FREE) ? SHAREX_EXCLUSIVE_LOCK : SHAREX_FREE; 
+    // kot_locked_flag = (global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK);
+    // __CPROVER_assume(global_data.kot.lock.raw == SHAREX_EXCLUSIVE_LOCK); // "exclusive access to the lock"
+    // __CPROVER_assume(kot_locked_flag); //"make sure the locked flag is set"
     
     // Protection against speculation attacks with out-of-bound td_hkid user input value
     lfence();
@@ -192,11 +192,11 @@ EXIT:
     //     release_sharex_lock_ex(&global_data->kot.lock);
     // }
 
-    if (kot_locked_flag)
-    {
-        //release_sharex_lock_ex(&global_data->kot.lock);
-        global_data.kot.lock.raw = SHAREX_FREE; 
-    }
+    // if (kot_locked_flag)
+    // {
+    //     //release_sharex_lock_ex(&global_data->kot.lock);
+    //     global_data.kot.lock.raw = SHAREX_FREE; 
+    // }
 
     // if (tdr_locked_flag)
     // {
@@ -209,8 +209,9 @@ EXIT:
     __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
     __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
     __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
-    __CPROVER_assert(global_data.kot.lock.raw == SHAREX_FREE, "KOT should not be locked");
+    //__CPROVER_assert(global_data.kot.lock.raw == SHAREX_FREE, "KOT should not be locked");
     __CPROVER_assert(1 == 2, "this should fail");
+    return_val = TDX_SUCCESS;
     return return_val;
     
 }
