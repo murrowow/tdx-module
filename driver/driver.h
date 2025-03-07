@@ -65,6 +65,14 @@ typedef struct tdr_small_s
 
 } tdr_small_t;
 
+typedef struct tdcs_small_s
+{
+    struct {
+        op_state_e op_state;
+    } management_fields;
+
+} tdcs_small_t;
+
 struct hardware_states
 {
    pamt_entry_t pamt_entry; 
@@ -72,10 +80,10 @@ struct hardware_states
    uint8_t tdr_mem; 
    bool_t tdr_lock;
    
-//    pamt_entry_t tdcx_pamt_entry;
-//    tdcs_t tdcx_table;
-//    uint8_t tdcx_mem;
-//    bool_t tdcx_lock;
+   pamt_entry_t tdcx_pamt_entry;
+   tdcs_small_t tdcx_table;
+   uint8_t tdcx_mem;
+   bool_t tdcx_lock;
 };
 
 // some kind of flag to give to the driver

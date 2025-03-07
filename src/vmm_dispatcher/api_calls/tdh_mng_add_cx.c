@@ -172,31 +172,30 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         // Map the TDCS structure and check the state.
         // AHMAD: Stubbed this function since it maps the tdcs pages to keyholes
         // tdcs_p = map_implicit_tdcs(tdr_ptr, TDX_RANGE_RW, false);
-        // tables[tdr_pa.raw & HKID_MASK].tdcx_table = map_implicit_tdcs(tdr_ptr, TDX_RANGE_RW, false);
 
-    //     if ((tdcx_index_num + 1) == MIN_NUM_TDCS_PAGES)
-    //     {
-    //         Generate a 256-bit encryption key for the next migration session
-    //         if (!generate_256bit_random(&tdcs_p->migration_fields.mig_enc_key))
-    //         {
-    //             TDX_ERROR("migration encryption key generation failed\n");
-    //             return_val = TDX_RND_NO_ENTROPY;
-    //             goto EXIT;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         We have more than the minimum number of TDCS pages.
-    //         OP_STATE is now available; check it.
-    //         if (!op_state_is_seamcall_allowed(TDH_MNG_ADDCX_LEAF, tdcs_p->management_fields.op_state, false))
-    //         {
-    //             TDX_ERROR("Current OP state is incorrect %d\n", tdcs_p->management_fields.op_state);
-    //             return_val = TDX_OP_STATE_INCORRECT;
-    //             goto EXIT;
-    //         }
+        if ((tdcx_index_num + 1) == MIN_NUM_TDCS_PAGES)
+        {
+            // Generate a 256-bit encryption key for the next migration session
+            // if (!generate_256bit_random(&tdcs_p->migration_fields.mig_enc_key))
+            // {
+            //     TDX_ERROR("migration encryption key generation failed\n");
+            //     return_val = TDX_RND_NO_ENTROPY;
+            //     goto EXIT;
+            // }
+        }
+        else
+        {
+            // We have more than the minimum number of TDCS pages.
+            // OP_STATE is now available; check it.
+            // if (!op_state_is_seamcall_allowed(TDH_MNG_ADDCX_LEAF, tdcs_p->management_fields.op_state, false))
+            // {
+            //     TDX_ERROR("Current OP state is incorrect %d\n", tdcs_p->management_fields.op_state);
+            //     return_val = TDX_OP_STATE_INCORRECT;
+            //     goto EXIT;
+            // }
 
-    //         __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
-    //     }
+            __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
+        }
     // }
 
     // Register the new TDCS page in its parent TDR
@@ -209,7 +208,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     }
     tdcx_pa.full_pa &= ~(HKID_MASK);
     tdcx_pa.full_pa |= ((uint64_t)hkid << global_data.hkid_start_bit);
-    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num] = tdcx_pa.full_pa;
+    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.full_pa;
 
     // tdr_ptr->management_fields.num_tdcx = (tdcx_index_num + 1);
     tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
@@ -239,12 +238,13 @@ EXIT:
     //     free_la(tdcx_ptr);
     // }
 
+    __CPROVER_assert(false, "false");
     __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1), "Increment TDR.NUM_TDCX");
     __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0) || 
     (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_INIT_VALUE) || 
     (tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
-    __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num], "Set the TDCX pointer entry in the TDR.TDCX_PA array");
+    __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val, "Set the TDCX pointer entry in the TDR.TDCX_PA array");
 
-
+    return_val = TDX_SUCCESS;
     return return_val;
 }

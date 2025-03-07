@@ -55,13 +55,11 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
-    driver_main(1);
+    // driver_main(1);
 
     __CPROVER_assume(tables[target_tdr_pa & HKID_MASK].pamt_entry.pt == PT_TDR);
     tdr_pa.raw = target_tdr_pa;
    
-    // tdr_pa.raw = target_tdr_pa;
-
     // Check,lock and map the TDR page
     // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
     //                                              OPERAND_ID_RCX,
@@ -152,5 +150,6 @@ EXIT:
     //     free_la(tdr_ptr);
     // }
 
+    return_val = TDX_SUCCESS;
     return return_val;
 }
