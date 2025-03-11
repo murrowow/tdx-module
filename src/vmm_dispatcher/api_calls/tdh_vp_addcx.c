@@ -24,16 +24,18 @@
  * @file tdh_vp_addcx.c
  * @brief TDHVPADDCX API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
-#include "accessors/ia32_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/ia32_accessors.h"
+
+#include "driver/driver.h"
 
 
 api_error_type tdh_vp_addcx(uint64_t target_tdcx_pa, uint64_t target_tdvpr_pa)
@@ -68,84 +70,97 @@ api_error_type tdh_vp_addcx(uint64_t target_tdcx_pa, uint64_t target_tdvpr_pa)
     tdvpr_pa.raw = target_tdvpr_pa;
 
     // Check and lock the parent TDVPR page
-    return_val = check_and_lock_explicit_4k_private_hpa(tdvpr_pa,
-                                                         OPERAND_ID_RDX,
-                                                         TDX_LOCK_EXCLUSIVE,
-                                                         PT_TDVPR,
-                                                         &tdvpr_pamt_block,
-                                                         &tdvpr_pamt_entry_ptr,
-                                                         &tdvpr_locked_flag);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock a TDVPR - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_and_lock_explicit_4k_private_hpa(tdvpr_pa,
+    //                                                      OPERAND_ID_RDX,
+    //                                                      TDX_LOCK_EXCLUSIVE,
+    //                                                      PT_TDVPR,
+    //                                                      &tdvpr_pamt_block,
+    //                                                      &tdvpr_pamt_entry_ptr,
+    //                                                      &tdvpr_locked_flag);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock a TDVPR - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
+    tdvpr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdvpr_pamt_entry);
+    __CPROVER_assume(tdvpr_pamt_entry_ptr->pt == PT_TDVPR);
 
     // Get and lock the owner TDR page
     tdr_pa = get_pamt_entry_owner(tdvpr_pamt_entry_ptr);
-    return_val = lock_and_map_implicit_tdr(tdr_pa,
-                                           OPERAND_ID_TDR,
-                                           TDX_RANGE_RW,
-                                           TDX_LOCK_SHARED,
-                                           &tdr_pamt_entry_ptr,
-                                           &tdr_locked_flag,
-                                           &tdr_ptr);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to lock/map a TDR - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = lock_and_map_implicit_tdr(tdr_pa,
+    //                                        OPERAND_ID_TDR,
+    //                                        TDX_RANGE_RW,
+    //                                        TDX_LOCK_SHARED,
+    //                                        &tdr_pamt_entry_ptr,
+    //                                        &tdr_locked_flag,
+    //                                        &tdr_ptr);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to lock/map a TDR - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
 
     // Map the TDCS structure and check the state
-    return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
-                                               false, TDH_VP_ADDCX_LEAF, &tdcs_ptr);
+    // return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
+    //                                            false, TDH_VP_ADDCX_LEAF, &tdcs_ptr);
 
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
+    
+    __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES);
+
+    __CPROVER_assume(seamcall_state_lookup[TDH_VP_CREATE_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
 
     // Get the TD's ephemeral HKID
-    td_hkid = tdr_ptr->key_management_fields.hkid;
+    td_hkid = tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.hkid;
 
     // Map the TDVPS structure.  Note that only the 1st page (TDVPR) is
     // accessible at this point.
-    tdvps_ptr = (tdvps_t*)map_pa((void*)(set_hkid_to_pa(tdvpr_pa, td_hkid).full_pa), TDX_RANGE_RW);
+    // tdvps_ptr = (tdvps_t*)map_pa((void*)(set_hkid_to_pa(tdvpr_pa, td_hkid).full_pa), TDX_RANGE_RW);
 
     // Check the VCPU state
-    if (tdvps_ptr->management.state != VCPU_UNINITIALIZED)
-    {
-        TDX_ERROR("TD VCPU is already initialized\n");
-        return_val = TDX_VCPU_STATE_INCORRECT;
-        goto EXIT;
-    }
+    // if (tdvps_ptr->management.state != VCPU_UNINITIALIZED)
+    // {
+    //     TDX_ERROR("TD VCPU is already initialized\n");
+    //     return_val = TDX_VCPU_STATE_INCORRECT;
+    //     goto EXIT;
+    // }
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.state == VCPU_UNINITIALIZED);
 
     // Get the current number of TDCX pages and verify
-    num_tdvps_pages = tdvps_ptr->management.num_tdvps_pages;
-    if (num_tdvps_pages >= MAX_TDVPS_PAGES)
-    {
-        TDX_ERROR("Number of TDCX pages (%llu) exceeds the allowed count (%d)\n", num_tdvps_pages, MAX_TDVPS_PAGES-1);
-        return_val = TDX_TDCX_NUM_INCORRECT;
-        goto EXIT;
-    }
+    num_tdvps_pages = tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.num_tdvps_pages;
+    // if (num_tdvps_pages >= MAX_TDVPS_PAGES)
+    // {
+    //     TDX_ERROR("Number of TDCX pages (%llu) exceeds the allowed count (%d)\n", num_tdvps_pages, MAX_TDVPS_PAGES-1);
+    //     return_val = TDX_TDCX_NUM_INCORRECT;
+    //     goto EXIT;
+    // }
+    __CPROVER_assume(num_tdvps_pages < MAX_TDVPS_PAGES);
 
     // Check, lock and map the new TDCX page
-    return_val = check_lock_and_map_explicit_private_4k_hpa(tdcx_pa,
-                                                            OPERAND_ID_RCX,
-                                                            tdr_ptr,
-                                                            TDX_RANGE_RW,
-                                                            TDX_LOCK_EXCLUSIVE,
-                                                            PT_NDA,
-                                                            &tdcx_pamt_block,
-                                                            &tdcx_pamt_entry_ptr,
-                                                            &tdcx_locked_flag,
-                                                            (void**)&tdcx_ptr);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock/map a TDCX - error = %lld\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_lock_and_map_explicit_private_4k_hpa(tdcx_pa,
+    //                                                         OPERAND_ID_RCX,
+    //                                                         tdr_ptr,
+    //                                                         TDX_RANGE_RW,
+    //                                                         TDX_LOCK_EXCLUSIVE,
+    //                                                         PT_NDA,
+    //                                                         &tdcx_pamt_block,
+    //                                                         &tdcx_pamt_entry_ptr,
+    //                                                         &tdcx_locked_flag,
+    //                                                         (void**)&tdcx_ptr);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock/map a TDCX - error = %lld\n", return_val);
+    //     goto EXIT;
+    // }
+
+    tdcx_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_pamt_entry);
+    __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
@@ -153,22 +168,29 @@ api_error_type tdh_vp_addcx(uint64_t target_tdcx_pa, uint64_t target_tdvpr_pa)
     // MSR and shadow MSR bitmaps pages are initialized to all -1
     if (is_l2_msr_bitmap_page_index(num_tdvps_pages))
     {
-        fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, (~(uint64_t)0));
+        // fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, (~(uint64_t)0));
+        tables[tdr_pa.raw & HKID_MASK].tdcx_mem = ~(uint64_t)0; 
     }
     else
     {
-        zero_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES);
+        // zero_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES);
+        tables[tdr_pa.raw & HKID_MASK].tdcx_mem = 0; 
     }
 
     // Register the new TDCX in its parent TDVPS structure
     // Note that tdcx_pa[0] is the PA of TDVPR, so TDCX
     // pages start from index 1
-    tdvps_ptr->management.tdvps_pa[num_tdvps_pages] = set_hkid_to_pa(tdcx_pa, td_hkid).raw;
+    // tdvps_ptr->management.tdvps_pa[num_tdvps_pages] = set_hkid_to_pa(tdcx_pa, td_hkid).raw;
+    tdcx_pa.full_pa &= ~(global_data.hkid_mask);
+    tdcx_pa.full_pa |= ((uint64_t)td_hkid << global_data.hkid_start_bit);
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.tdvps_pa[num_tdvps_pages].val = tdcx_pa.raw;
+
     num_tdvps_pages++;
-    tdvps_ptr->management.num_tdvps_pages = (uint8_t)num_tdvps_pages;
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.num_tdvps_pages = (uint8_t)num_tdvps_pages;
 
     // Register the new TDCX page in its owner TDR
-    (void)_lock_xadd_64b(&(tdr_ptr->management_fields.chldcnt), 1);
+    // (void)_lock_xadd_64b(&(tdr_ptr->management_fields.chldcnt), 1);
+    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt++;
 
     // Set the new TDCX page PAMT fields
     tdcx_pamt_entry_ptr->pt = PT_TDCX;
@@ -177,28 +199,31 @@ api_error_type tdh_vp_addcx(uint64_t target_tdcx_pa, uint64_t target_tdvpr_pa)
 
 EXIT:
     // Release all acquired locks and free keyhole mappings
-    if (tdvpr_locked_flag)
-    {
-        pamt_unwalk(tdvpr_pa, tdvpr_pamt_block, tdvpr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-        if (tdvps_ptr != NULL)
-        {
-            free_la(tdvps_ptr);
-        }
-    }
-    if (tdcx_locked_flag)
-    {
-        pamt_unwalk(tdcx_pa, tdcx_pamt_block, tdcx_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-        free_la(tdcx_ptr);
-    }
-    if (tdcs_ptr != NULL)
-    {
-        release_sharex_lock_hp_sh(&tdcs_ptr->management_fields.op_state_lock);
-        free_la(tdcs_ptr);
-    }
-    if (tdr_locked_flag)
-    {
-        pamt_implicit_release_lock(tdr_pamt_entry_ptr, TDX_LOCK_SHARED);
-        free_la(tdr_ptr);
-    }
+    // if (tdvpr_locked_flag)
+    // {
+    //     pamt_unwalk(tdvpr_pa, tdvpr_pamt_block, tdvpr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+    //     if (tdvps_ptr != NULL)
+    //     {
+    //         free_la(tdvps_ptr);
+    //     }
+    // }
+    // if (tdcx_locked_flag)
+    // {
+    //     pamt_unwalk(tdcx_pa, tdcx_pamt_block, tdcx_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+    //     free_la(tdcx_ptr);
+    // }
+    // if (tdcs_ptr != NULL)
+    // {
+    //     release_sharex_lock_hp_sh(&tdcs_ptr->management_fields.op_state_lock);
+    //     free_la(tdcs_ptr);
+    // }
+    // if (tdr_locked_flag)
+    // {
+    //     pamt_implicit_release_lock(tdr_pamt_entry_ptr, TDX_LOCK_SHARED);
+    //     free_la(tdr_ptr);
+    // }
+
+    __CPROVER_assert(false, "false");
+    return_val = TDX_SUCCESS;
     return return_val;
 }

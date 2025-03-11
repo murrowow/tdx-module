@@ -24,17 +24,18 @@
  * @file tdh_vp_create.c
  * @brief TDHVPCREATE API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
-#include "accessors/ia32_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/ia32_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_vp_create(uint64_t target_tdvpr_pa, uint64_t target_tdr_pa)
 {
@@ -60,64 +61,92 @@ api_error_type tdh_vp_create(uint64_t target_tdvpr_pa, uint64_t target_tdr_pa)
     tdr_pa.raw = target_tdr_pa;
 
     // Check, lock and map the owner TDR page
-    return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-                                                 OPERAND_ID_RDX,
-                                                 TDX_RANGE_RW,
-                                                 TDX_LOCK_SHARED,
-                                                 PT_TDR,
-                                                 &tdr_pamt_block,
-                                                 &tdr_pamt_entry_ptr,
-                                                 &tdr_locked_flag,
-                                                 &tdr_ptr);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+    //                                              OPERAND_ID_RDX,
+    //                                              TDX_RANGE_RW,
+    //                                              TDX_LOCK_SHARED,
+    //                                              PT_TDR,
+    //                                              &tdr_pamt_block,
+    //                                              &tdr_pamt_entry_ptr,
+    //                                              &tdr_locked_flag,
+    //                                              &tdr_ptr);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
 
+    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+    __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
+    
     // Map the TDCS structure and check the state
-    return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
-                                               false, TDH_VP_CREATE_LEAF, &tdcs_ptr);
+    // return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
+    //                                            false, TDH_VP_CREATE_LEAF, &tdcs_ptr);
 
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
-        goto EXIT;
-    }
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
+    //     goto EXIT;
+    // }
+
+    __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES);
+
+    __CPROVER_assume(seamcall_state_lookup[TDH_VP_CREATE_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
 
     // Check, lock and map the new TDVPR page
-    return_val = check_lock_and_map_explicit_private_4k_hpa(tdvpr_pa,
-                                                            OPERAND_ID_RCX,
-                                                            tdr_ptr,
-                                                            TDX_RANGE_RW,
-                                                            TDX_LOCK_EXCLUSIVE,
-                                                            PT_NDA,
-                                                            &tdvpr_pamt_block,
-                                                            &tdvpr_pamt_entry_ptr,
-                                                            &tdvpr_locked_flag,
-                                                            (void**)&tdvps_ptr);
-    if (return_val != TDX_SUCCESS)
-    {
-        TDX_ERROR("Failed to check/lock/map a TDVPR - error = 0x%llx\n", return_val);
-        goto EXIT;
-    }
+    // return_val = check_lock_and_map_explicit_private_4k_hpa(tdvpr_pa,
+    //                                                         OPERAND_ID_RCX,
+    //                                                         tdr_ptr,
+    //                                                         TDX_RANGE_RW,
+    //                                                         TDX_LOCK_EXCLUSIVE,
+    //                                                         PT_NDA,
+    //                                                         &tdvpr_pamt_block,
+    //                                                         &tdvpr_pamt_entry_ptr,
+    //                                                         &tdvpr_locked_flag,
+    //                                                         (void**)&tdvps_ptr);
+    // if (return_val != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Failed to check/lock/map a TDVPR - error = 0x%llx\n", return_val);
+    //     goto EXIT;
+    // }
+
+    tdvpr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdvpr_pamt_entry);
+    __CPROVER_assume(tdvpr_pamt_entry_ptr->pt == PT_NDA);
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
     // Clear the content of the TDVPR page using direct writes
-    zero_area_cacheline(tdvps_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    // zero_area_cacheline(tdvps_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_mem = 0; 
 
     /**
      * Initialize TDVPS management fields.
      * Fields which are initialized to zero are implicitly zero'd in the
      * previous state.
      */
-    tdvps_ptr->management.num_tdvps_pages = 1;
-    tdvps_ptr->management.assoc_lpid = (uint32_t)-1;
-    tdvps_ptr->management.tdvps_pa[0] = assign_hkid_to_hpa(tdr_ptr, tdvpr_pa).raw;
+    // tdvps_ptr->management.num_tdvps_pages = 1;
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.num_tdvps_pages = 1;
+
+    // tdvps_ptr->management.assoc_lpid = (uint32_t)-1;
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.assoc_lpid = (uint32_t)-1;
+
+    // tdvps_ptr->management.tdvps_pa[0] = assign_hkid_to_hpa(tdr_ptr, tdvpr_pa).raw;
+    uint16_t hkid;
+    if (&tables[tdr_pa.raw & HKID_MASK].tdr_table == NULL) {
+        hkid = global_data.hkid;
+    } else {
+        hkid = tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.hkid;
+    }
+    tdvpr_pa.full_pa &= ~(HKID_MASK);
+    tdvpr_pa.full_pa |= ((uint64_t)hkid << global_data.hkid_start_bit);
+    tables[tdr_pa.raw & HKID_MASK].tdvpr_table.management.tdvps_pa[0].val = tdvpr_pa.full_pa;
 
     // Register the new TDVPR page in its owner TDR
-    (void)_lock_xadd_64b(&(tdr_ptr->management_fields.chldcnt), 1);
+    // AHMAD: For now ignore atomic increment
+    // (void)_lock_xadd_64b(&(tdr_ptr->management_fields.chldcnt), 1);
+    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt++;
 
     // Set the new TDVPR page PAMT fields
     tdvpr_pamt_entry_ptr->pt = PT_TDVPR;
@@ -125,24 +154,27 @@ api_error_type tdh_vp_create(uint64_t target_tdvpr_pa, uint64_t target_tdr_pa)
 
 EXIT:
     // Release all acquired locks and free keyhole mappings
-    if (tdvpr_locked_flag)
-    {
-        pamt_unwalk(tdvpr_pa, tdvpr_pamt_block, tdvpr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-        free_la(tdvps_ptr);
-    }
+    // if (tdvpr_locked_flag)
+    // {
+    //     pamt_unwalk(tdvpr_pa, tdvpr_pamt_block, tdvpr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+    //     free_la(tdvps_ptr);
+    // }
 
-    if (tdcs_ptr != NULL)
-    {
-        release_sharex_lock_hp_sh(&tdcs_ptr->management_fields.op_state_lock);
-        free_la(tdcs_ptr);
-    }
+    // if (tdcs_ptr != NULL)
+    // {
+    //     release_sharex_lock_hp_sh(&tdcs_ptr->management_fields.op_state_lock);
+    //     free_la(tdcs_ptr);
+    // }
 
-    if (tdr_locked_flag)
-    {
-        pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
-        free_la(tdr_ptr);
-    }
+    // if (tdr_locked_flag)
+    // {
+    //     pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
+    //     free_la(tdr_ptr);
+    // }
 
+    __CPROVER_assert(false, "false");
+
+    return_val = TDX_SUCCESS;
     return return_val;
 }
 

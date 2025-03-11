@@ -70,9 +70,22 @@ typedef struct tdcs_small_s
     struct {
         op_state_e op_state;
     } management_fields;
-    tdcs_epoch_tracking_fields_t           epoch_tracking;
+    tdcs_epoch_tracking_fields_t epoch_tracking;
 
 } tdcs_small_t;
+
+typedef struct tdvps_small_s
+{
+    struct {
+        unsigned state : HKID_SIZE;
+        unsigned num_tdvps_pages : HKID_SIZE;
+        unsigned assoc_lpid : HKID_SIZE;
+        struct {
+            unsigned val : HKID_SIZE;
+        } tdvps_pa[MAX_TDVPS_PAGES];
+    } management;
+
+} tdvps_small_t;
 
 struct hardware_states
 {
@@ -85,6 +98,11 @@ struct hardware_states
    tdcs_small_t tdcx_table;
    uint8_t tdcx_mem;
    bool_t tdcx_lock;
+
+   pamt_entry_t tdvpr_pamt_entry;
+   tdvps_small_t tdvpr_table;
+   uint8_t tdvpr_mem;
+   bool_t tdvpr_lock;
 };
 
 // some kind of flag to give to the driver
@@ -109,4 +127,4 @@ void driver_main(driver_flag);
 // registers
 // Boot NT4 bit
 uint64_t boot_nt4; 
-#endif 
+#endif
