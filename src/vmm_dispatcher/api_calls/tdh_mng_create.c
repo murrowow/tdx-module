@@ -65,7 +65,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     // }
 
     // SOPHIA: assertions that the checks we do pass
-    //driver_main(0); 
     __CPROVER_assume((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)); //hkid within valid bounds
     
     /**
@@ -92,7 +91,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     
     // SOPHIA: hardware model stub
     tdr_pamt_entry_ptr = &(tables[td_hkid & HKID_MASK].pamt_entry);
-    tables[td_hkid & HKID_MASK].tdr_lock = true; 
+    //tables[td_hkid & HKID_MASK].tdr_lock = true; 
     // SOPHIA: This has been checked via assertion on the hardware stub 
     __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
 
@@ -204,7 +203,7 @@ EXIT:
     //     free_la(tdr_ptr);
     // }
 
-    tables[td_hkid & HKID_MASK].tdr_lock = false; 
+    //tables[td_hkid & HKID_MASK].tdr_lock = false; 
 
     __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
     __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");

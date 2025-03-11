@@ -20,6 +20,10 @@
 #include "driver/flows/flows.h"
 #include "src/vmm_dispatcher/api_calls/tdh_mng_create.c"
 
+// SOPHIA: these are the 4 instructions for setting up a TD
 api_error_type tdh_mng_create(uint64_t, hkid_api_input_t);
+api_error_type tdh_mng_key_config(uint64_t);
+api_error_type tdh_mng_add_cx(uint64_t, uint64_t);
+api_error_type tdh_mng_init(uint64_t, uint64_t); 
 
 #endif

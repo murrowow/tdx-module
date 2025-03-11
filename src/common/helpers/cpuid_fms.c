@@ -25,8 +25,8 @@
  * @brief Allowed CPUID definitions
  */
 
-#include "cpuid_fms.h"
-#include "accessors/data_accessors.h"
+#include "src/common/helpers/cpuid_fms.h"
+#include "src/common/accessors/data_accessors.h"
 
 const fms_info_t allowed_fms[TOTAL_KNOWN_FMS] = {
 

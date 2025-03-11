@@ -19,7 +19,7 @@
 #include "stdint.h"
 
 // from tdx_global_data.h the max number of hkids is 2048 
-#define n 3
+#define n 1
 #define HKID_SIZE 0x1 << n
 #define HKID_MASK (0x1U << n) - 1
 
@@ -70,6 +70,7 @@ typedef struct tdcs_small_s
     struct {
         op_state_e op_state;
     } management_fields;
+    tdcs_epoch_tracking_fields_t           epoch_tracking;
 
 } tdcs_small_t;
 
@@ -105,4 +106,7 @@ char kot_lock;
 
 void driver_main(driver_flag); 
 
+// registers
+// Boot NT4 bit
+uint64_t boot_nt4; 
 #endif 

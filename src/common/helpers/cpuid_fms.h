@@ -28,7 +28,7 @@
 #ifndef SRC_COMMON_HELPERS_CPUID_FMS_H_
 #define SRC_COMMON_HELPERS_CPUID_FMS_H_
 
-#include "x86_defs/x86_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
 
 #define NUM_OF_DISALLOWED_FMS           0
 
