@@ -1,9 +1,6 @@
 #ifndef DRIVERHEADER_H
 #define DRIVERHEADER_H
 
-// #define SOURCE
-// #define MODULAR_PROOF
-// #define FLOW_PROOF
 
 #include "include/tdx_vmm_api_handlers.h"
 #include "include/tdx_basic_defs.h"
@@ -21,6 +18,8 @@
 
 #include "stdio.h"
 #include "stdint.h"
+
+// SOPHIA: define SOURCE, MODULAR_PROOF, FLOW_PROOF on command line for compile tine defines
 
 #ifdef SOURCE
 #else 
