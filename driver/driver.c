@@ -2,8 +2,10 @@
 #include "driver/flows/flows.h"
 #include "stdlib.h"
 
-void driver_main(driver_flag flag) {
-    if (flag == BOOTUP) {
+#ifdef SOURCE
+#else 
+void driver_main() {
+    #ifdef SETUP
         // init global data
         __CPROVER_havoc_object(&global_data.private_hkid_min);
         __CPROVER_havoc_object(&global_data.private_hkid_max); 
@@ -16,14 +18,17 @@ void driver_main(driver_flag flag) {
             tables[i].pamt_entry.pt = PT_NDA; 
             tables[i].tdr_lock = false; 
         }
-        //global_data.kot.lock.raw = SHAREX_FREE; 
 
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
-    } else if (flag == MID_SETUP) {
+    #endif // SETUP
+    
+    #ifdef MID_SETUP
         __CPROVER_havoc_object(&local_data.lp_info.pkg);
         __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < 32);
         __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
         __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
-    }
+    #endif // MID_SETUP
+
     TD_setup();
 }
+#endif // not SOURCE
