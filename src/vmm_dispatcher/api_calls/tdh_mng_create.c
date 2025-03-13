@@ -41,8 +41,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 {
     #ifdef SOURCE
         tdx_module_global_t * global_data = get_global_data();
-    #else
-        driver_main(); 
     #endif //SOURCE
 
     // TDR related variables
