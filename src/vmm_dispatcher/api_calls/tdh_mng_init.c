@@ -73,8 +73,11 @@ static api_error_type read_and_set_td_configurations(tdr_t * tdr_ptr,
     td_param_attributes_t tmp_attributes;
     ia32_xcr0_t    tmp_xfam;
 
-    // tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+    #ifdef SOURCE
+    tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+    #else 
     tdx_module_global_t* tdx_global_data_ptr = &global_data;
+    #endif // SOURCE
 
     api_error_type return_val = UNINITIALIZE_ERROR;
 
@@ -571,9 +574,12 @@ EXIT:
 api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa)
 {
     // Global data
-    //tdx_module_global_t * global_data_ptr = get_global_data();
-    // Local data for return values
-    //tdx_module_local_t  * local_data_ptr = get_local_data();
+    #ifdef SOURCE
+        tdx_module_global_t * global_data_ptr = get_global_data();
+        // Local data for return values
+        tdx_module_local_t  * local_data_ptr = get_local_data();
+    #endif // SOURCE
+
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
     tdr_small_t         * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -595,151 +601,201 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
     td_params_pa.raw = target_td_params_pa;
 
     // By default, no extended error code is returned
-    //local_data_ptr->vmm_regs.rcx = 0ULL;
-    local_data.vmm_regs.rcx = 0ULL; 
+    #ifdef SOURCE
+        local_data_ptr->vmm_regs.rcx = 0ULL;
+        #else 
+        local_data.vmm_regs.rcx = 0ULL;
+    #endif // SOURCE
 
-    // Boot NT4 bit should not be set
-    // if ((ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) & MISC_EN_LIMIT_CPUID_MAXVAL_BIT ) != 0)
-    // {
-    //     return_val = TDX_LIMIT_CPUID_MAXVAL_SET;
-    //     goto EXIT;
-    // }
-
-    // SOPHIA: Not sure what Boot NT4 does
-    __CPROVER_assume(boot_nt4 & MISC_EN_LIMIT_CPUID_MAXVAL_BIT != 0);
+    #ifdef SOURCE
+        // Boot NT4 bit should not be set
+        // SOPHIA: With bit 22 set in IA32_MISC_ENABLE, early Windows versions can run on new processors
+        // SOPHIA: Geoff Chappel
+        if ((ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) & MISC_EN_LIMIT_CPUID_MAXVAL_BIT ) != 0)
+        {
+            return_val = TDX_LIMIT_CPUID_MAXVAL_SET;
+            goto EXIT;
+        }
+    #endif // SOURCE
 
     // Check, lock and map the owner TDR page
-    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-    //                                              OPERAND_ID_RCX,
-    //                                              TDX_RANGE_RW,
-    //                                              TDX_LOCK_EXCLUSIVE,
-    //                                              PT_TDR,
-    //                                              &tdr_pamt_block,
-    //                                              &tdr_pamt_entry_ptr,
-    //                                              &tdr_locked_flag,
-    //                                              &tdr_ptr);
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("Failed to check/lock/map a TDR - error = %lld\n", return_val);
-    //     goto EXIT;
-    // }
-    // SOPHIA: check and lock TDR
-    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
-    tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr_table);
-    tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_table);
-    __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA);
+    #ifdef SOURCE
+        return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+                                                 OPERAND_ID_RCX,
+                                                 TDX_RANGE_RW,
+                                                 TDX_LOCK_EXCLUSIVE,
+                                                 PT_TDR,
+                                                 &tdr_pamt_block,
+                                                 &tdr_pamt_entry_ptr,
+                                                 &tdr_locked_flag,
+                                                 &tdr_ptr);
+        if (return_val != TDX_SUCCESS)
+        {
+        TDX_ERROR("Failed to check/lock/map a TDR - error = %lld\n", return_val);
+        goto EXIT;
+        }
+    #else
+        // SOPHIA: check and lock TDR
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+        tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr_table);
+        tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_table);
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "The TDR page metadata in PAMT must be correct (PT must be PT_TDR)."); 
+    #endif // FLOW_PROOF
 
 
     // Map the TDCS structure and check the state
-    // return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_NO_LOCK,
-    //                                            false, TDH_MNG_INIT_LEAF, &tdcs_ptr);
+    #ifdef SOURCE
+        return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_NO_LOCK,
+                                               false, TDH_MNG_INIT_LEAF, &tdcs_ptr);
 
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
-    //     goto EXIT;
-    // }
+        if (return_val != TDX_SUCCESS)
+        {
+        TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
+        goto EXIT;
+        }
+    #endif // SOURCE
+    
+    #ifdef MODULAR_PROOF
     // SOPHIA: from check_td_in_correct_build_state in helpers.h
-    __CPROVER_assume(!tdr_ptr->management_fields.fatal);
-    __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
-    __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
+        __CPROVER_assume(!tdr_ptr->management_fields.fatal);
+        __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        // SOPHIA: from check_td_in_correct_build_state in helpers.h
+        __CPROVER_assert(!tdr_ptr->management_fields.fatal, "The TD is not in a FATAL state");
+        __CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "The TD keys are configured on the hardware");
+        __CPROVER_assert(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES, "All the required TDCS pages have been added but the TD has not have been initialized (TDCS.OP_STATE is UNINITIALIZED)");
+    #endif // FLOW_PROOF
 
     // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
     // Verify the TD PARAMS physical address is canonical and shared
-    // if ((return_val = shared_hpa_check_with_pwr_2_alignment(td_params_pa, TD_PARAMS_ALIGN_IN_BYTES)) != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("Failed on source shared HPA 0x%llx check - error = %llx\n", td_params_pa.raw, return_val);
-    //     return_val = api_error_with_operand_id(return_val, OPERAND_ID_RDX);
-    //     goto EXIT;
-    // }
-    __CPROVER_assume(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES));
-    //SOPHIA: shared_hpa_check from helpers.c
-    __CPROVER_assume(!is_pa_smaller_than_max_pa(td_params_pa.raw));
-    __CPROVER_assume(is_overlap(get_addr_from_pa(td_params_pa), TD_PARAMS_ALIGN_IN_BYTES, 
+    #ifdef SOURCE
+        if ((return_val = shared_hpa_check_with_pwr_2_alignment(td_params_pa, TD_PARAMS_ALIGN_IN_BYTES)) != TDX_SUCCESS)
+        {
+            TDX_ERROR("Failed on source shared HPA 0x%llx check - error = %llx\n", td_params_pa.raw, return_val);
+            return_val = api_error_with_operand_id(return_val, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES));
+        //SOPHIA: shared_hpa_check from helpers.c
+        __CPROVER_assume(!is_pa_smaller_than_max_pa(td_params_pa.raw));
+        __CPROVER_assume(is_overlap(get_addr_from_pa(td_params_pa), TD_PARAMS_ALIGN_IN_BYTES, 
                      global_data.private_hkid_min, 
                      global_data.private_hkid_max - global_data.private_hkid_min));
-    __CPROVER_assume((uint64_t)get_hkid_from_pa(td_params_pa) >= global_data.private_hkid_min);
+        __CPROVER_assume((uint64_t)get_hkid_from_pa(td_params_pa) >= global_data.private_hkid_min);
+    #endif // MODULAR_PROOF
 
-    // Map the TD PARAMS address
-    // td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
+    #ifdef SOURCE
+        // Map the TD PARAMS address
+        td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
+    #endif // SOURCE
     /**
      *  Initialize the TD management fields
      */
     // SOPHIA: VCPUs for multiple core systems I believe so can ignore for now
-    // tdcs_ptr->management_fields.num_vcpus = 0U;
-    // tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
+    #ifdef SOURCE
+        tdcs_ptr->management_fields.num_vcpus = 0U;
+        tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
+    #endif // SOURCE
     // SOPHIA: epoch
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
 
-    // SOPHIA: I don't think native_tsc_frequency is going to be an important field
-    //uint64_t native_tsc_frequency = get_global_data()->native_tsc_frequency;
-    //tdx_sanity_check((native_tsc_frequency <= BIT_MASK_32BITS), SCEC_SEAMCALL_SOURCE(TDH_MNG_INIT_LEAF), 0);
-    // safe to cast to 32-bits due to the sanity check above
-    //tdcs_ptr->executions_ctl_fields.hp_lock_timeout = translate_usec_to_tsc(DEFAULT_HP_LOCK_TIMEOUT_USEC, (uint32_t)native_tsc_frequency);
+    // SOPHIA: TSC = time stamp counter: counts number of cycles since the last reset
+    // SOPHIA: Do not think this is important for now
+    #ifdef SOURCE
+        uint64_t native_tsc_frequency = get_global_data()->native_tsc_frequency;
+        tdx_sanity_check((native_tsc_frequency <= BIT_MASK_32BITS), SCEC_SEAMCALL_SOURCE(TDH_MNG_INIT_LEAF), 0);
+        // safe to cast to 32-bits due to the sanity check above
+        tdcs_ptr->executions_ctl_fields.hp_lock_timeout = translate_usec_to_tsc(DEFAULT_HP_LOCK_TIMEOUT_USEC, (uint32_t)native_tsc_frequency);
+    #endif // SOURCE
 
     /**
      *  Read the TD configuration input and set TDCS fields
      */
-    // return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
+    #ifdef SOURCE
+        return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
 
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("read_and_set_td_configurations failed\n");
-    //     goto EXIT;
-    // }
+        if (return_val != TDX_SUCCESS)
+        {
+            TDX_ERROR("read_and_set_td_configurations failed\n");
+            goto EXIT;
+        }
+    #endif // SOURCE
 
     /**
      *  Handle CPUID Configuration
      */
-    // return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
-    //                                                local_data_ptr);
+    #ifdef SOURCE
+        return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
+                                                   local_data_ptr);
 
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("read_and_set_cpuid_configurations failed\n");
-    //     goto EXIT;
-    // }
+        if (return_val != TDX_SUCCESS)
+        {
+            TDX_ERROR("read_and_set_cpuid_configurations failed\n");
+            goto EXIT;
+        }
+    #endif // SOURCE
 
     // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
-    // if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
-    //                                       td_params_ptr->ia32_arch_capabilities_config))
-    // {
-    //     TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
-    //     return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
-    //     goto EXIT;
-    // }
+    #ifdef SOURCE
+        if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
+                                          td_params_ptr->ia32_arch_capabilities_config))
+        {
+        TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
+        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
+        goto EXIT;
+        }
+    #endif // SOURCE
 
     // if (!td_immutable_state_cross_check(tdcs_ptr))
-    // {
-    //     TDX_ERROR("td_immutable_state_cross_check failed\n");
-    //     return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-    //     goto EXIT;
-    // }
+    #ifdef SOURCE
+        {
+        TDX_ERROR("td_immutable_state_cross_check failed\n");
+        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+        goto EXIT;
+        }
+    #endif // SOURCE
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
     /**
      *  Build the MSR bitmaps
      */
-    //set_msr_bitmaps(tdcs_ptr);
+    #ifdef SOURCE
+    set_msr_bitmaps(tdcs_ptr);
 
     // Initialize the virtual MSR values
-    //init_virt_ia32_vmx_msrs(tdcs_ptr);
+    init_virt_ia32_vmx_msrs(tdcs_ptr);
+    #endif // SOURCE
 
     /**
      *  Initialize the TD Measurement Fields
      */
     store_xmms_in_buffer(xmms);
 
-    // SOPHIA: some crytographic function 
-    // if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
-    // {
-    //     // Unexpected error - Fatal Error
-    //     TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
-    //     FATAL_ERROR();
-    // }
+    // SOPHIA: Crytographic function we will assume works correctly
+    #ifdef SOURCE
+        if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
+        {
+            // Unexpected error - Fatal Error
+            TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
+            FATAL_ERROR();
+        }
+    #endif // SOURCE
 
     load_xmms_from_buffer(xmms);
     basic_memset_to_zero(xmms, sizeof(xmms));
@@ -751,18 +807,22 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
     return_val = TDX_SUCCESS; 
 EXIT:
     // Release all acquired locks and free keyhole mappings
-    // if (tdr_locked_flag)
-    // {
-    //     pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-    //     free_la(tdr_ptr);
-    // }
-    // if (tdcs_ptr != NULL)
-    // {
-    //     free_la(tdcs_ptr);
-    // }
-    // if (td_params_ptr != NULL)
-    // {
-    //     free_la(td_params_ptr);
-    // }
+    
+    #ifdef SOURCE
+        if (tdr_locked_flag)
+        {
+            pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+            free_la(tdr_ptr);
+        }
+        if (tdcs_ptr != NULL)
+        {
+            free_la(tdcs_ptr);
+        }
+        if (td_params_ptr != NULL)
+        {
+            free_la(td_params_ptr);
+        }
+    #endif // SOURCE
+
     return return_val;
 }

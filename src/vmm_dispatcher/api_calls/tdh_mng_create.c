@@ -69,7 +69,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //SOURCE
 
     #ifdef FLOW_PROOF
-        __CPROVER_assume((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max), "hkid within valid bounds");
+        __CPROVER_assert((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max), "hkid within valid bounds");
     #endif //FLOW_PROOF
 
     #ifdef MODULAR_PROOF
@@ -139,7 +139,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
+        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE, "HKID in KOT has the correct value in the table"); //"HKID in KOT has the correct value in the table"
     #endif // FLOW_PROOF
 
     // Clear the content of the TDR page using direct writes
