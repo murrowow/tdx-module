@@ -87,7 +87,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR);
+        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "PAMT has correct state stored in it");
     #endif //FLOW_PROOF
 
     //Verify TDR is not in fatal state
@@ -104,25 +104,25 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+        __CPROVER_assert(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal, "Not in a fatal state");
     #endif //FLOW_PROOF
 
 
     // Verify LIFECYCLE_STATE
     #ifdef SOURCE
-    // if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
-    // {
-    //     TDX_ERROR("TDR HKID state is not assigned. lifecycle_state = %d\n", tdr_ptr->management_fields.lifecycle_state);
-    //     return_val = TDX_LIFECYCLE_STATE_INCORRECT;
-    //     goto EXIT;
-    // }
+    if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
+    {
+        TDX_ERROR("TDR HKID state is not assigned. lifecycle_state = %d\n", tdr_ptr->management_fields.lifecycle_state);
+        return_val = TDX_LIFECYCLE_STATE_INCORRECT;
+        goto EXIT;
+    }
     #endif //SOURCE
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED);
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED, "Lifecycle is in the correct state");
     #endif //FLOW_PROOF
     
     // Check if the key is already configured
@@ -139,7 +139,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         __CPROVER_assume(!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))));
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))));
+        __CPROVER_assert(!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))), "Check if the key is already configured");
     #endif //FLOW_PROOF
 
     /** Try to configure the key on the package using a CPU-generated key.
@@ -180,7 +180,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap);
+        // __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap);
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)));
         __CPROVER_assume(((tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
                         || (!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)));

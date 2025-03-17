@@ -29,6 +29,6 @@ void driver_main() {
         __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
     #endif // MID_SETUP
 
-    //TD_setup();
+    TD_setup();
 }
 #endif // not SOURCE

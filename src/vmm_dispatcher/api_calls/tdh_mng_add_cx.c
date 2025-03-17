@@ -87,7 +87,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR);
+        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "PAMT is labeled correctly");
     #endif //FLOW_PROOF
 
     // Check the TD state
@@ -104,7 +104,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+        __CPROVER_assert(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal, "Make sure the TD is not in a fatal state");
     #endif //FLOW_PROOF
 
     #ifdef SOURCE
@@ -120,7 +120,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "Lifecycle is in the correct state");
     #endif //FLOW_PROOF
 
     // Get the current number of TDCS pages and verify
@@ -143,7 +143,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tdcx_index_num < MAX_NUM_TDCS_PAGES);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdcx_index_num < MAX_NUM_TDCS_PAGES);
+        __CPROVER_assert(tdcx_index_num < MAX_NUM_TDCS_PAGES, "ensure valid number of TDCS pages added");
     #endif //FLOW_PROOF
 
     // Check, lock and map the new TDCX page
@@ -179,7 +179,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA);
+        __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA, "Make sure TDCX entry is correct");
     #endif //FLOW_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
@@ -222,7 +222,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdcx_mem)
+        __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdcx_mem);
         if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
         {
             __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0); 
@@ -280,7 +280,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
                     __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
                 #endif //MODULAR_PROOF
                 #ifdef FLOW_PROOF
-                    __CPROVER_assert(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
+                    __CPROVER_assert(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state], "Correct op state");
                 #endif //FLOW_PROOF
             }
         }
@@ -321,8 +321,8 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        uint currChildCount = tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt;
-        __CPROVER_havoc_pbject(&tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields);
+        uint64_t currChildCount = tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt;
+        __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields);
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa);
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1));
         __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1);
