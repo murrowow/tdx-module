@@ -13,6 +13,8 @@
 #include "src/common/accessors/ia32_accessors.h"
 #include "src/vmm_dispatcher/tdx_vmm_dispatcher.h"
 
+#include "driver/driver.h"
+
 #include "stdio.h"
 #include "stdint.h"
 

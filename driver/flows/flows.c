@@ -11,6 +11,9 @@ void TD_setup() {
     __CPROVER_havoc_object(&target_tdr_pa);
     __CPROVER_havoc_object(&target_tdcx_pa);
     __CPROVER_havoc_object(&hkid_info); 
+    // SOPHIA: For now assume HKID is upper most bits of the PA
+    __CPROVER_assume(hkid_info.hkid == target_tdr_pa >> (64-16)); 
+    __CPROVER_assume(hkid_info.hkid >= global_data.private_hkid_min & hkid_info.hkid <= global_data.private_hkid_max); 
 
     error = tdh_mng_create(target_tdr_pa, hkid_info); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");

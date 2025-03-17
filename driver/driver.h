@@ -24,7 +24,7 @@
 #ifdef SOURCE
 #else 
 // from tdx_global_data.h the max number of hkids is 2048 
-#define n 1
+#define n 2
 #define HKID_SIZE 0x1 << n
 #define HKID_MASK (0x1U << n) - 1
 
