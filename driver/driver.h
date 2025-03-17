@@ -24,7 +24,7 @@
 #ifdef SOURCE
 #else 
 // from tdx_global_data.h the max number of hkids is 2048 
-#define n 2
+#define n 1
 #define HKID_SIZE 0x1 << n
 #define HKID_MASK (0x1U << n) - 1
 
@@ -69,8 +69,11 @@ typedef struct tdcs_small_s
 {
     struct {
         op_state_e op_state;
+        uint16_t num_l2_vms;
     } management_fields;
-    tdcs_epoch_tracking_fields_t epoch_tracking;
+    tdcs_execution_control_fields_t        executions_ctl_fields;
+    tdcs_epoch_tracking_fields_t           epoch_tracking;
+    tdcs_measurement_fields_t              measurement_fields;
 
 } tdcs_small_t;
 

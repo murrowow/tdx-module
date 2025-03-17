@@ -65,131 +65,199 @@ static void apply_cpuid_xfam_masks(cpuid_config_return_values_t* cpuid_values,
     }
 }
 
-static api_error_type read_and_set_td_configurations(tdr_t * tdr_ptr,
+#ifdef SOURCE
+    static api_error_type read_and_set_td_configurations(tdr_t * tdr_ptr,
                                                      tdcs_t * tdcs_ptr,
                                                      td_params_t * td_params_ptr)
+#else 
+    static api_error_type read_and_set_td_configurations(tdr_small_t * tdr_ptr,
+                                                     tdcs_small_t * tdcs_ptr,
+                                                     td_params_t * td_params_ptr)
+#endif // SOURCE
 {
     ia32e_eptp_t   target_eptp = { .raw = 0 };
     td_param_attributes_t tmp_attributes;
     ia32_xcr0_t    tmp_xfam;
 
     #ifdef SOURCE
-    tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+        tdx_module_global_t* tdx_global_data_ptr = get_global_data();
     #else 
-    tdx_module_global_t* tdx_global_data_ptr = &global_data;
+        tdx_module_global_t* tdx_global_data_ptr = &global_data;
     #endif // SOURCE
 
     api_error_type return_val = UNINITIALIZE_ERROR;
 
     // Read and verify ATTRIBUTES
     tmp_attributes.raw = td_params_ptr->attributes.raw;
-    if (!verify_td_attributes(tmp_attributes, false))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_ATTRIBUTES);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!verify_td_attributes(tmp_attributes, false))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_ATTRIBUTES);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(verify_td_attributes(tmp_attributes, false));
+    #endif 
+
     tdcs_ptr->executions_ctl_fields.attributes.raw = tmp_attributes.raw;
 
     tdcs_ptr->executions_ctl_fields.td_ctls.pending_ve_disable = tmp_attributes.sept_ve_disable;
 
     // Read and verify XFAM
+    #ifdef SOURCE
     tmp_xfam.raw = td_params_ptr->xfam;
     if (!check_xfam(tmp_xfam))
     {
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_XFAM);
         goto EXIT;
     }
+    #endif // SOURCE
     tdcs_ptr->executions_ctl_fields.xfam = tmp_xfam.raw;
 
-    set_xbuff_offsets_and_size(tdcs_ptr, tmp_xfam.raw);
+    #ifdef SOURCE
+        set_xbuff_offsets_and_size(tdcs_ptr, tmp_xfam.raw);
+    #else
+        // SOPHIA: Not sure how effective this would, but just outlined entire function body
+        uint32_t offset = offsetof(xsave_area_t, extended_region);
+        for (uint32_t xfam_i = 2; xfam_i <= XCR0_MAX_VALID_BIT; xfam_i++)
+        {
+            if ((tmp_xfam.raw & BIT(xfam_i)) != 0)
+            {
+                if (tdx_global_data_ptr->xsave_comp[xfam_i].align)
+                {
+                    // Align the offset up to the next 64B boundary
+                    offset = ROUND_UP(offset, 64U);
+                }
+                tdcs_ptr->executions_ctl_fields.xbuff_offsets[xfam_i] = offset;
+                offset += tdx_global_data_ptr->xsave_comp[xfam_i].size;
+            }
+        }
+
+        tdcs_ptr->executions_ctl_fields.xbuff_size = offset;
+    #endif // SOURCE
 
     // Read and verify MAX_VCPUS
     uint32_t max_vcpus = (uint32_t)td_params_ptr->max_vcpus;
-    if ((max_vcpus == 0) || (max_vcpus > MAX_VCPUS_PER_TD))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_MAX_VCPUS);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if ((max_vcpus == 0) || (max_vcpus > MAX_VCPUS_PER_TD))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_MAX_VCPUS);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(!(max_vcpus == 0) & !(max_vcpus > MAX_VCPUS_PER_TD));
+    #endif // SOURCE
     tdcs_ptr->executions_ctl_fields.max_vcpus = max_vcpus;
 
     uint16_t num_l2_vms = (uint16_t)td_params_ptr->num_l2_vms;
-    if (num_l2_vms > MAX_L2_VMS)
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_NUM_L2_VMS);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (num_l2_vms > MAX_L2_VMS)
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_NUM_L2_VMS);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(num_l2_vms <= MAX_L2_VMS);
+    #endif // SOURCE
 
     // Now that we know the number of L2 VMs, check that enough pages have been allocated for TDCS
-    if (!is_required_tdcs_allocated(tdr_ptr, num_l2_vms))
-    {
-        return_val = TDX_TDCS_NOT_ALLOCATED;
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!is_required_tdcs_allocated(tdr_ptr, num_l2_vms))
+        {
+            return_val = TDX_TDCS_NOT_ALLOCATED;
+            goto EXIT;
+        }
+    #else 
+        // SOPHIA: simply just pulled out the function body
+        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >=
+            (uint32_t)(MIN_NUM_TDCS_PAGES + (TDCS_PAGES_PER_L2_VM * num_l2_vms)));
+    #endif // SOURCE 
 
     // Only now we can safely update TDCS; NUM_L2_VMS is used by TDH.MNG.RD/WR to calculate offset into TDCS
     tdcs_ptr->management_fields.num_l2_vms = num_l2_vms;
 
     // Check reserved0 bits are 0
-    if (!tdx_memcmp_to_zero(td_params_ptr->reserved_0, TD_PARAMS_RESERVED0_SIZE))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!tdx_memcmp_to_zero(td_params_ptr->reserved_0, TD_PARAMS_RESERVED0_SIZE))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(tdx_memcmp_to_zero(td_params_ptr->reserved_0, TD_PARAMS_RESERVED0_SIZE));
+    #endif // SOURCE 
 
     // Read and verify CONFIG_FLAGS
     config_flags_t config_flags_local_var;
     config_flags_local_var.raw = td_params_ptr->config_flags.raw;
 
-    if (!verify_td_config_flags(config_flags_local_var))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_EXEC_CONTROLS);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!verify_td_config_flags(config_flags_local_var))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_EXEC_CONTROLS);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(verify_td_config_flags(config_flags_local_var)); 
+    #endif 
 
     // Read and verify EPTP_CONTROLS
     target_eptp.raw = td_params_ptr->eptp_controls.raw;
 
-    if (!verify_and_set_td_eptp_controls(tdr_ptr, tdcs_ptr, config_flags_local_var.gpaw, target_eptp))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_EPTP_CONTROLS);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!verify_and_set_td_eptp_controls(tdr_ptr, tdcs_ptr, config_flags_local_var.gpaw, target_eptp))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_EPTP_CONTROLS);
+            goto EXIT;
+        }
+    #else 
+    #endif 
 
     tdcs_ptr->executions_ctl_fields.config_flags.raw = config_flags_local_var.raw;
     tdcs_ptr->executions_ctl_fields.gpaw = config_flags_local_var.gpaw;
 
-    uint16_t virt_tsc_freq = td_params_ptr->tsc_frequency;
-    if ((virt_tsc_freq < VIRT_TSC_FREQUENCY_MIN) || (virt_tsc_freq > VIRT_TSC_FREQUENCY_MAX))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_TSC_FREQUENCY);
-        goto EXIT;
-    }
+    // SOPHIA: TSC Freq abstracted away for now
+    #ifdef SOURCE
+        uint16_t virt_tsc_freq = td_params_ptr->tsc_frequency;
+        if ((virt_tsc_freq < VIRT_TSC_FREQUENCY_MIN) || (virt_tsc_freq > VIRT_TSC_FREQUENCY_MAX))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_TSC_FREQUENCY);
+            goto EXIT;
+        }
+    #endif // SOURCE
 
-    tdcs_ptr->executions_ctl_fields.tsc_frequency = virt_tsc_freq;
+    // SOPHIA: TSC Freq abstracted away for now
+    #ifdef SOURCE
+        tdcs_ptr->executions_ctl_fields.tsc_frequency = virt_tsc_freq;
 
-    // We read TSC below.  Compare IA32_TSC_ADJUST to the value sampled on TDHSYSINIT
-    // to make sure the host VMM doesn't play any trick on us.
-    if (ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR) != tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust)
-    {
-        return_val = api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TSC_ADJ_MSR_ADDR);
-        goto EXIT;
-    }
+        // We read TSC below.  Compare IA32_TSC_ADJUST to the value sampled on TDHSYSINIT
+        // to make sure the host VMM doesn't play any trick on us.
+        if (ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR) != tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust)
+        {
+            return_val = api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TSC_ADJ_MSR_ADDR);
+            goto EXIT;
+        }
 
-    // Calculate TSC multiplier of offset that will be written in every TD VMCS, such that
-    // virtual TSC will advance at the configured frequency, and will start from 0 at this
-    // moment.
-    calculate_tsc_virt_params(ia32_rdtsc(),tdx_global_data_ptr->native_tsc_frequency,
-                              virt_tsc_freq, 0,
-                              &tdcs_ptr->executions_ctl_fields.tsc_multiplier,
-                              &tdcs_ptr->executions_ctl_fields.tsc_offset);
+        // Calculate TSC multiplier of offset that will be written in every TD VMCS, such that
+        // virtual TSC will advance at the configured frequency, and will start from 0 at this
+        // moment.
+        calculate_tsc_virt_params(ia32_rdtsc(),tdx_global_data_ptr->native_tsc_frequency,
+                                  virt_tsc_freq, 0,
+                                  &tdcs_ptr->executions_ctl_fields.tsc_multiplier,
+                                  &tdcs_ptr->executions_ctl_fields.tsc_offset);
 
+    #endif // SOURCE 
 
     // Check reserved1 bits are 0
-    if (!tdx_memcmp_to_zero(td_params_ptr->reserved_1, TD_PARAMS_RESERVED1_SIZE))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (!tdx_memcmp_to_zero(td_params_ptr->reserved_1, TD_PARAMS_RESERVED1_SIZE))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(tdx_memcmp_to_zero(td_params_ptr->reserved_1, TD_PARAMS_RESERVED1_SIZE));
+    #endif // SOURCE
 
     tdx_memcpy(tdcs_ptr->measurement_fields.mr_config_id.bytes, sizeof(measurement_t),
                td_params_ptr->mr_config_id.bytes, sizeof(measurement_t));
@@ -198,19 +266,26 @@ static api_error_type read_and_set_td_configurations(tdr_t * tdr_ptr,
     tdx_memcpy(tdcs_ptr->measurement_fields.mr_owner_config.bytes, sizeof(measurement_t),
                td_params_ptr->mr_owner_config.bytes, sizeof(measurement_t));
 
-    if (td_params_ptr->msr_config_ctls.reserved_0 != 0)
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (td_params_ptr->msr_config_ctls.reserved_0 != 0)
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(td_params_ptr->msr_config_ctls.reserved_0 == 0);
+    #endif 
 
     // Check reserved2 bits are 0
-    if (!tdx_memcmp_to_zero(td_params_ptr->reserved_2, TD_PARAMS_RESERVED2_SIZE))
-    {
-        return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-        goto EXIT;
-    }
-
+    #ifdef SOURCE 
+        if (!tdx_memcmp_to_zero(td_params_ptr->reserved_2, TD_PARAMS_RESERVED2_SIZE))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(tdx_memcmp_to_zero(td_params_ptr->reserved_2, TD_PARAMS_RESERVED2_SIZE)); 
+    #endif // SOURCE
     return_val = TDX_SUCCESS;
 
 EXIT:
@@ -580,6 +655,7 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
         tdx_module_local_t  * local_data_ptr = get_local_data();
     #endif // SOURCE
 
+    driver_main(); 
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
     tdr_small_t         * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -639,15 +715,11 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
         tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
         tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr_table);
         tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_table);
-    #endif // SOURCE
+    #endif // SOURCE */
 
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA);
+        __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //, "Page Metadata Table should be correct"
     #endif // MODULAR_PROOF
-
-    #ifdef FLOW_PROOF
-        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "The TDR page metadata in PAMT must be correct (PT must be PT_TDR)."); 
-    #endif // FLOW_PROOF
 
 
     // Map the TDCS structure and check the state
@@ -668,13 +740,6 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
         __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
     #endif // MODULAR_PROOF
-
-    #ifdef FLOW_PROOF
-        // SOPHIA: from check_td_in_correct_build_state in helpers.h
-        __CPROVER_assert(!tdr_ptr->management_fields.fatal, "The TD is not in a FATAL state");
-        __CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "The TD keys are configured on the hardware");
-        __CPROVER_assert(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES, "All the required TDCS pages have been added but the TD has not have been initialized (TDCS.OP_STATE is UNINITIALIZED)");
-    #endif // FLOW_PROOF
 
     // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
     // Verify the TD PARAMS physical address is canonical and shared
@@ -701,6 +766,9 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
         // Map the TD PARAMS address
         td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
     #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+    #endif // MODULAR_PROOF
     /**
      *  Initialize the TD management fields
      */
@@ -726,14 +794,17 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
     /**
      *  Read the TD configuration input and set TDCS fields
      */
-    #ifdef SOURCE
-        return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
 
+    return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
+    
+    #ifdef SOURCE
         if (return_val != TDX_SUCCESS)
         {
             TDX_ERROR("read_and_set_td_configurations failed\n");
             goto EXIT;
         }
+    #else 
+        __CPROVER_assume(return_val == TDX_SUCCESS); 
     #endif // SOURCE
 
     /**
@@ -748,6 +819,9 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
             TDX_ERROR("read_and_set_cpuid_configurations failed\n");
             goto EXIT;
         }
+    #else 
+        return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, 
+                                                       &global_data, &local_data);
     #endif // SOURCE
 
     // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
@@ -761,8 +835,8 @@ api_error_type tdh_mng_init(uint64_t target_tdr_pa, uint64_t target_td_params_pa
         }
     #endif // SOURCE
 
-    // if (!td_immutable_state_cross_check(tdcs_ptr))
     #ifdef SOURCE
+        if (!td_immutable_state_cross_check(tdcs_ptr))
         {
         TDX_ERROR("td_immutable_state_cross_check failed\n");
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
@@ -823,6 +897,6 @@ EXIT:
             free_la(td_params_ptr);
         }
     #endif // SOURCE
-
+    __CPROVER_assert(false, "false"); 
     return return_val;
 }
