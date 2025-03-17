@@ -64,74 +64,123 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     tdr_pa.raw = target_tdr_pa;
 
     // Check, lock and map the owner TDR page
-    // return_val = check_lock_and_map_explicit_tdr(tdr_pa,
-    //                                              OPERAND_ID_RDX,
-    //                                              TDX_RANGE_RW,
-    //                                              TDX_LOCK_EXCLUSIVE,
-    //                                              PT_TDR,
-    //                                              &tdr_pamt_block,
-    //                                              &tdr_pamt_entry_ptr,
-    //                                              &tdr_locked_flag,
-    //                                              &tdr_ptr);
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
-    //     goto EXIT;
-    // }
-    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
-    __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
+    #ifdef SOURCE
+        return_val = check_lock_and_map_explicit_tdr(tdr_pa,
+                                                    OPERAND_ID_RDX,
+                                                    TDX_RANGE_RW,
+                                                    TDX_LOCK_EXCLUSIVE,
+                                                    PT_TDR,
+                                                    &tdr_pamt_block,
+                                                    &tdr_pamt_entry_ptr,
+                                                    &tdr_locked_flag,
+                                                    &tdr_ptr);
+        if (return_val != TDX_SUCCESS)
+        {
+            TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
+            goto EXIT;
+        }
+    #else
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
+    #endif //MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR);
+    #endif //FLOW_PROOF
 
     // Check the TD state
-    // if (tdr_ptr->management_fields.fatal)
-    // {
-    //     TDX_ERROR("TDR state is fatal\n");
-    //     return_val = TDX_TD_FATAL;
-    //     goto EXIT;
-    // }
-    __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+    #ifdef SOURCE
+        if (tdr_ptr->management_fields.fatal)
+        {
+            TDX_ERROR("TDR state is fatal\n");
+            return_val = TDX_TD_FATAL;
+            goto EXIT;
+        }
+    #endif //SOURCE
 
-    // if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
-    // {
-    //     TDX_ERROR("TDR key state not configured\n");
-    //     return_val = TDX_TD_KEYS_NOT_CONFIGURED;
-    //     goto EXIT;
-    // }
-    __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+    #endif //MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(!tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.fatal);
+    #endif //FLOW_PROOF
+
+    #ifdef SOURCE
+        if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
+        {
+            TDX_ERROR("TDR key state not configured\n");
+            return_val = TDX_TD_KEYS_NOT_CONFIGURED;
+            goto EXIT;
+        }
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+    #endif //MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+    #endif //FLOW_PROOF
 
     // Get the current number of TDCS pages and verify
-    tdcx_index_num = tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx;
-    // if (tdcx_index_num > (MAX_NUM_TDCS_PAGES-1))
-    // {
-    //     TDX_ERROR("Number of TDCS pages (%lu) exceeds the allowed count (%d)\n", tdcx_index_num, MAX_NUM_TDCS_PAGES-1);
-    //     return_val = TDX_TDCX_NUM_INCORRECT;
-    //     goto EXIT;
-    // }
-    __CPROVER_assume(tdcx_index_num < MAX_NUM_TDCS_PAGES);
+    #ifdef SOURCE
+        tdcx_index_num = tdr_ptr->management_fields.num_tdcx;
+    #else
+        tdcx_index_num = tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx;
+    #endif //SOURCE
+
+    #ifdef SOURCE
+        if (tdcx_index_num > (MAX_NUM_TDCS_PAGES-1))
+        {
+            TDX_ERROR("Number of TDCS pages (%lu) exceeds the allowed count (%d)\n", tdcx_index_num, MAX_NUM_TDCS_PAGES-1);
+            return_val = TDX_TDCX_NUM_INCORRECT;
+            goto EXIT;
+        }
+    #endif //SOURCE
+    
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdcx_index_num < MAX_NUM_TDCS_PAGES);
+    #endif //MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdcx_index_num < MAX_NUM_TDCS_PAGES);
+    #endif //FLOW_PROOF
 
     // Check, lock and map the new TDCX page
-    // return_val = check_lock_and_map_explicit_private_4k_hpa(tdcx_pa,
-    //                                                         OPERAND_ID_RCX,
-    //                                                         tdr_ptr,
-    //                                                         TDX_RANGE_RW,
-    //                                                         TDX_LOCK_EXCLUSIVE,
-    //                                                         PT_NDA,
-    //                                                         &tdcx_pamt_block,
-    //                                                         &tdcx_pamt_entry_ptr,
-    //                                                         &tdcx_locked_flag,
-    //                                                         (void**)&tdcx_ptr);
-                                                            
-    // if (return_val != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("Failed to check/lock/map a TDCS - error = %llx\n", return_val);
-    //     goto EXIT;
-    // }
+    #ifdef SOURCE
+        return_val = check_lock_and_map_explicit_private_4k_hpa(tdcx_pa,
+                                                                OPERAND_ID_RCX,
+                                                                tdr_ptr,
+                                                                TDX_RANGE_RW,
+                                                                TDX_LOCK_EXCLUSIVE,
+                                                                PT_NDA,
+                                                                &tdcx_pamt_block,
+                                                                &tdcx_pamt_entry_ptr,
+                                                                &tdcx_locked_flag,
+                                                                (void**)&tdcx_ptr);
+                                                                
+        if (return_val != TDX_SUCCESS)
+        {
+            TDX_ERROR("Failed to check/lock/map a TDCS - error = %llx\n", return_val);
+            goto EXIT;
+        }
+    #else
+        tdcx_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_pamt_entry);
+    #endif //SOURCE
 
-    // pa_t hpa_with_hkid = assign_hkid_to_hpa(tdr_ptr, tdcx_pa);
+    // AHMAD: Abstract away mappings for now
+    #ifdef SOURCE
+        pa_t hpa_with_hkid = assign_hkid_to_hpa(tdr_ptr, tdcx_pa);
 
-    // tdcx_ptr = map_pa((void*)hpa_with_hkid.full_pa, TDX_RANGE_RW);
+        tdcx_ptr = map_pa((void*)hpa_with_hkid.full_pa, TDX_RANGE_RW);
+    #endif //SOURCE
 
-    tdcx_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_pamt_entry);
-    __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
+    #endif //MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA);
+    #endif //FLOW_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
@@ -142,108 +191,174 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
      *  Other pages are filled with 0's.
      */
 
-    if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
-    {
-        // fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, (~(uint64_t)0));
-        tables[tdr_pa.raw & HKID_MASK].tdcx_mem = ~(uint64_t)0; 
-    }
-    else if (tdcx_index_num == SEPT_ROOT_PAGE_INDEX)
-    {
-        // fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, SEPTE_INIT_VALUE);
-        tables[tdr_pa.raw & HKID_MASK].tdcx_mem = SEPTE_INIT_VALUE; 
-    }
-    else
-    {
-        // fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, SEPTE_L2_INIT_VALUE);
-        tables[tdr_pa.raw & HKID_MASK].tdcx_mem = SEPTE_L2_INIT_VALUE; 
-    }
-
-    /* OP_STATE is assumed to reside in the first TDCS page, and its value is 0 so there's no need
-           to initialize it separately. */
-    // tdx_sanity_check(offsetof(tdcs_t, management_fields) + offsetof(tdcs_management_fields_t, op_state) <=
-    //                  _4KB - sizeof(tdcs_p->management_fields.op_state),
-    //                  SCEC_SEAMCALL_SOURCE(TDH_MNG_ADDCX_LEAF), 0);  // Ensure it fits in the first page
-    // tdx_sanity_check(0 == OP_STATE_UNINITIALIZED, SCEC_SEAMCALL_SOURCE(TDH_MNG_ADDCX_LEAF), 0);
-
-    // if ((tdcx_index_num + 1) >= MIN_NUM_TDCS_PAGES)
-    // {
-        // With the new page, we have enough TDCS pages to do some initializations and checks.
-
-        // Map the TDCS structure and check the state.
-        // AHMAD: Stubbed this function since it maps the tdcs pages to keyholes
-        // tdcs_p = map_implicit_tdcs(tdr_ptr, TDX_RANGE_RW, false);
-
-        if ((tdcx_index_num + 1) == MIN_NUM_TDCS_PAGES)
+    #ifdef SOURCE
+        if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
         {
-            // Generate a 256-bit encryption key for the next migration session
-            // if (!generate_256bit_random(&tdcs_p->migration_fields.mig_enc_key))
-            // {
-            //     TDX_ERROR("migration encryption key generation failed\n");
-            //     return_val = TDX_RND_NO_ENTROPY;
-            //     goto EXIT;
-            // }
+            fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, (~(uint64_t)0));
+        }
+        else if (tdcx_index_num == SEPT_ROOT_PAGE_INDEX)
+        {
+            fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, SEPTE_INIT_VALUE);
         }
         else
         {
-            // We have more than the minimum number of TDCS pages.
-            // OP_STATE is now available; check it.
-            // if (!op_state_is_seamcall_allowed(TDH_MNG_ADDCX_LEAF, tdcs_p->management_fields.op_state, false))
-            // {
-            //     TDX_ERROR("Current OP state is incorrect %d\n", tdcs_p->management_fields.op_state);
-            //     return_val = TDX_OP_STATE_INCORRECT;
-            //     goto EXIT;
-            // }
-
-            __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
+            fill_area_cacheline(tdcx_ptr, TDX_PAGE_SIZE_IN_BYTES, SEPTE_L2_INIT_VALUE);
         }
-    // }
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+        if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
+        {
+            tables[tdr_pa.raw & HKID_MASK].tdcx_mem = ~(uint64_t)0; 
+        }
+        else if (tdcx_index_num == SEPT_ROOT_PAGE_INDEX)
+        {
+            tables[tdr_pa.raw & HKID_MASK].tdcx_mem = SEPTE_INIT_VALUE; 
+        }
+        else
+        {
+            tables[tdr_pa.raw & HKID_MASK].tdcx_mem = SEPTE_L2_INIT_VALUE; 
+        }
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_havoc_object(&tables[tdr_pa.raw & HKID_MASK].tdcx_mem)
+        if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
+        {
+            __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0); 
+        }
+        else if (tdcx_index_num == SEPT_ROOT_PAGE_INDEX)
+        {
+           __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_INIT_VALUE); 
+        }
+        else
+        {
+            __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_L2_INIT_VALUE); 
+        }
+    #endif //FLOW_PROOF
+
+    #ifdef SOURCE
+        if ((tdcx_index_num + 1) >= MIN_NUM_TDCS_PAGES)
+        {
+            // With the new page, we have enough TDCS pages to do some initializations and checks.
+
+            // Map the TDCS structure and check the state.
+            tdcs_p = map_implicit_tdcs(tdr_ptr, TDX_RANGE_RW, false);
+
+            if ((tdcx_index_num + 1) == MIN_NUM_TDCS_PAGES)
+            {
+                Generate a 256-bit encryption key for the next migration session
+                if (!generate_256bit_random(&tdcs_p->migration_fields.mig_enc_key))
+                {
+                    TDX_ERROR("migration encryption key generation failed\n");
+                    return_val = TDX_RND_NO_ENTROPY;
+                    goto EXIT;
+                }
+            }
+            else
+            {
+                We have more than the minimum number of TDCS pages.
+                OP_STATE is now available; check it.
+                if (!op_state_is_seamcall_allowed(TDH_MNG_ADDCX_LEAF, tdcs_p->management_fields.op_state, false))
+                {
+                    TDX_ERROR("Current OP state is incorrect %d\n", tdcs_p->management_fields.op_state);
+                    return_val = TDX_OP_STATE_INCORRECT;
+                    goto EXIT;
+                }
+            }
+        }
+    #else 
+        if ((tdcx_index_num + 1) >= MIN_NUM_TDCS_PAGES)
+        {
+            // With the new page, we have enough TDCS pages to do some initializations and checks.
+
+            // Map the TDCS structure and check the state.
+            // AHMAD: Abstract away mapping the tdcs pages to keyholes
+            if ((tdcx_index_num + 1) != MIN_NUM_TDCS_PAGES)
+            {
+                #ifdef MODULAR_PROOF
+                    __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
+                #endif //MODULAR_PROOF
+                #ifdef FLOW_PROOF
+                    __CPROVER_assert(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
+                #endif //FLOW_PROOF
+            }
+        }
+    #endif //SOURCE
 
     // Register the new TDCS page in its parent TDR
-    // tdr_ptr->management_fields.tdcx_pa[tdcx_index_num] = assign_hkid_to_hpa(tdr_ptr, tdcx_pa).raw;
-    uint16_t hkid;
-    if (&tables[tdr_pa.raw & HKID_MASK].tdr_table == NULL) {
-        hkid = global_data.hkid;
-    } else {
-        hkid = tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.hkid;
-    }
-    tdcx_pa.full_pa &= ~(HKID_MASK);
-    tdcx_pa.full_pa |= ((uint64_t)hkid << global_data.hkid_start_bit);
-    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.full_pa;
+    #ifdef SOURCE
+        tdr_ptr->management_fields.tdcx_pa[tdcx_index_num] = assign_hkid_to_hpa(tdr_ptr, tdcx_pa).raw;
+        tdr_ptr->management_fields.num_tdcx = (tdcx_index_num + 1);
 
-    // tdr_ptr->management_fields.num_tdcx = (tdcx_index_num + 1);
-    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
+        // Complete new TDCX page registration in its parent TDR
+        tdr_ptr->management_fields.chldcnt++;
 
-    // Complete new TDCX page registration in its parent TDR
-    // tdr_ptr->management_fields.chldcnt++;
-    tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt++;
+        // Set the new TDCS page PAMT fields
+        tdcx_pamt_entry_ptr->pt = PT_TDCX;
+        set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa);  
+    #else
+        uint16_t hkid;
+        if (&tables[tdr_pa.raw & HKID_MASK].tdr_table == NULL) {
+            hkid = global_data.hkid;
+        } else {
+            hkid = tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.hkid;
+        }
+        tdcx_pa.full_pa &= ~(HKID_MASK);
+        tdcx_pa.full_pa |= ((uint64_t)hkid << global_data.hkid_start_bit);
+    #endif //SOURCE
 
-    // Set the new TDCS page PAMT fields
-    tdcx_pamt_entry_ptr->pt = PT_TDCX;
-    set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
+    #ifdef MODULAR_PROOF
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.full_pa;
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
+
+        // Complete new TDCX page registration in its parent TDR
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt++;
+
+        // Set the new TDCS page PAMT fields
+        tdcx_pamt_entry_ptr->pt = PT_TDCX;
+        set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        uint currChildCount = tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt;
+        __CPROVER_havoc_pbject(&tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields);
+        __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa);
+        __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1));
+        __CPROVER_assume(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1);
+
+        __CPROVER_havoc_object(tdcx_pamt_entry_ptr); 
+        __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_TDCX);
+        __CPROVER_assume(tdcx_pamt_entry_ptr->owner == tdr_pa.page_4k_num);
+    #endif //FLOW_PROOF
 
 EXIT:
-    // if (tdcs_p)
-    // {
-    //     free_la(tdcs_p);
-    // }
-    // // Release all acquired locks and free keyhole mappings
-    // if (tdr_locked_flag)
-    // {
-    //     pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-    //     free_la(tdr_ptr);
-    // }
-    // if (tdcx_locked_flag)
-    // {
-    //     pamt_unwalk(tdcx_pa, tdcx_pamt_block, tdcx_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
-    //     free_la(tdcx_ptr);
-    // }
+    #ifdef SOURCE
+        if (tdcs_p)
+        {
+            free_la(tdcs_p);
+        }
+        // Release all acquired locks and free keyhole mappings
+        if (tdr_locked_flag)
+        {
+            pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+            free_la(tdr_ptr);
+        }
+        if (tdcx_locked_flag)
+        {
+            pamt_unwalk(tdcx_pa, tdcx_pamt_block, tdcx_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
+            free_la(tdcx_ptr);
+        }
+    #endif //SOURCE
 
-    __CPROVER_assert(false, "false");
-    __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1), "Increment TDR.NUM_TDCX");
-    __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0) || 
-    (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_INIT_VALUE) || 
-    (tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
-    __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val, "Set the TDCX pointer entry in the TDR.TDCX_PA array");
+    #ifdef MODULAR_PROOF
+        __CPROVER_assert(false, "false");
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1), "Increment TDR.NUM_TDCX");
+        __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0) || 
+        (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_INIT_VALUE) || 
+        (tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa, "Set the TDCX pointer entry in the TDR.TDCX_PA array");
+    #endif //MODULAR_PROOF
 
     return_val = TDX_SUCCESS;
     return return_val;

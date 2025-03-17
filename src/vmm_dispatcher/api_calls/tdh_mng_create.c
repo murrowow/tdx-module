@@ -108,7 +108,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "the pamt table is PT_NDA"); 
-    #endif //MODULAR_PROOF
+    #endif //FLOW_PROOF
 
     // Acquire exclusive access to KOT
     #ifdef SOURCE
