@@ -74,6 +74,7 @@ typedef struct tdcs_small_s
     tdcs_execution_control_fields_t        executions_ctl_fields;
     tdcs_epoch_tracking_fields_t           epoch_tracking;
     tdcs_measurement_fields_t              measurement_fields;
+    cpuid_config_return_values_t           cpuid_config_vals[MAX_POSSIBLE_CPUID_LOOKUP];
 
 } tdcs_small_t;
 
@@ -124,8 +125,5 @@ char kot_lock;
 
 void driver_main(); 
 
-// registers
-// Boot NT4 bit
-uint64_t boot_nt4; 
 #endif // not SOURCE
 #endif
