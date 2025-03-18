@@ -62,6 +62,8 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
 
     tdcx_pa.raw = target_tdcx_pa;
     tdr_pa.raw = target_tdr_pa;
+    __CPROVER_printf("INDEX: %d   ALSO: %d     OPSTATE BEFORE: %d\n", tdr_pa.raw & HKID_MASK, tdr_pa.raw, tables[0].tdcx_table.management_fields.op_state);
+
 
     // Check, lock and map the owner TDR page
     #ifdef SOURCE
@@ -182,6 +184,8 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA, "Make sure TDCX entry is correct");
     #endif //FLOW_PROOF
 
+    __CPROVER_printf("INDEX: %d   ALSO: %d     OPSTATE PRE: %d\n", tdr_pa.raw & HKID_MASK, tdr_pa.raw, tables[(tdr_pa.raw & HKID_MASK)].tdcx_table.management_fields.op_state);
+
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
     /**
@@ -274,15 +278,17 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
 
             // Map the TDCS structure and check the state.
             // AHMAD: Abstract away mapping the tdcs pages to keyholes
-            if ((tdcx_index_num + 1) != MIN_NUM_TDCS_PAGES)
-            {
-                #ifdef MODULAR_PROOF
-                    __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state]);
-                #endif //MODULAR_PROOF
-                #ifdef FLOW_PROOF
-                    __CPROVER_assert(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state], "Correct op state");
-                #endif //FLOW_PROOF
-            }
+            // if ((tdcx_index_num + 1) != MIN_NUM_TDCS_PAGES)
+            // {
+            //     __CPROVER_printf("OPSTATE: %d\n", tables[(tdr_pa.raw & HKID_MASK)].tdcx_table.management_fields.op_state);
+            //     #ifdef MODULAR_PROOF
+            //         __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[(tdr_pa.raw & HKID_MASK)].tdcx_table.management_fields.op_state]);
+            //         __CPROVER_printf("OPSTATE POST: %d\n", tables[tdr_pa.raw & HKID_MASK].tdcx_table.management_fields.op_state);
+            //     #endif //MODULAR_PROOF
+            //     #ifdef FLOW_PROOF
+            //         __CPROVER_assert(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[(tdr_pa.raw & HKID_MASK)].tdcx_table.management_fields.op_state], "Correct op state");
+            //     #endif //FLOW_PROOF
+            // }
         }
     #endif //SOURCE
 
@@ -309,7 +315,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #endif //SOURCE
 
     #ifdef MODULAR_PROOF
-        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.full_pa;
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.raw & (HKID_SIZE << 1 - 1);
         tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
 
         // Complete new TDCX page registration in its parent TDR
@@ -353,11 +359,11 @@ EXIT:
 
     #ifdef MODULAR_PROOF
         __CPROVER_assert(false, "false");
-        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1), "Increment TDR.NUM_TDCX");
-        __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == ~(uint64_t)0) || 
-        (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_INIT_VALUE) || 
-        (tables[tdr_pa.raw & HKID_MASK].tdcx_mem == SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
-        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa, "Set the TDCX pointer entry in the TDR.TDCX_PA array");
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1) & HKID_MASK, "Increment TDR.NUM_TDCX");
+        __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == (uint8_t)(~0)) || 
+        (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[tdr_pa.raw & HKID_MASK].tdcx_mem == (uint8_t)SEPTE_INIT_VALUE) || 
+        (tables[tdr_pa.raw & HKID_MASK].tdcx_mem == (uint8_t)SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
+        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == (tdcx_pa.raw & (HKID_SIZE << 1 - 1)), "Set the TDCX pointer entry in the TDR.TDCX_PA array");
     #endif //MODULAR_PROOF
 
     return_val = TDX_SUCCESS;

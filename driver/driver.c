@@ -22,12 +22,46 @@ void driver_main() {
         __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     #endif // SETUP
     
-    #ifdef MID_SETUP
+    #ifdef KEY_CONFIG_SETUP
         __CPROVER_havoc_object(&local_data.lp_info.pkg);
-        __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < 32);
+        __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < HKID_SIZE);
         __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
         __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
-    #endif // MID_SETUP
+
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_havoc_object(&tables[i]);
+        }
+        // Ensure at least one element has pamt_entry.pt set to PT_TDR
+        bool_t found = false;
+        for (int i = 0; i < HKID_SIZE; i++) {
+            if (tables[i].pamt_entry.pt == PT_TDR) {
+                found = true;
+                break;
+            }
+        }
+        __CPROVER_assume(found);
+
+    #endif // KEY_CONFIG_SETUP
+
+    #ifdef ADD_CX_SETUP
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_havoc_object(&tables[i].pamt_entry);
+            __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
+            __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
+            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
+            __CPROVER_printf("INDEX: %d      OPSTATE VERY: %d\n", i, tables[(i)].tdcx_table.management_fields.op_state);
+        }
+        // Ensure at least one element has pamt_entry.pt set to PT_TDR
+        bool_t found = false;
+        for (int i = 0; i < HKID_SIZE; i++) {
+            if (tables[i].pamt_entry.pt == PT_TDR && tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED && tables[i].tdcx_table.management_fields.op_state == OP_STATE_UNINITIALIZED) {
+                found = true;
+                break;
+            }
+        }
+        __CPROVER_assume(found);
+
+    #endif // ADD_CX_SETUP
 
     TD_setup();
 }

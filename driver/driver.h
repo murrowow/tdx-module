@@ -27,6 +27,7 @@
 #define n 1
 #define HKID_SIZE 0x1 << n
 #define HKID_MASK (0x1U << n) - 1
+#define NUM_TDCX_BIT_WIDTH ((MAX_NUM_TDCS_PAGES) == 0 ? 1 : (32 - __builtin_clz(MAX_NUM_TDCS_PAGES)))
 
 
 // flag that controls what hardware is being written to
@@ -40,8 +41,8 @@ typedef struct tdr_small_s
     struct {
         bool_t fatal;
 
-        unsigned num_tdcx : HKID_SIZE;
-        unsigned chldcnt : HKID_SIZE;
+        unsigned num_tdcx : NUM_TDCX_BIT_WIDTH;
+        unsigned chldcnt : NUM_TDCX_BIT_WIDTH;
         td_lifecycle_state_t  lifecycle_state;
         struct {
             unsigned val : HKID_SIZE;
@@ -103,10 +104,10 @@ struct hardware_states
    uint8_t tdcx_mem;
    bool_t tdcx_lock;
 
-   pamt_entry_t tdvpr_pamt_entry;
-   tdvps_small_t tdvpr_table;
-   uint8_t tdvpr_mem;
-   bool_t tdvpr_lock;
+//    pamt_entry_t tdvpr_pamt_entry;
+//    tdvps_small_t tdvpr_table;
+//    uint8_t tdvpr_mem;
+//    bool_t tdvpr_lock;
 };
 
 // global_data pointer 

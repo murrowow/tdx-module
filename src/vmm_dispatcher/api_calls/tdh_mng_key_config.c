@@ -57,10 +57,6 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
 
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
-    #ifndef SOURCE
-    __CPROVER_assume(tables[target_tdr_pa & HKID_MASK].pamt_entry.pt == PT_TDR);
-    #endif //SOURCE
-
     tdr_pa.raw = target_tdr_pa;
    
     // Check,lock and map the TDR page
@@ -171,7 +167,7 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
     #endif //SOURCE
     
     #ifdef MODULAR_PROOF
-        tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap |= (BIT(local_data.lp_info.pkg));
+        tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap |= BIT(local_data.lp_info.pkg);
 
         if (tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == (uint64_t)global_data.pkg_config_bitmap)
         {
@@ -197,8 +193,8 @@ EXIT:
     #endif //SOURCE
 
     #ifdef MODULAR_PROOF
-        __CPROVER_assert(false, "false");
-        __CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)), "current package configured");
+        __CPROVER_assert(false, "false");        
+        __CPROVER_assert((tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & BIT(local_data.lp_info.pkg)) != 0, "current package configured");
         __CPROVER_assert(((tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
                         || (!(tables[tdr_pa.raw & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[tdr_pa.raw & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)),
                         "correctly adjusts lifecycle state if keys are configured on all packages");
