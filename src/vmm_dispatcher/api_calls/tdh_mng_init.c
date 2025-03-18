@@ -292,11 +292,17 @@ EXIT:
     return return_val;
 }
 
-
-static api_error_type read_and_set_cpuid_configurations(tdcs_t * tdcs_ptr,
+#ifdef SOURCE
+    static api_error_type read_and_set_cpuid_configurations(tdcs_t * tdcs_ptr,
                                                         td_params_t * td_params_ptr,
                                                         tdx_module_global_t * global_data_ptr,
                                                         tdx_module_local_t * local_data_ptr)
+#else 
+static api_error_type read_and_set_cpuid_configurations(tdcs_small_t * tdcs_ptr,
+    td_params_t * td_params_ptr,
+    tdx_module_global_t * global_data_ptr,
+    tdx_module_local_t * local_data_ptr)
+#endif // SOURCE
 {
     uint32_t cpuid_index = 0;
     cpuid_config_leaf_subleaf_t cpuid_leaf_subleaf;
