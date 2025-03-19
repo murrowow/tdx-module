@@ -7,19 +7,20 @@
 void driver_main() {
     #ifdef SETUP
         // init global data
-        __CPROVER_havoc_object(&global_data.private_hkid_min);
-        __CPROVER_havoc_object(&global_data.private_hkid_max); 
+        __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
         __CPROVER_assume((global_data.private_hkid_min > 0x00000000) && (global_data.private_hkid_min < 0xFFFFFFFF)); 
         __CPROVER_assume((global_data.private_hkid_max > global_data.private_hkid_min) && (global_data.private_hkid_max < 0xFFFFFFFF)); 
         
+
+        __CPROVER_havoc_object(&tables);
         //init the kot table
         for (int i = 0; i < HKID_SIZE; i++) {
-            global_data.kot.entries[i].state = KOT_STATE_HKID_FREE;
-            tables[i].pamt_entry.pt = PT_NDA; 
-            tables[i].tdr_lock = false; 
+            __CPROVER_assume(global_data.kot.entries[i].state == KOT_STATE_HKID_FREE);
+            __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
+            __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
         }
-
-        __CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
+        __CPROVER_printf("SOPHIA in driver fatal: %d", tables[0].tdr_table.management_fields.fatal);
+        //__CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
     #endif // SETUP
     
     #ifdef KEY_CONFIG_SETUP

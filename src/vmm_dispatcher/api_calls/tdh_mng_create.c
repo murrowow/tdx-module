@@ -152,11 +152,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         tables[td_hkid & HKID_MASK].tdr_mem = 0; 
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        __CPROVER_havoc_object(&tables[td_hkid & HKID_MASK]);
-        __CPROVER_assume(&tables[td_hkid & HKID_MASK] == 0);
-    #endif
-
     
     /**
      * Initialize the TD Management and Key Management Fields.
@@ -225,6 +220,8 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #ifdef FLOW_PROOF
         // Mark the HKID entry in the KOT as assigned
         __CPROVER_havoc_object(&global_data.kot.entries[td_hkid & HKID_MASK]);
+        __CPROVER_havoc_slice(&(tables[td_hkid & HKID_MASK].tdr_mem), sizeof(uint8_t));
+        __CPROVER_havoc_slice(tdr_pamt_entry_ptr, sizeof(pamt_entry_t));
         __CPROVER_assume(global_data.kot.entries[td_hkid & HKID_MASK].state == (uint8_t)KOT_STATE_HKID_ASSIGNED);
 
         // Set HKID in the TKT entry
@@ -241,9 +238,10 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.handoff_version == global_data.module_hv);
 
         // Set the new TDR page PAMT fields
-        __CPROVER_havoc_object(tdr_pamt_entry_ptr); 
         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR);
         __CPROVER_assume(tdr_pamt_entry_ptr->owner == 0);
+
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_mem == 0);
     #endif // FLOW_PROOF
 
 EXIT:
@@ -269,16 +267,9 @@ EXIT:
 
     #ifdef MODULAR_PROOF
         __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
-        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware pamt was set correctly");
+        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware  pamt was set correctly");
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
-        __CPROVER_assert(false, "false");
     #endif //MODULAR_PROOF
-
-    #ifdef FLOW_PROOF
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR);
-        __CPROVER_assume(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED);
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_mem == 0);
-    #endif //FLOW_PROOF
 
     return_val = TDX_SUCCESS;
     return return_val;
