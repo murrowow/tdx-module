@@ -18,6 +18,7 @@ void driver_main() {
             __CPROVER_assume(global_data.kot.entries[i].state == KOT_STATE_HKID_FREE);
             __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
             __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
+            __CPROVER_assume(tables[i].tdr_table.key_management_fields.pkg_config_bitmap == 0); 
         }
         __CPROVER_printf("SOPHIA in driver fatal: %d", tables[0].tdr_table.management_fields.fatal);
         //__CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
