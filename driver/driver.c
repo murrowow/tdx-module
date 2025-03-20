@@ -57,10 +57,12 @@ void driver_main() {
             __CPROVER_havoc_object(&tables[i].pamt_entry);
             __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
             __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
-            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
-            __CPROVER_printf("INDEX: %d      OPSTATE VERY: %d\n", i, tables[(i)].tdcx_table.management_fields.op_state);
         }
-        // Ensure at least one element has pamt_entry.pt set to PT_TDR
+
+        for(int i = 0; i < HKID_SIZE; i++)
+            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
+        
+        // Ensure at least one element is as we need it
         bool_t found = false;
         for (int i = 0; i < HKID_SIZE; i++) {
             if (tables[i].pamt_entry.pt == PT_TDR && tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED && tables[i].tdcx_table.management_fields.op_state == OP_STATE_UNINITIALIZED) {

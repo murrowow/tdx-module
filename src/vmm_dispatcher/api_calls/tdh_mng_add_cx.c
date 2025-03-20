@@ -249,7 +249,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
 
             if ((tdcx_index_num + 1) == MIN_NUM_TDCS_PAGES)
             {
-                Generate a 256-bit encryption key for the next migration session
+                // Generate a 256-bit encryption key for the next migration session
                 if (!generate_256bit_random(&tdcs_p->migration_fields.mig_enc_key))
                 {
                     TDX_ERROR("migration encryption key generation failed\n");
@@ -327,7 +327,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         uint64_t currChildCount = tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt;
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));
         // SOPHIA: This line below causes verification to break
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa);
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.raw & (HKID_SIZE << 1 - 1));
         
         // SOPHIA: everything below is okay 
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1));
