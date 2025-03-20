@@ -311,7 +311,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #endif //SOURCE
 
     #ifdef MODULAR_PROOF
-        tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.raw & (HKID_SIZE << 1 - 1);
+        tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.raw & ((HKID_SIZE << 1) - 1);
         tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
 
         // Complete new TDCX page registration in its parent TDR
@@ -326,11 +326,15 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #ifdef FLOW_PROOF
         uint64_t currChildCount = tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt;
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));
-        // SOPHIA: This line below causes verification to break
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.raw & (HKID_SIZE << 1 - 1));
-        
-        // SOPHIA: everything below is okay 
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1));
+        struct {
+            unsigned val : 2;
+        } two_bit;
+        tdcx_pa_two_bit.val = tdcx_pa.raw & ((HKID_SIZE << 1) - 1);
+        __CPROVER_assert(false, "false1");
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa_two_bit.val);
+        __CPROVER_assert(false, "false2");
+
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == tdcx_index_num + 1);
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1); 
 
         __CPROVER_havoc_slice(tdcx_pamt_entry_ptr, sizeof(pamt_entry_t)); 
@@ -363,7 +367,7 @@ EXIT:
         __CPROVER_assert((tdcx_index_num == MSR_BITMAPS_PAGE_INDEX && tables[td_hkid & HKID_MASK].tdcx_mem == (uint8_t)(~0)) || 
         (tdcx_index_num == SEPT_ROOT_PAGE_INDEX && tables[td_hkid & HKID_MASK].tdcx_mem == (uint8_t)SEPTE_INIT_VALUE) || 
         (tables[td_hkid & HKID_MASK].tdcx_mem == (uint8_t)SEPTE_L2_INIT_VALUE), "Initialize the TDCX page contents using direct writes");
-        __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == (tdcx_pa.raw & (HKID_SIZE << 1 - 1)), "Set the TDCX pointer entry in the TDR.TDCX_PA array");
+        __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == (tdcx_pa.raw & ((HKID_SIZE << 1) - 1)), "Set the TDCX pointer entry in the TDR.TDCX_PA array");
     #endif //MODULAR_PROOF
 
     return_val = TDX_SUCCESS;
