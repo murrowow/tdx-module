@@ -22,8 +22,8 @@ void TD_setup() {
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_mng_key_config(target_tdr_pa); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    // error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // tdh_mng_init(target_tdr_pa, target_td_params_pa);
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
 }

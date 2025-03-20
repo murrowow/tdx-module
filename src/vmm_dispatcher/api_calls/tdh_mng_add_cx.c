@@ -224,7 +224,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_havoc_object(&tables[td_hkid & HKID_MASK].tdcx_mem);
+        __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdcx_mem, sizeof(uint8_t));
         if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
         {
             __CPROVER_assume(tables[td_hkid & HKID_MASK].tdcx_mem == ~(uint64_t)0); 
@@ -259,8 +259,8 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
             }
             else
             {
-                We have more than the minimum number of TDCS pages.
-                OP_STATE is now available; check it.
+                // We have more than the minimum number of TDCS pages.
+                // OP_STATE is now available; check it.
                 if (!op_state_is_seamcall_allowed(TDH_MNG_ADDCX_LEAF, tdcs_p->management_fields.op_state, false))
                 {
                     TDX_ERROR("Current OP state is incorrect %d\n", tdcs_p->management_fields.op_state);
@@ -322,14 +322,18 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
     #endif //MODULAR_PROOF
 
+
     #ifdef FLOW_PROOF
         uint64_t currChildCount = tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt;
-        __CPROVER_havoc_object(&tables[td_hkid & HKID_MASK].tdr_table.management_fields);
+        __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));
+        // SOPHIA: This line below causes verification to break
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa.full_pa);
+        
+        // SOPHIA: everything below is okay 
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == (tdcx_index_num + 1));
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1);
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1); 
 
-        __CPROVER_havoc_object(tdcx_pamt_entry_ptr); 
+        __CPROVER_havoc_slice(tdcx_pamt_entry_ptr, sizeof(pamt_entry_t)); 
         __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_TDCX);
         __CPROVER_assume(tdcx_pamt_entry_ptr->owner == tdr_pa.page_4k_num);
     #endif //FLOW_PROOF

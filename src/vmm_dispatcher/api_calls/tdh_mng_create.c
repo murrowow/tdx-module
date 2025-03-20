@@ -219,7 +219,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 
     #ifdef FLOW_PROOF
         // Mark the HKID entry in the KOT as assigned
-        __CPROVER_havoc_object(&global_data.kot.entries[td_hkid & HKID_MASK]);
+        __CPROVER_havoc_slice(&global_data.kot.entries[td_hkid & HKID_MASK], sizeof(kot_entry_t));
         __CPROVER_havoc_slice(&(tables[td_hkid & HKID_MASK].tdr_mem), sizeof(uint8_t));
         __CPROVER_havoc_slice(tdr_pamt_entry_ptr, sizeof(pamt_entry_t));
         __CPROVER_assume(global_data.kot.entries[td_hkid & HKID_MASK].state == (uint8_t)KOT_STATE_HKID_ASSIGNED);

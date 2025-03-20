@@ -10,6 +10,8 @@ void driver_main() {
         __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
         __CPROVER_assume((global_data.private_hkid_min > 0x00000000) && (global_data.private_hkid_min < 0xFFFFFFFF)); 
         __CPROVER_assume((global_data.private_hkid_max > global_data.private_hkid_min) && (global_data.private_hkid_max < 0xFFFFFFFF)); 
+        __CPROVER_assume(global_data.hkid_start_bit == (64 - 16)); 
+        __CPROVER_havoc_object(&tables); 
         
 
         __CPROVER_havoc_object(&tables);
@@ -19,9 +21,14 @@ void driver_main() {
             __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
             __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
             __CPROVER_assume(tables[i].tdr_table.key_management_fields.pkg_config_bitmap == 0); 
+            __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES); 
+            __CPROVER_assume(tables[i].tdcx_pamt_entry.pt == PT_NDA);
+            __CPROVER_assume((tables[i].tdcx_table.management_fields.op_state >= 0) && (tables[i].tdcx_table.management_fields.op_state <= 10));
+
+            // SOPHIA: highkey have no idea what this does for add_cx
+            __CPROVER_assume(seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[i].tdcx_table.management_fields.op_state]); 
         }
-        __CPROVER_printf("SOPHIA in driver fatal: %d", tables[0].tdr_table.management_fields.fatal);
-        //__CPROVER_printf(("seamrr_base: %llx seamrr_top: %llx", global_data.private_hkid_min, global_data.private_hkid_max));
+
     #endif // SETUP
     
     #ifdef KEY_CONFIG_SETUP

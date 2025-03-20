@@ -176,13 +176,19 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         }
     #endif //MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        __CPROVER_havoc_object(&tables[td_hkid & HKID_MASK].tdr_table.key_management_fields);
-        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)));
-        __CPROVER_assume(((tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
-                        || (!(tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)));
-    #endif //FLOW_PROOF
+    // #ifdef FLOW_PROOF
+    //     __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.key_management_fields, sizeof(&tables[td_hkid & HKID_MASK].tdr_table.key_management_fields));
+    //     __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == 
+    //                     tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap | (BIT(local_data.lp_info.pkg)));
+    //     __CPROVER_assume(((tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
+    //                     || (!(tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)));
+    // #endif //FLOW_PROOF
 
+    // SOPHIA: for now abstract away and assume we are simply configuring one key
+    #ifdef FLOW_PROOF
+        __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state, sizeof(td_lifecycle_state_t));
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED);
+    #endif // FLOW_PROOF
 EXIT:
     #ifdef SOURCE
         // Release all acquired locks and free keyhole mappings
