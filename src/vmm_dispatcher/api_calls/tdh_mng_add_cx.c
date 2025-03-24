@@ -328,7 +328,7 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));
         struct {
             unsigned val : 2;
-        } two_bit;
+        } tdcx_pa_two_bit;
         tdcx_pa_two_bit.val = tdcx_pa.raw & ((HKID_SIZE << 1) - 1);
         __CPROVER_assert(false, "false1");
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa_two_bit.val);
