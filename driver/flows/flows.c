@@ -18,13 +18,13 @@ void TD_setup() {
     __CPROVER_assume(hkid_info.hkid == target_tdr_pa >> (64-16)); 
     __CPROVER_assume(hkid_info.hkid >= global_data.private_hkid_min & hkid_info.hkid <= global_data.private_hkid_max); 
 
-    error = tdh_mng_create(target_tdr_pa, hkid_info); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    error = tdh_mng_key_config(target_tdr_pa); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    // tdh_mng_init(target_tdr_pa, target_td_params_pa);
+    // error = tdh_mng_create(target_tdr_pa, hkid_info); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_mng_key_config(target_tdr_pa); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    tdh_mng_init(target_tdr_pa, target_td_params_pa);
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
 }
 

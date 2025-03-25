@@ -187,6 +187,7 @@
      td_param_attributes_t tmp_attributes;
      ia32_xcr0_t    tmp_xfam;
  
+     // SOPHIA: get global data pointer
      #ifdef SOURCE
          tdx_module_global_t* tdx_global_data_ptr = get_global_data();
      #else 
@@ -792,7 +793,6 @@
          tdx_module_local_t  * local_data_ptr = get_local_data();
      #endif // SOURCE
  
-     driver_main(); 
      // TDR related variables
      pa_t                  tdr_pa;                    // TDR physical address
      tdr_small_t         * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -816,7 +816,7 @@
      // By default, no extended error code is returned
      #ifdef SOURCE
          local_data_ptr->vmm_regs.rcx = 0ULL;
-         #else 
+     #else 
          local_data.vmm_regs.rcx = 0ULL;
      #endif // SOURCE
  
@@ -855,7 +855,7 @@
      #endif // SOURCE */
  
      #ifdef MODULAR_PROOF
-         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //, "Page Metadata Table should be correct"
+         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR); //, "Page Metadata Table should be correct"
      #endif // MODULAR_PROOF
  
  
@@ -872,10 +872,11 @@
      #endif // SOURCE
      
      #ifdef MODULAR_PROOF
-     // SOPHIA: from check_td_in_correct_build_state in helpers.h
-         __CPROVER_assume(!tdr_ptr->management_fields.fatal);
-         __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
-         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
+        __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR); //, "Page Metadata Table should be correct"
+        // SOPHIA: from check_td_in_correct_build_state in helpers.h
+        __CPROVER_assume(!tdr_ptr->management_fields.fatal);
+        __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
+        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
      #endif // MODULAR_PROOF
  
      // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
@@ -892,20 +893,21 @@
      #ifdef MODULAR_PROOF
          __CPROVER_assume(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES));
          //SOPHIA: shared_hpa_check from helpers.c
-         __CPROVER_assume(!is_pa_smaller_than_max_pa(td_params_pa.raw));
-         __CPROVER_assume(is_overlap(get_addr_from_pa(td_params_pa), TD_PARAMS_ALIGN_IN_BYTES, 
+        __CPROVER_assume(!is_pa_smaller_than_max_pa(td_params_pa.raw));
+        // from get_addr_from_pa from helpers.h
+         __CPROVER_assume(is_overlap(td_params_pa.full_pa & ~(global_data.hkid_mask), TD_PARAMS_ALIGN_IN_BYTES, 
                       global_data.private_hkid_min, 
-                      global_data.private_hkid_max - global_data.private_hkid_min));
-         __CPROVER_assume((uint64_t)get_hkid_from_pa(td_params_pa) >= global_data.private_hkid_min);
+                      HKID_SIZE));
+        __CPROVER_assume((td_params_pa.full_pa & global_data.hkid_mask) >> global_data.hkid_start_bit 
+                          >= global_data.private_hkid_min);
      #endif // MODULAR_PROOF
  
+     // SOPHIA: keyhole mapping can be abstracted away for now
      #ifdef SOURCE
          // Map the TD PARAMS address
          td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
      #endif // SOURCE
  
-     #ifdef MODULAR_PROOF
-     #endif // MODULAR_PROOF
      /**
       *  Initialize the TD management fields
       */
@@ -914,10 +916,10 @@
          tdcs_ptr->management_fields.num_vcpus = 0U;
          tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
      #endif // SOURCE
-     // SOPHIA: epoch
-         tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
-         tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
-         tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
+    // SOPHIA: epoch counting needs to be done regardless of which mode we are running n 
+    tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
+    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
+    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
  
      // SOPHIA: TSC = time stamp counter: counts number of cycles since the last reset
      // SOPHIA: Do not think this is important for now
@@ -927,96 +929,97 @@
          // safe to cast to 32-bits due to the sanity check above
          tdcs_ptr->executions_ctl_fields.hp_lock_timeout = translate_usec_to_tsc(DEFAULT_HP_LOCK_TIMEOUT_USEC, (uint32_t)native_tsc_frequency);
      #endif // SOURCE
- 
+  
      /**
       *  Read the TD configuration input and set TDCS fields
       */
  
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
      
-     #ifdef SOURCE
-         if (return_val != TDX_SUCCESS)
-         {
-             TDX_ERROR("read_and_set_td_configurations failed\n");
-             goto EXIT;
-         }
-     #else 
-         __CPROVER_assume(return_val == TDX_SUCCESS); 
-     #endif // SOURCE
+     __CPROVER_assert(false, "false");
+//      #ifdef SOURCE
+//          if (return_val != TDX_SUCCESS)
+//          {
+//              TDX_ERROR("read_and_set_td_configurations failed\n");
+//              goto EXIT;
+//          }
+//      #else 
+//          __CPROVER_assume(return_val == TDX_SUCCESS); 
+//      #endif // SOURCE
  
-     /**
-      *  Handle CPUID Configuration
-      */
-     #ifdef SOURCE
-         return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
-                                                    local_data_ptr);
+//      /**
+//       *  Handle CPUID Configuration
+//       */
+//      #ifdef SOURCE
+//          return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
+//                                                     local_data_ptr);
  
-         if (return_val != TDX_SUCCESS)
-         {
-             TDX_ERROR("read_and_set_cpuid_configurations failed\n");
-             goto EXIT;
-         }
-     #else 
-         return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, 
-                                                        &global_data, &local_data);
-     #endif // SOURCE
+//          if (return_val != TDX_SUCCESS)
+//          {
+//              TDX_ERROR("read_and_set_cpuid_configurations failed\n");
+//              goto EXIT;
+//          }
+//      #else 
+//          return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, 
+//                                                         &global_data, &local_data);
+//      #endif // SOURCE
  
-     // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
-     #ifdef SOURCE
-         if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
-                                           td_params_ptr->ia32_arch_capabilities_config))
-         {
-         TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
-         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
-         goto EXIT;
-         }
-     #endif // SOURCE
+//      // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
+//      #ifdef SOURCE
+//          if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
+//                                            td_params_ptr->ia32_arch_capabilities_config))
+//          {
+//          TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
+//          return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
+//          goto EXIT;
+//          }
+//      #endif // SOURCE
  
-     #ifdef SOURCE
-         if (!td_immutable_state_cross_check(tdcs_ptr))
-         {
-         TDX_ERROR("td_immutable_state_cross_check failed\n");
-         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-         goto EXIT;
-         }
-     #endif // SOURCE
+//      #ifdef SOURCE
+//          if (!td_immutable_state_cross_check(tdcs_ptr))
+//          {
+//          TDX_ERROR("td_immutable_state_cross_check failed\n");
+//          return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+//          goto EXIT;
+//          }
+//      #endif // SOURCE
  
-     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
+//      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
  
-     /**
-      *  Build the MSR bitmaps
-      */
-     #ifdef SOURCE
-     set_msr_bitmaps(tdcs_ptr);
+//      /**
+//       *  Build the MSR bitmaps
+//       */
+//      #ifdef SOURCE
+//      set_msr_bitmaps(tdcs_ptr);
  
-     // Initialize the virtual MSR values
-     init_virt_ia32_vmx_msrs(tdcs_ptr);
-     #endif // SOURCE
+//      // Initialize the virtual MSR values
+//      init_virt_ia32_vmx_msrs(tdcs_ptr);
+//      #endif // SOURCE
  
-     /**
-      *  Initialize the TD Measurement Fields
-      */
-     store_xmms_in_buffer(xmms);
+//      /**
+//       *  Initialize the TD Measurement Fields
+//       */
+//      store_xmms_in_buffer(xmms);
  
-     // SOPHIA: Crytographic function we will assume works correctly
-     #ifdef SOURCE
-         if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
-         {
-             // Unexpected error - Fatal Error
-             TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
-             FATAL_ERROR();
-         }
-     #endif // SOURCE
+//      // SOPHIA: Crytographic function we will assume works correctly
+//      #ifdef SOURCE
+//          if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
+//          {
+//              // Unexpected error - Fatal Error
+//              TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
+//              FATAL_ERROR();
+//          }
+//      #endif // SOURCE
  
-     load_xmms_from_buffer(xmms);
-     basic_memset_to_zero(xmms, sizeof(xmms));
+//      load_xmms_from_buffer(xmms);
+//      basic_memset_to_zero(xmms, sizeof(xmms));
  
-     // Zero the RTMR hash values
-     //basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
+//      // Zero the RTMR hash values
+//      //basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
  
-     tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
-     return_val = TDX_SUCCESS; 
- EXIT:
+//      tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
+//      return_val = TDX_SUCCESS; 
+    EXIT:
      // Release all acquired locks and free keyhole mappings
      
      #ifdef SOURCE
@@ -1034,7 +1037,7 @@
              free_la(td_params_ptr);
          }
      #endif // SOURCE
-     __CPROVER_assert(false, "false"); 
+     return_val = TDX_SUCCESS; 
      return return_val;
  }
  

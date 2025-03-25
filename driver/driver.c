@@ -5,15 +5,16 @@
 #ifdef SOURCE
 #else 
 void driver_main() {
+    __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
+    __CPROVER_assume((global_data.private_hkid_min == 0x00000000));  //&& (global_data.private_hkid_min < (0xFFFFFFFF - (HKID_SIZE)))); 
+    __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE))); //&& (global_data.private_hkid_max < 0xFFFFFFFF)); 
+    __CPROVER_assume(global_data.hkid_start_bit == (32 - (HKID_SIZE))); 
+    __CPROVER_assume(global_data.hkid_mask == HKID_MASK);
+    __CPROVER_havoc_object(&tables); 
+    
+    // __CPROVER_printf("SOPHIA: size of pa: %d hkid_start_bit %d hkid_mask: %X hkid_min: %X hkid_max: %X", 
+    //     52, global_data.hkid_start_bit, global_data.hkid_mask, global_data.private_hkid_min, global_data.private_hkid_max);
     #ifdef SETUP
-        // init global data
-        __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
-        __CPROVER_assume((global_data.private_hkid_min > 0x00000000) && (global_data.private_hkid_min < 0xFFFFFFFF)); 
-        __CPROVER_assume((global_data.private_hkid_max > global_data.private_hkid_min) && (global_data.private_hkid_max < 0xFFFFFFFF)); 
-        __CPROVER_assume(global_data.hkid_start_bit == (64 - 16)); 
-        __CPROVER_havoc_object(&tables); 
-        
-
         __CPROVER_havoc_object(&tables);
         //init the kot table
         for (int i = 0; i < HKID_SIZE; i++) {
@@ -74,6 +75,23 @@ void driver_main() {
 
     #endif // ADD_CX_SETUP
 
+    #ifdef INIT_SETUP
+
+    // Ensure at least one element is as we need it
+    bool_t found = false;
+    for (int i = 0; i < HKID_SIZE; i++) {
+        if (tables[i].pamt_entry.pt == PT_TDR 
+            && tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED 
+            && tables[i].tdr_table.management_fields.fatal == false);  {
+            found = true;
+            break;
+        }
+    }
+    // TDR page metadata in the PAMT must be correct (PT must be PT_TDR)
+    // TD is not in a fatal state
+    // TD keys are configured on the hardware
+    __CPROVER_assume(found);
+    #endif // INIT_SETUP
     TD_setup();
 }
 #endif // not SOURCE
