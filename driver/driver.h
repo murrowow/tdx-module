@@ -30,12 +30,6 @@
 #define NUM_TDCX_BIT_WIDTH ((MAX_NUM_TDCS_PAGES) == 0 ? 1 : (32 - __builtin_clz(MAX_NUM_TDCS_PAGES)))
 
 
-// flag that controls what hardware is being written to
-typedef enum{
-    KOT = 0,
-    PAMT = 1
-}hardware_flag; 
-
 typedef struct tdr_small_s
 {
     struct {
@@ -103,6 +97,8 @@ struct hardware_states
    tdcs_small_t tdcx_table;
    uint8_t tdcx_mem;
    bool_t tdcx_lock;
+
+   td_params_t td_params_table;
 
 //    pamt_entry_t tdvpr_pamt_entry;
 //    tdvps_small_t tdvpr_table;

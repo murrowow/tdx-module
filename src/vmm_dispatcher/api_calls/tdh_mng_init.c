@@ -205,7 +205,10 @@
              goto EXIT;
          }
      #else 
-         __CPROVER_assume(verify_td_attributes(tmp_attributes, false));
+         // SOPHIA TODO: figure out why this fails
+         // __CPROVER_assume(((tmp_attributes.raw & ~tdx_global_data_ptr->attributes_fixed0) == 0)
+         //                && ((tmp_attributes.raw & tdx_global_data_ptr->attributes_fixed1) == tdx_global_data_ptr->attributes_fixed1));
+         // __CPROVER_assume(!tmp_attributes.migratable || (!tmp_attributes.debug && !tmp_attributes.perfmon)); 
      #endif 
  
      tdcs_ptr->executions_ctl_fields.attributes.raw = tmp_attributes.raw;
@@ -213,13 +216,15 @@
      tdcs_ptr->executions_ctl_fields.td_ctls.pending_ve_disable = tmp_attributes.sept_ve_disable;
  
      // Read and verify XFAM
-     #ifdef SOURCE
      tmp_xfam.raw = td_params_ptr->xfam;
-     if (!check_xfam(tmp_xfam))
-     {
-         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_XFAM);
-         goto EXIT;
-     }
+     #ifdef SOURCE
+        if (!check_xfam(tmp_xfam))
+        {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_XFAM);
+            goto EXIT;
+        }
+    #else 
+        //__CPROVER_assume(); 
      #endif // SOURCE
      tdcs_ptr->executions_ctl_fields.xfam = tmp_xfam.raw;
  
@@ -257,7 +262,7 @@
          __CPROVER_assume(!(max_vcpus == 0) & !(max_vcpus > MAX_VCPUS_PER_TD));
      #endif // SOURCE
      tdcs_ptr->executions_ctl_fields.max_vcpus = max_vcpus;
- 
+
      uint16_t num_l2_vms = (uint16_t)td_params_ptr->num_l2_vms;
      #ifdef SOURCE
          if (num_l2_vms > MAX_L2_VMS)
@@ -858,7 +863,6 @@
          __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR); //, "Page Metadata Table should be correct"
      #endif // MODULAR_PROOF
  
- 
      // Map the TDCS structure and check the state
      #ifdef SOURCE
          return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_NO_LOCK,
@@ -906,17 +910,18 @@
      #ifdef SOURCE
          // Map the TD PARAMS address
          td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
+    #else 
+         td_params_ptr = (td_params_t *)(&tables[(td_params_pa.raw & global_data.hkid_mask) >> global_data.hkid_start_bit].td_params_table);
      #endif // SOURCE
- 
      /**
       *  Initialize the TD management fields
       */
-     // SOPHIA: VCPUs for multiple core systems I believe so can ignore for now
-     #ifdef SOURCE
-         tdcs_ptr->management_fields.num_vcpus = 0U;
-         tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
-     #endif // SOURCE
-    // SOPHIA: epoch counting needs to be done regardless of which mode we are running n 
+    #ifdef SOURCE
+      tdcs_ptr->management_fields.num_vcpus = 0U;
+      tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
+    #endif // SOURCE
+
+    // SOPHIA: epoch counting needs to be done regardless of which mode we are running in 
     tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
     tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
     tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
@@ -934,6 +939,7 @@
       *  Read the TD configuration input and set TDCS fields
       */
  
+      //__CPROVER_printf("SOPHIA: td_params_table: %d", tables[0].td_params_table.num_l2_vms);
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
      
      __CPROVER_assert(false, "false");
