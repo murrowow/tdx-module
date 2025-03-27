@@ -206,9 +206,9 @@
          }
      #else 
          // SOPHIA TODO: figure out why this fails
-         // __CPROVER_assume(((tmp_attributes.raw & ~tdx_global_data_ptr->attributes_fixed0) == 0)
-         //                && ((tmp_attributes.raw & tdx_global_data_ptr->attributes_fixed1) == tdx_global_data_ptr->attributes_fixed1));
-         // __CPROVER_assume(!tmp_attributes.migratable || (!tmp_attributes.debug && !tmp_attributes.perfmon)); 
+         __CPROVER_assume(((tmp_attributes.raw & ~tdx_global_data_ptr->attributes_fixed0) == 0)
+                        && ((tmp_attributes.raw & tdx_global_data_ptr->attributes_fixed1) == tdx_global_data_ptr->attributes_fixed1));
+         __CPROVER_assume(!tmp_attributes.migratable || (!tmp_attributes.debug && !tmp_attributes.perfmon)); 
      #endif 
  
      tdcs_ptr->executions_ctl_fields.attributes.raw = tmp_attributes.raw;
@@ -223,8 +223,13 @@
             return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_XFAM);
             goto EXIT;
         }
-    #else 
-        //__CPROVER_assume(); 
+     #else 
+        __CPROVER_assume((tmp_xfam.raw & TDX_XFAM_FIXED1) == TDX_XFAM_FIXED1); 
+        __CPROVER_assume(!(tmp_xfam.avx3_kmask && !tmp_xfam.avx));
+        __CPROVER_assume(tmp_xfam.avx3_kmask == tmp_xfam.avx3_zmm_hi);
+        __CPROVER_assume(tmp_xfam.avx3_kmask == tmp_xfam.avx3_zmm);
+        __CPROVER_assume(tmp_xfam.cet_s == tmp_xfam.cet_u);
+        __CPROVER_assume(tmp_xfam.amx_xtilecfg == tmp_xfam.amx_xtiledata);
      #endif // SOURCE
      tdcs_ptr->executions_ctl_fields.xfam = tmp_xfam.raw;
  
@@ -283,10 +288,13 @@
          }
      #else 
          // SOPHIA: simply just pulled out the function body
-         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >=
-             (uint32_t)(MIN_NUM_TDCS_PAGES + (TDCS_PAGES_PER_L2_VM * num_l2_vms)));
+         __CPROVER_printf("SOPHIA: MIN_NUM_TDCS_PAGES: %d, right hand side: %d, num_tdcx field: %d", 
+                           MIN_NUM_TDCS_PAGES, (TDCS_PAGES_PER_L2_VM * num_l2_vms) + MIN_NUM_TDCS_PAGES, tdr_ptr->management_fields.num_tdcx);
+         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >= ((TDCS_PAGES_PER_L2_VM * num_l2_vms)));
+
+        // (uint32_t)(MIN_NUM_TDCS_PAGES + (TDCS_PAGES_PER_L2_VM * num_l2_vms))
      #endif // SOURCE 
- 
+
      // Only now we can safely update TDCS; NUM_L2_VMS is used by TDH.MNG.RD/WR to calculate offset into TDCS
      tdcs_ptr->management_fields.num_l2_vms = num_l2_vms;
  
@@ -312,7 +320,8 @@
              goto EXIT;
          }
      #else 
-         __CPROVER_assume(verify_td_config_flags(config_flags_local_var)); 
+         __CPROVER_assume((config_flags_local_var.raw & ~tdx_global_data_ptr->config_flags_fixed0.raw) == 0);
+         __CPROVER_assume((config_flags_local_var.raw & tdx_global_data_ptr->config_flags_fixed1.raw) == tdx_global_data_ptr->config_flags_fixed1.raw);
      #endif 
  
      // Read and verify EPTP_CONTROLS
@@ -325,8 +334,25 @@
              goto EXIT;
          }
      #else 
+        // SOPHIA TODO: not sure what the importance of pml5 or whether or not this is a safe assumption to make
+        ia32_vmx_ept_vpid_cap_t vpid_cap = { .raw = tdx_global_data_ptr->plt_common_config.ia32_vmx_ept_vpid_cap };
+        __CPROVER_assume(vpid_cap.pml5_supported == true);
+        __CPROVER_assume(( (target_eptp.fields.ept_ps_mt == MT_WB) &&
+                           (target_eptp.fields.enable_ad_bits == 0) &&
+                           (target_eptp.fields.enable_sss_control == 0) &&
+                           (target_eptp.fields.reserved_0 == 0) &&
+                           (target_eptp.fields.base_pa == 0) &&
+                           (target_eptp.fields.reserved_1 == 0)));
+
+        __CPROVER_assume((target_eptp.fields.ept_pwl >= LVL_PML4) &&
+                         (target_eptp.fields.ept_pwl <= LVL_PML5)); 
+        
+        __CPROVER_assume(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
+                         !(tdx_global_data_ptr->max_pa < MIN_PA_FOR_PML5));
+        __CPROVER_assume(!(config_flags_local_var.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)));
      #endif 
  
+     __CPROVER_assert(false, "false");
      tdcs_ptr->executions_ctl_fields.config_flags.raw = config_flags_local_var.raw;
      tdcs_ptr->executions_ctl_fields.gpaw = config_flags_local_var.gpaw;
  
@@ -942,7 +968,6 @@
       //__CPROVER_printf("SOPHIA: td_params_table: %d", tables[0].td_params_table.num_l2_vms);
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
      
-     __CPROVER_assert(false, "false");
 //      #ifdef SOURCE
 //          if (return_val != TDX_SUCCESS)
 //          {
