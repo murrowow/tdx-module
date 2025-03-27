@@ -43,6 +43,7 @@
  #include "src/common/helpers/cpuid_fms.h"
  
  #include "driver/driver.h"
+ #include <string.h> 
  
  // SOPHIA: Having so many linking errors I'm putting this in here
  #ifdef SOURCE
@@ -352,7 +353,6 @@
         __CPROVER_assume(!(config_flags_local_var.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)));
      #endif 
  
-     __CPROVER_assert(false, "false");
      tdcs_ptr->executions_ctl_fields.config_flags.raw = config_flags_local_var.raw;
      tdcs_ptr->executions_ctl_fields.gpaw = config_flags_local_var.gpaw;
  
@@ -399,13 +399,20 @@
          __CPROVER_assume(tdx_memcmp_to_zero(td_params_ptr->reserved_1, TD_PARAMS_RESERVED1_SIZE));
      #endif // SOURCE
  
-     tdx_memcpy(tdcs_ptr->measurement_fields.mr_config_id.bytes, sizeof(measurement_t),
+     #ifdef SOURCE
+        tdx_memcpy(tdcs_ptr->measurement_fields.mr_config_id.bytes, sizeof(measurement_t),
                 td_params_ptr->mr_config_id.bytes, sizeof(measurement_t));
-     tdx_memcpy(tdcs_ptr->measurement_fields.mr_owner.bytes, sizeof(measurement_t),
+        tdx_memcpy(tdcs_ptr->measurement_fields.mr_owner.bytes, sizeof(measurement_t),
                 td_params_ptr->mr_owner.bytes, sizeof(measurement_t));
-     tdx_memcpy(tdcs_ptr->measurement_fields.mr_owner_config.bytes, sizeof(measurement_t),
+        tdx_memcpy(tdcs_ptr->measurement_fields.mr_owner_config.bytes, sizeof(measurement_t),
                 td_params_ptr->mr_owner_config.bytes, sizeof(measurement_t));
- 
+    #else
+         // SOPHIA: dest, dest_size, src, src_size
+        memcpy(tdcs_ptr->measurement_fields.mr_config_id.bytes, td_params_ptr->mr_config_id.bytes, sizeof(measurement_t));
+        memcpy(tdcs_ptr->measurement_fields.mr_owner.bytes, td_params_ptr->mr_owner.bytes, sizeof(measurement_t));
+        memcpy(tdcs_ptr->measurement_fields.mr_owner_config.bytes, td_params_ptr->mr_owner_config.bytes, sizeof(measurement_t));
+    #endif // SOURCE
+
      #ifdef SOURCE
          if (td_params_ptr->msr_config_ctls.reserved_0 != 0)
          {
@@ -426,9 +433,9 @@
      #else 
          __CPROVER_assume(tdx_memcmp_to_zero(td_params_ptr->reserved_2, TD_PARAMS_RESERVED2_SIZE)); 
      #endif // SOURCE
-     return_val = TDX_SUCCESS;
  
  EXIT:
+     return_val = TDX_SUCCESS;
      return return_val;
  }
  
@@ -967,6 +974,7 @@
  
       //__CPROVER_printf("SOPHIA: td_params_table: %d", tables[0].td_params_table.num_l2_vms);
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
+     __CPROVER_assert(false, "false");
      
 //      #ifdef SOURCE
 //          if (return_val != TDX_SUCCESS)
