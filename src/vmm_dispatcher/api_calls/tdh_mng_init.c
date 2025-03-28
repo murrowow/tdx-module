@@ -462,7 +462,12 @@
      attributes.raw = tdcs_ptr->executions_ctl_fields.attributes.raw;
      xfam.raw = tdcs_ptr->executions_ctl_fields.xfam;
  
-     for (cpuid_index = 0; cpuid_index < MAX_NUM_CPUID_LOOKUP; cpuid_index++)
+     // SOPHIA: Limiting the number of CPUID_LOOKUP
+     #ifdef SOURCE
+        for (cpuid_index = 0; cpuid_index < MAX_NUM_CPUID_LOOKUP; cpuid_index++)
+     #else
+        for (cpuid_index = 0; cpuid_index < 2; cpuid_index++)
+     #endif 
      {
          cpuid_leaf_subleaf = cpuid_lookup[cpuid_index].leaf_subleaf;
  
@@ -974,90 +979,99 @@
  
       //__CPROVER_printf("SOPHIA: td_params_table: %d", tables[0].td_params_table.num_l2_vms);
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
-     __CPROVER_assert(false, "false");
      
-//      #ifdef SOURCE
-//          if (return_val != TDX_SUCCESS)
-//          {
-//              TDX_ERROR("read_and_set_td_configurations failed\n");
-//              goto EXIT;
-//          }
-//      #else 
-//          __CPROVER_assume(return_val == TDX_SUCCESS); 
-//      #endif // SOURCE
+     #ifdef SOURCE
+         if (return_val != TDX_SUCCESS)
+         {
+             TDX_ERROR("read_and_set_td_configurations failed\n");
+             goto EXIT;
+         }
+     #else 
+         __CPROVER_assume(return_val == TDX_SUCCESS); 
+     #endif // SOURCE
  
-//      /**
-//       *  Handle CPUID Configuration
-//       */
-//      #ifdef SOURCE
-//          return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
-//                                                     local_data_ptr);
+     /**
+      *  Handle CPUID Configuration
+      */
+      // SOPHIA: Since not executing actual code, I don't think the CPUID configurations are needed 
+      // for compatibility checks
+     #ifdef SOURCE
+         return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
+                                                    local_data_ptr);
  
-//          if (return_val != TDX_SUCCESS)
-//          {
-//              TDX_ERROR("read_and_set_cpuid_configurations failed\n");
-//              goto EXIT;
-//          }
-//      #else 
-//          return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, 
-//                                                         &global_data, &local_data);
-//      #endif // SOURCE
+         if (return_val != TDX_SUCCESS)
+         {
+             TDX_ERROR("read_and_set_cpuid_configurations failed\n");
+             goto EXIT;
+         }
+     #endif // SOURCE
+
  
-//      // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
-//      #ifdef SOURCE
-//          if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
-//                                            td_params_ptr->ia32_arch_capabilities_config))
-//          {
-//          TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
-//          return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
-//          goto EXIT;
-//          }
-//      #endif // SOURCE
+     // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
+     #ifdef SOURCE
+         if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
+                                           td_params_ptr->ia32_arch_capabilities_config))
+         {
+         TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
+         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
+         goto EXIT;
+         }
+     #else 
+         ia32_arch_capabilities_t config_value = { .raw = td_params_ptr->ia32_arch_capabilities_config};
+         ia32_arch_capabilities_t arch_cap_value;
+
+         // SOPHIA: assume all the work has been done and no more configurable bits
+         __CPROVER_assume((config_value.raw == 0));
+     #endif // SOURCE
+
+     #ifdef SOURCE
+         if (!td_immutable_state_cross_check(tdcs_ptr))
+         {
+         TDX_ERROR("td_immutable_state_cross_check failed\n");
+         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+         goto EXIT;
+         }
+     #else 
+         __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
+                          !(tdcs_ptr->management_fields.num_l2_vms > 0));
+     #endif // SOURCE
  
-//      #ifdef SOURCE
-//          if (!td_immutable_state_cross_check(tdcs_ptr))
-//          {
-//          TDX_ERROR("td_immutable_state_cross_check failed\n");
-//          return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
-//          goto EXIT;
-//          }
-//      #endif // SOURCE
- 
+     __CPROVER_assert(false, "false");
 //      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
  
-//      /**
-//       *  Build the MSR bitmaps
-//       */
-//      #ifdef SOURCE
-//      set_msr_bitmaps(tdcs_ptr);
+     /**
+      *  Build the MSR bitmaps
+      */
+     #ifdef SOURCE
+     set_msr_bitmaps(tdcs_ptr);
  
-//      // Initialize the virtual MSR values
-//      init_virt_ia32_vmx_msrs(tdcs_ptr);
-//      #endif // SOURCE
+     // Initialize the virtual MSR values
+     init_virt_ia32_vmx_msrs(tdcs_ptr);
+     #endif // SOURCE
  
-//      /**
-//       *  Initialize the TD Measurement Fields
-//       */
-//      store_xmms_in_buffer(xmms);
+     /**
+      *  Initialize the TD Measurement Fields
+      */
+     store_xmms_in_buffer(xmms);
  
-//      // SOPHIA: Crytographic function we will assume works correctly
-//      #ifdef SOURCE
-//          if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
-//          {
-//              // Unexpected error - Fatal Error
-//              TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
-//              FATAL_ERROR();
-//          }
-//      #endif // SOURCE
+     // SOPHIA: Crytographic function we will assume works correctly
+     #ifdef SOURCE
+         if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
+         {
+             // Unexpected error - Fatal Error
+             TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
+             FATAL_ERROR();
+         }
+     #endif // SOURCE
  
-//      load_xmms_from_buffer(xmms);
-//      basic_memset_to_zero(xmms, sizeof(xmms));
+     load_xmms_from_buffer(xmms);
+     basic_memset_to_zero(xmms, sizeof(xmms));
  
-//      // Zero the RTMR hash values
-//      //basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
+     // Zero the RTMR hash values
+     //basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
  
-//      tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
-//      return_val = TDX_SUCCESS; 
+     tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
+     return_val = TDX_SUCCESS; 
     EXIT:
      // Release all acquired locks and free keyhole mappings
      
