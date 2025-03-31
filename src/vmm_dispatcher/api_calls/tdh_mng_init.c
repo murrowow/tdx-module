@@ -151,7 +151,27 @@
 
     return TDX_SUCCESS;
     }
-#endif // SOURCE
+
+    bool_t is_small_msr_dynamic_bit_cleared(tdcs_small_t* tdcs_ptr, uint32_t msr_addr, msr_bitmap_bit_type bit_meaning)
+    {
+    // Common dynamic cases
+    if (((bit_meaning == MSR_BITMAP_DYN_PERFMON)  && (bool_t)tdcs_ptr->executions_ctl_fields.attributes.perfmon) ||
+        ((bit_meaning == MSR_BITMAP_DYN_XFAM_CET) && (((tdcs_ptr->executions_ctl_fields.xfam & (BIT(11))) |
+                                                       (tdcs_ptr->executions_ctl_fields.xfam & (BIT(12)))) ? true : false)   )  ||
+        ((bit_meaning == MSR_BITMAP_DYN_XFAM_PT)  && ((tdcs_ptr->executions_ctl_fields.xfam & (BIT(8))) ? true : false))      ||
+        ((bit_meaning == MSR_BITMAP_DYN_XFAM_ULI) && ((tdcs_ptr->executions_ctl_fields.xfam & (BIT(14))) ? true : false))     ||
+        ((bit_meaning == MSR_BITMAP_DYN_XFAM_LBR) && ((tdcs_ptr->executions_ctl_fields.xfam & (BIT(15))) ? true : false))     ||
+        ((bit_meaning == MSR_BITMAP_DYN_UMWAIT)   && (tdcs_ptr->executions_ctl_fields.cpuid_flags.waitpkg_supported)) ||
+        ((bit_meaning == MSR_BITMAP_DYN_PKS)      && (tdcs_ptr->executions_ctl_fields.attributes.pks))     ||
+        ((bit_meaning == MSR_BITMAP_DYN_XFD)      && (tdcs_ptr->executions_ctl_fields.cpuid_flags.xfd_supported))     ||
+        ((bit_meaning == MSR_BITMAP_DYN_TSX)      && (tdcs_ptr->executions_ctl_fields.cpuid_flags.tsx_supported)))
+    {
+        return true;
+    }
+    // SOPHIA: assume rare dynamic cases not possible for now since we aren't executing any code
+    return false;
+    }
+ #endif // SOURCE
 
  static void apply_cpuid_xfam_masks(cpuid_config_return_values_t* cpuid_values,
                                     uint64_t xfam,
@@ -987,7 +1007,7 @@
              goto EXIT;
          }
      #else 
-         __CPROVER_assume(return_val == TDX_SUCCESS); 
+         __CPROVER_assert(return_val == TDX_SUCCESS, "this should pass"); 
      #endif // SOURCE
  
      /**
@@ -1036,39 +1056,49 @@
                           !(tdcs_ptr->management_fields.num_l2_vms > 0));
      #endif // SOURCE
  
-     __CPROVER_assert(false, "false");
-//      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
+     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
  
      /**
       *  Build the MSR bitmaps
       */
+      // SOPHIA: reduce the number of maximum MSR
      #ifdef SOURCE
-     set_msr_bitmaps(tdcs_ptr);
- 
-     // Initialize the virtual MSR values
-     init_virt_ia32_vmx_msrs(tdcs_ptr);
+        set_msr_bitmaps(tdcs_ptr);
+            
+        // Initialize the virtual MSR values
+        init_virt_ia32_vmx_msrs(tdcs_ptr);
+     #else 
+        for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
+            uint32_t msr_addr = msr_lookup[i].start_address;
+            __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
+            (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0));
+            __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
+                              (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0));
+        }
      #endif // SOURCE
- 
+
      /**
       *  Initialize the TD Measurement Fields
       */
-     store_xmms_in_buffer(xmms);
  
      // SOPHIA: Crytographic function we will assume works correctly
+     // SOPHIA: Abstract away the XMMS since it seems to be crypto related
      #ifdef SOURCE
+         store_xmms_in_buffer(xmms);
+
          if ((sha_error_code = sha384_init(&(tdcs_ptr->measurement_fields.td_sha_ctx))) != 0)
          {
              // Unexpected error - Fatal Error
              TDX_ERROR("Unexpected error in SHA384 - error = %d\n", sha_error_code);
              FATAL_ERROR();
          }
+
+         load_xmms_from_buffer(xmms);
+         basic_memset_to_zero(xmms, sizeof(xmms));
+
+         // Zero the RTMR hash values
+        basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
      #endif // SOURCE
- 
-     load_xmms_from_buffer(xmms);
-     basic_memset_to_zero(xmms, sizeof(xmms));
- 
-     // Zero the RTMR hash values
-     //basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
  
      tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
      return_val = TDX_SUCCESS; 
@@ -1090,6 +1120,15 @@
              free_la(td_params_ptr);
          }
      #endif // SOURCE
+     __CPROVER_assert(true, "Set TDCS TD Management fields to their initial values");
+     __CPROVER_assert(true, "Init the TDCS logical structure");
+     __CPROVER_assert(true, "Check that ATTRIBUTES and XFAM bits that must be fixed-0 or fixed-1 are set correctly");
+     __CPROVER_assert(true, "Check the other input parameters. See the definition of TD_PARAMS in 3.4.5 for details.");
+     __CPROVER_assert(true, "Initialize EPTP to point to TDCS.SEPT_ROOT");
+     __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
+     __CPROVER_assert(true, "Initialize the TDCS measurement fields");
+     __CPROVER_assert(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED, "Mark the TD as initialized (set TDCS.OP_STATE to INITIALIZED)");
+     __CPROVER_assert(false, "False"); 
      return_val = TDX_SUCCESS; 
      return return_val;
  }
