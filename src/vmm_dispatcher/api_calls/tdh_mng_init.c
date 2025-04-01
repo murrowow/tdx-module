@@ -45,6 +45,7 @@
  #include "driver/driver.h"
  #include <string.h> 
  
+ // SOPHIA TODO: TD_PARAMS input needs to be examined more
  // SOPHIA: Having so many linking errors I'm putting this in here
  #ifdef SOURCE
  #else
@@ -226,7 +227,6 @@
              goto EXIT;
          }
      #else 
-         // SOPHIA TODO: figure out why this fails
          __CPROVER_assume(((tmp_attributes.raw & ~tdx_global_data_ptr->attributes_fixed0) == 0)
                         && ((tmp_attributes.raw & tdx_global_data_ptr->attributes_fixed1) == tdx_global_data_ptr->attributes_fixed1));
          __CPROVER_assume(!tmp_attributes.migratable || (!tmp_attributes.debug && !tmp_attributes.perfmon)); 
@@ -312,8 +312,6 @@
          __CPROVER_printf("SOPHIA: MIN_NUM_TDCS_PAGES: %d, right hand side: %d, num_tdcx field: %d", 
                            MIN_NUM_TDCS_PAGES, (TDCS_PAGES_PER_L2_VM * num_l2_vms) + MIN_NUM_TDCS_PAGES, tdr_ptr->management_fields.num_tdcx);
          __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >= ((TDCS_PAGES_PER_L2_VM * num_l2_vms)));
-
-        // (uint32_t)(MIN_NUM_TDCS_PAGES + (TDCS_PAGES_PER_L2_VM * num_l2_vms))
      #endif // SOURCE 
 
      // Only now we can safely update TDCS; NUM_L2_VMS is used by TDH.MNG.RD/WR to calculate offset into TDCS
@@ -465,7 +463,7 @@
                                                          tdx_module_global_t * global_data_ptr,
                                                          tdx_module_local_t * local_data_ptr)
  #else 
- static api_error_type read_and_set_cpuid_configurations(tdcs_small_t * tdcs_ptr,
+    static api_error_type read_and_set_cpuid_configurations(tdcs_small_t * tdcs_ptr,
      td_params_t * td_params_ptr,
      tdx_module_global_t * global_data_ptr,
      tdx_module_local_t * local_data_ptr)
@@ -977,6 +975,9 @@
     #ifdef SOURCE
       tdcs_ptr->management_fields.num_vcpus = 0U;
       tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
+    #else 
+      tdcs_ptr->management_fields.num_vcpus = 0U;
+      tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
     #endif // SOURCE
 
     // SOPHIA: epoch counting needs to be done regardless of which mode we are running in 
@@ -1120,14 +1121,30 @@
              free_la(td_params_ptr);
          }
      #endif // SOURCE
-     __CPROVER_assert(true, "Set TDCS TD Management fields to their initial values");
-     __CPROVER_assert(true, "Init the TDCS logical structure");
-     __CPROVER_assert(true, "Check that ATTRIBUTES and XFAM bits that must be fixed-0 or fixed-1 are set correctly");
+     __CPROVER_assert((tdcs_ptr->management_fields.num_l2_vms == (uint16_t)td_params_ptr->num_l2_vms) &&
+                      (tdcs_ptr->management_fields.num_vcpus == 0U) &&
+                      (tdcs_ptr->management_fields.num_assoc_vcpus == 0U), "Set TDCS TD Management fields to their initial values");
+     __CPROVER_assert(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED, "Mark the TD as initialized (set TDCS.OP_STATE to INITIALIZED)");
+
+     __CPROVER_assert(((td_params_ptr->attributes.raw & ~global_data.attributes_fixed0) == 0) &&
+                      ((td_params_ptr->attributes.raw & global_data.attributes_fixed1) == global_data.attributes_fixed1), 
+                      "Check that ATTRIBUTES that must be fixed-0 or fixed-1 are set correctly"); 
+     ia32_xcr0_t temp;
+     temp.raw = td_params_ptr->xfam;
+     __CPROVER_assert( !((temp.raw & TDX_XFAM_FIXED1) != TDX_XFAM_FIXED1)||
+                         (temp.avx3_kmask && !temp.avx) ||
+                         (temp.avx3_kmask != temp.avx3_zmm_hi) ||
+                         (temp.avx3_kmask != temp.avx3_zmm) ||
+                         (temp.cet_s != temp.cet_u) ||
+                         (temp.amx_xtilecfg != temp.amx_xtiledata), 
+                      "Check that XFAM that must be fixed-0 or fixed-1 are set correctly"); 
+
      __CPROVER_assert(true, "Check the other input parameters. See the definition of TD_PARAMS in 3.4.5 for details.");
      __CPROVER_assert(true, "Initialize EPTP to point to TDCS.SEPT_ROOT");
-     __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
      __CPROVER_assert(true, "Initialize the TDCS measurement fields");
-     __CPROVER_assert(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED, "Mark the TD as initialized (set TDCS.OP_STATE to INITIALIZED)");
+
+     // SOPHIA: These are properties that I have decided to abstract away for now 
+     // __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
      __CPROVER_assert(false, "False"); 
      return_val = TDX_SUCCESS; 
      return return_val;
