@@ -65,6 +65,8 @@ typedef struct tdcs_small_s
     struct {
         op_state_e op_state;
         uint16_t num_l2_vms;
+        uint32_t num_vcpus;
+        uint32_t num_assoc_vcpus;
     } management_fields;
     tdcs_execution_control_fields_t        executions_ctl_fields;
     tdcs_epoch_tracking_fields_t           epoch_tracking;
@@ -121,6 +123,14 @@ char kot_lock;
 //PAMT TABLE
 
 void driver_main(); 
+
+_STATIC_INLINE_ pa_t set_hkid_to_pa_local(pa_t pa, uint16_t hkid)
+{
+    pa.full_pa &= ~(global_data.hkid_mask);
+    pa.full_pa |= ((uint64_t)hkid << global_data.hkid_start_bit);
+
+    return pa;
+}
 
 #endif // not SOURCE
 #endif
