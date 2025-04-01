@@ -1139,12 +1139,34 @@
                          (temp.amx_xtilecfg != temp.amx_xtiledata), 
                       "Check that XFAM that must be fixed-0 or fixed-1 are set correctly"); 
 
+    // SOPHIA: EPTP config check
+     ia32e_eptp_t   target_eptp = { .raw = 0 };
+     target_eptp.raw = td_params_ptr->eptp_controls.raw;
+     ia32_vmx_ept_vpid_cap_t vpid_cap = { .raw = global_data.plt_common_config.ia32_vmx_ept_vpid_cap };
+     __CPROVER_assert(vpid_cap.pml5_supported == true, "EPTP config check 1");
+     __CPROVER_assert(( (target_eptp.fields.ept_ps_mt == MT_WB) &&
+                        (target_eptp.fields.enable_ad_bits == 0) &&
+                        (target_eptp.fields.enable_sss_control == 0) &&
+                        (target_eptp.fields.reserved_0 == 0) &&
+                        (target_eptp.fields.base_pa == 0) &&
+                        (target_eptp.fields.reserved_1 == 0)), "EPTP config check 2");
+
+     __CPROVER_assert((target_eptp.fields.ept_pwl >= LVL_PML4) &&
+                       (target_eptp.fields.ept_pwl <= LVL_PML5), "EPTP config check 3"); 
+        
+     __CPROVER_assert(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
+                      !(global_data.max_pa < MIN_PA_FOR_PML5), "EPTP config check 4");
+     __CPROVER_assert(!(td_params_ptr->config_flags.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)), "EPTP config check 5");
+
+     // __CPROVER_assert();
      __CPROVER_assert(true, "Check the other input parameters. See the definition of TD_PARAMS in 3.4.5 for details.");
      __CPROVER_assert(true, "Initialize EPTP to point to TDCS.SEPT_ROOT");
      __CPROVER_assert(true, "Initialize the TDCS measurement fields");
 
      // SOPHIA: These are properties that I have decided to abstract away for now 
      // __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
+     // __CPROVER_assert(true, "TD_PARAM TSC abstracted away")
+     // __CPROVER_assert(true, "TD_PARAM MRCONFIG ID, MROWNER, MROWNER config, crypto abstracted away")
      __CPROVER_assert(false, "False"); 
      return_val = TDX_SUCCESS; 
      return return_val;
