@@ -369,10 +369,19 @@
         __CPROVER_assume(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
                          !(tdx_global_data_ptr->max_pa < MIN_PA_FOR_PML5));
         __CPROVER_assume(!(config_flags_local_var.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)));
+
+        pa_t sept_root_pa; 
+        sept_root_pa.raw = tdr_ptr->management_fields.tdcx_pa[SEPT_ROOT_PAGE_INDEX].val;
+
+        sept_root_pa = set_hkid_to_pa_local(sept_root_pa, 0); 
+
+        target_eptp.fields.base_pa = sept_root_pa.page_4k_num;
+        tdcs_ptr->executions_ctl_fields.eptp.raw = target_eptp.raw;
+
+        tdcs_ptr->executions_ctl_fields.config_flags.raw = config_flags_local_var.raw;
+        tdcs_ptr->executions_ctl_fields.gpaw = config_flags_local_var.gpaw;
+
      #endif 
- 
-     tdcs_ptr->executions_ctl_fields.config_flags.raw = config_flags_local_var.raw;
-     tdcs_ptr->executions_ctl_fields.gpaw = config_flags_local_var.gpaw;
  
      // SOPHIA: TSC Freq abstracted away for now
      #ifdef SOURCE
@@ -1158,15 +1167,13 @@
                       !(global_data.max_pa < MIN_PA_FOR_PML5), "EPTP config check 4");
      __CPROVER_assert(!(td_params_ptr->config_flags.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)), "EPTP config check 5");
 
-     // __CPROVER_assert();
-     __CPROVER_assert(true, "Check the other input parameters. See the definition of TD_PARAMS in 3.4.5 for details.");
-     __CPROVER_assert(true, "Initialize EPTP to point to TDCS.SEPT_ROOT");
-     __CPROVER_assert(true, "Initialize the TDCS measurement fields");
+     __CPROVER_assert(tdcs_ptr->executions_ctl_fields.eptp.raw == td_params_ptr->eptp_controls.raw, "Initialize EPTP to point to TDCS.SEPT_ROOT");
 
      // SOPHIA: These are properties that I have decided to abstract away for now 
      // __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
      // __CPROVER_assert(true, "TD_PARAM TSC abstracted away")
      // __CPROVER_assert(true, "TD_PARAM MRCONFIG ID, MROWNER, MROWNER config, crypto abstracted away")
+     __CPROVER_assert(true, "Initialize the TDCS measurement fields");
      __CPROVER_assert(false, "False"); 
      return_val = TDX_SUCCESS; 
      return return_val;
