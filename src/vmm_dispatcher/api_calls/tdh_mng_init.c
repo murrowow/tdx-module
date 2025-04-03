@@ -886,14 +886,21 @@
      // By default, no extended error code is returned
      #ifdef SOURCE
          local_data_ptr->vmm_regs.rcx = 0ULL;
-     #else 
+     #endif 
+
+     #ifdef MODULAR_PROOF
          local_data.vmm_regs.rcx = 0ULL;
-     #endif // SOURCE
- 
+     #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+        __CPROVER_havoc_slice(local_data.vmm_regs.rcx, sizeof(uint64_t)); 
+        __CPROVER_assume(local_data.vmm_regs.rcx == 0ULL);
+     #endif 
+
+    // SOPHIA: Abstract away, With bit 22 set in IA32_MISC_ENABLE, early Windows versions can run on new processors
+    // SOPHIA: Geoff Chappel
      #ifdef SOURCE
          // Boot NT4 bit should not be set
-         // SOPHIA: With bit 22 set in IA32_MISC_ENABLE, early Windows versions can run on new processors
-         // SOPHIA: Geoff Chappel
          if ((ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) & MISC_EN_LIMIT_CPUID_MAXVAL_BIT ) != 0)
          {
              return_val = TDX_LIMIT_CPUID_MAXVAL_SET;
@@ -901,6 +908,7 @@
          }
      #endif // SOURCE
  
+     // SOPHIA: get the necessary TD pointers
      // Check, lock and map the owner TDR page
      #ifdef SOURCE
          return_val = check_lock_and_map_explicit_tdr(tdr_pa,
@@ -918,7 +926,6 @@
          goto EXIT;
          }
      #else
-         // SOPHIA: check and lock TDR
          tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
          tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr_table);
          tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_table);
@@ -927,6 +934,10 @@
      #ifdef MODULAR_PROOF
          __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR); //, "Page Metadata Table should be correct"
      #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "Page Metadata Table should be correct");
+     #endif 
  
      // Map the TDCS structure and check the state
      #ifdef SOURCE
@@ -948,6 +959,14 @@
         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
      #endif // MODULAR_PROOF
  
+     #ifdef FLOW_PROOF
+        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "Page Metadata Table should be correct"); //, "Page Metadata Table should be correct"
+        // SOPHIA: from check_td_in_correct_build_state in helpers.h
+        __CPROVER_assert(!tdr_ptr->management_fields.fatal, "TD should not be in fatal state");
+        __CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD lifecycle should be in keys configured");
+        __CPROVER_assert(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES, "TDCX pages should be less than the minimum");
+     #endif // FLOW_PROOF
+
      // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
      // Verify the TD PARAMS physical address is canonical and shared
      #ifdef SOURCE
@@ -958,7 +977,7 @@
              goto EXIT;
          }
      #endif // SOURCE
- 
+
      #ifdef MODULAR_PROOF
          __CPROVER_assume(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES));
          //SOPHIA: shared_hpa_check from helpers.c
@@ -970,32 +989,57 @@
         __CPROVER_assume((td_params_pa.full_pa & global_data.hkid_mask) >> global_data.hkid_start_bit 
                           >= global_data.private_hkid_min);
      #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+         __CPROVER_assert(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES), "TD_PARAMS_PA is aligned pwr of 2");
+         //SOPHIA: shared_hpa_check from helpers.c
+        __CPROVER_assert(!is_pa_smaller_than_max_pa(td_params_pa.raw), "TD_PARAMS_PA falls within PA range");
+        // from get_addr_from_pa from helpers.h
+         __CPROVER_assert(is_overlap(td_params_pa.full_pa & ~(global_data.hkid_mask), TD_PARAMS_ALIGN_IN_BYTES, 
+                      global_data.private_hkid_min, 
+                      HKID_SIZE), "There is overap between TD_PARAMS_PA addr and the hkid range");
+        __CPROVER_assert((td_params_pa.full_pa & global_data.hkid_mask) >> global_data.hkid_start_bit 
+                          >= global_data.private_hkid_min, "TD_PARAMS_PA has a HKID that is valid");
+     #endif // FLOW_PROOF
  
      // SOPHIA: keyhole mapping can be abstracted away for now
-     #ifdef SOURCE
+     // SOPHIA: get the TD params data struct
+    #ifdef SOURCE
          // Map the TD PARAMS address
          td_params_ptr = (td_params_t *)map_pa((void*)td_params_pa.raw, TDX_RANGE_RO);
     #else 
          td_params_ptr = (td_params_t *)(&tables[(td_params_pa.raw & global_data.hkid_mask) >> global_data.hkid_start_bit].td_params_table);
-     #endif // SOURCE
+    #endif // SOURCE
      /**
       *  Initialize the TD management fields
       */
-    #ifdef SOURCE
-      tdcs_ptr->management_fields.num_vcpus = 0U;
-      tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
-    #else 
-      tdcs_ptr->management_fields.num_vcpus = 0U;
-      tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
-    #endif // SOURCE
 
-    // SOPHIA: epoch counting needs to be done regardless of which mode we are running in 
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
-    tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
+    // SOPHIA: VCPU and Epoch counting
+    #ifdef FLOW_PROOF
+        __CPROVER_havoc_slice(tdcs_ptr->management_fields.num_vcpus, sizeof(uint32_t));
+        __CPROVER_havoc_slice(tdcs_ptr->management_fields.num_assoc_vcpus, sizeof(uint32_t));
+        __CPROVER_assume(tdcs_ptr->management_fields.num_vcpus == 0U);
+        __CPROVER_assume(tdcs_ptr->management_fields.num_assoc_vcpus == 0U);
+
+        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch, sizeof(uint64_t));
+        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0], sizeof(uint16_t));
+        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1], sizeof(uint16_t));
+        __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch == 1ULL);
+        __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] == 0);
+        __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] == 0);
+    #else 
+        // SOPHIA: VCPU counts
+        tdcs_ptr->management_fields.num_vcpus = 0U;
+        tdcs_ptr->management_fields.num_assoc_vcpus = 0U;
+        // SOPHIA: epoch counting needs to be done regardless of which mode we are running in
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch = 1ULL;
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] = 0;
+        tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] = 0;
+    #endif //  FLOW_PROOF
+
  
      // SOPHIA: TSC = time stamp counter: counts number of cycles since the last reset
-     // SOPHIA: Do not think this is important for now
+     // SOPHIA: Abstract away for now
      #ifdef SOURCE
          uint64_t native_tsc_frequency = get_global_data()->native_tsc_frequency;
          tdx_sanity_check((native_tsc_frequency <= BIT_MASK_32BITS), SCEC_SEAMCALL_SOURCE(TDH_MNG_INIT_LEAF), 0);
@@ -1007,7 +1051,6 @@
       *  Read the TD configuration input and set TDCS fields
       */
  
-      //__CPROVER_printf("SOPHIA: td_params_table: %d", tables[0].td_params_table.num_l2_vms);
      return_val = read_and_set_td_configurations(tdr_ptr, tdcs_ptr, td_params_ptr);
      
      #ifdef SOURCE
@@ -1016,14 +1059,22 @@
              TDX_ERROR("read_and_set_td_configurations failed\n");
              goto EXIT;
          }
-     #else 
+     #endif // SOURCE
+     
+     // SOPHIA TODO I think if read_and_set_td_configurations is done correctly this doesn't need to be here
+     #ifdef MODULAR_PROOF
          __CPROVER_assert(return_val == TDX_SUCCESS, "this should pass"); 
+     #endif // SOURCE
+
+     #ifdef FLOW_PROOF
+         __CPROVER_assume(return_val == TDX_SUCCESS, "this should pass"); 
      #endif // SOURCE
  
      /**
       *  Handle CPUID Configuration
       */
       // SOPHIA: Since not executing actual code, I don't think the CPUID configurations are needed 
+      // SOPHIA: Abstract away
       // for compatibility checks
      #ifdef SOURCE
          return_val = read_and_set_cpuid_configurations(tdcs_ptr, td_params_ptr, global_data_ptr,
@@ -1038,6 +1089,7 @@
 
  
      // Check and initialize the virtual IA32_ARCH_CAPABILITIES MSR
+     // SOPHIA: For now assume in our model that this is already taken care of
      #ifdef SOURCE
          if (!init_virt_ia32_arch_capabilities(tdcs_ptr, td_params_ptr->msr_config_ctls.ia32_arch_cap,
                                            td_params_ptr->ia32_arch_capabilities_config))
@@ -1047,13 +1099,21 @@
          goto EXIT;
          }
      #else 
-         ia32_arch_capabilities_t config_value = { .raw = td_params_ptr->ia32_arch_capabilities_config};
-         ia32_arch_capabilities_t arch_cap_value;
+        ia32_arch_capabilities_t config_value = { .raw = td_params_ptr->ia32_arch_capabilities_config};
+        ia32_arch_capabilities_t arch_cap_value;
+     #endif 
 
-         // SOPHIA: assume all the work has been done and no more configurable bits
-         __CPROVER_assume((config_value.raw == 0));
-     #endif // SOURCE
+     #ifdef MODULAR_PROOF
+        // SOPHIA: assume all the work has been done and no more configurable bits
+        __CPROVER_assume((config_value.raw == 0));
+     #endif // MODULAR_PROOF
 
+     #ifdef FLOW_PROOF
+        // SOPHIA: assume all the work has been done and no more configurable bits
+        __CPROVER_assert((config_value.raw == 0));
+     #endif // FLOW_PROOF
+
+     // SOPHIA: Check to make sure the TD is immutable 
      #ifdef SOURCE
          if (!td_immutable_state_cross_check(tdcs_ptr))
          {
@@ -1061,10 +1121,17 @@
          return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
          goto EXIT;
          }
-     #else 
-         __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
-                          !(tdcs_ptr->management_fields.num_l2_vms > 0));
      #endif // SOURCE
+
+     #ifdef MODULAR_PROOF
+        __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
+                         !(tdcs_ptr->management_fields.num_l2_vms > 0));
+     #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+         __CPROVER_assert(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
+                          !(tdcs_ptr->management_fields.num_l2_vms > 0));
+     #endif // FLOW_PROOF
  
      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
  
@@ -1077,7 +1144,10 @@
             
         // Initialize the virtual MSR values
         init_virt_ia32_vmx_msrs(tdcs_ptr);
-     #else 
+     #endif // SOURCE
+     
+     // SOPHIA: Assume that there is nothing to do for the whole MSR address range
+     #ifdef MODULAR_PROOF
         for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
             uint32_t msr_addr = msr_lookup[i].start_address;
             __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
@@ -1085,7 +1155,17 @@
             __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
                               (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0));
         }
-     #endif // SOURCE
+     #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+        for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
+           uint32_t msr_addr = msr_lookup[i].start_address;
+           __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
+           (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0), "Rd Bit cleared");
+           __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
+                             (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0), "Wr Bit cleared");
+        }
+     #endif // FLOW_PROOF
 
      /**
       *  Initialize the TD Measurement Fields
@@ -1110,8 +1190,11 @@
         basic_memset_to_zero(tdcs_ptr->measurement_fields.rtmr, (SIZE_OF_SHA384_HASH_IN_QWORDS<<3)*NUM_RTMRS);
      #endif // SOURCE
  
-     tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
-     return_val = TDX_SUCCESS; 
+     #ifdef FLOW_PROOF
+     #else 
+        tdcs_ptr->management_fields.op_state = OP_STATE_INITIALIZED;
+     #endif 
+
     EXIT:
      // Release all acquired locks and free keyhole mappings
      
@@ -1130,17 +1213,19 @@
              free_la(td_params_ptr);
          }
      #endif // SOURCE
-     __CPROVER_assert((tdcs_ptr->management_fields.num_l2_vms == (uint16_t)td_params_ptr->num_l2_vms) &&
-                      (tdcs_ptr->management_fields.num_vcpus == 0U) &&
-                      (tdcs_ptr->management_fields.num_assoc_vcpus == 0U), "Set TDCS TD Management fields to their initial values");
-     __CPROVER_assert(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED, "Mark the TD as initialized (set TDCS.OP_STATE to INITIALIZED)");
 
-     __CPROVER_assert(((td_params_ptr->attributes.raw & ~global_data.attributes_fixed0) == 0) &&
-                      ((td_params_ptr->attributes.raw & global_data.attributes_fixed1) == global_data.attributes_fixed1), 
-                      "Check that ATTRIBUTES that must be fixed-0 or fixed-1 are set correctly"); 
-     ia32_xcr0_t temp;
-     temp.raw = td_params_ptr->xfam;
-     __CPROVER_assert( !((temp.raw & TDX_XFAM_FIXED1) != TDX_XFAM_FIXED1)||
+     #ifdef MODULAR_PROOF
+        __CPROVER_assert((tdcs_ptr->management_fields.num_l2_vms == (uint16_t)td_params_ptr->num_l2_vms) &&
+                         (tdcs_ptr->management_fields.num_vcpus == 0U) &&
+                         (tdcs_ptr->management_fields.num_assoc_vcpus == 0U), "Set TDCS TD Management fields to their initial values");
+        __CPROVER_assert(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED, "Mark the TD as initialized (set TDCS.OP_STATE to INITIALIZED)");
+
+        __CPROVER_assert(((td_params_ptr->attributes.raw & ~global_data.attributes_fixed0) == 0) &&
+                         ((td_params_ptr->attributes.raw & global_data.attributes_fixed1) == global_data.attributes_fixed1), 
+                           "Check that ATTRIBUTES that must be fixed-0 or fixed-1 are set correctly"); 
+        ia32_xcr0_t temp;
+        temp.raw = td_params_ptr->xfam;
+        __CPROVER_assert( !((temp.raw & TDX_XFAM_FIXED1) != TDX_XFAM_FIXED1)||
                          (temp.avx3_kmask && !temp.avx) ||
                          (temp.avx3_kmask != temp.avx3_zmm_hi) ||
                          (temp.avx3_kmask != temp.avx3_zmm) ||
@@ -1148,33 +1233,74 @@
                          (temp.amx_xtilecfg != temp.amx_xtiledata), 
                       "Check that XFAM that must be fixed-0 or fixed-1 are set correctly"); 
 
-    // SOPHIA: EPTP config check
-     ia32e_eptp_t   target_eptp = { .raw = 0 };
-     target_eptp.raw = td_params_ptr->eptp_controls.raw;
-     ia32_vmx_ept_vpid_cap_t vpid_cap = { .raw = global_data.plt_common_config.ia32_vmx_ept_vpid_cap };
-     __CPROVER_assert(vpid_cap.pml5_supported == true, "EPTP config check 1");
-     __CPROVER_assert(( (target_eptp.fields.ept_ps_mt == MT_WB) &&
+        // SOPHIA: EPTP config check
+        ia32e_eptp_t   target_eptp = { .raw = 0 };
+        target_eptp.raw = td_params_ptr->eptp_controls.raw;
+        ia32_vmx_ept_vpid_cap_t vpid_cap = { .raw = global_data.plt_common_config.ia32_vmx_ept_vpid_cap };
+        __CPROVER_assert(vpid_cap.pml5_supported == true, "EPTP config check 1");
+        __CPROVER_assert(( (target_eptp.fields.ept_ps_mt == MT_WB) &&
                         (target_eptp.fields.enable_ad_bits == 0) &&
                         (target_eptp.fields.enable_sss_control == 0) &&
                         (target_eptp.fields.reserved_0 == 0) &&
                         (target_eptp.fields.base_pa == 0) &&
                         (target_eptp.fields.reserved_1 == 0)), "EPTP config check 2");
 
-     __CPROVER_assert((target_eptp.fields.ept_pwl >= LVL_PML4) &&
+        __CPROVER_assert((target_eptp.fields.ept_pwl >= LVL_PML4) &&
                        (target_eptp.fields.ept_pwl <= LVL_PML5), "EPTP config check 3"); 
         
-     __CPROVER_assert(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
+        __CPROVER_assert(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
                       !(global_data.max_pa < MIN_PA_FOR_PML5), "EPTP config check 4");
-     __CPROVER_assert(!(td_params_ptr->config_flags.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)), "EPTP config check 5");
+        __CPROVER_assert(!(td_params_ptr->config_flags.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)), "EPTP config check 5");
 
-     __CPROVER_assert(tdcs_ptr->executions_ctl_fields.eptp.raw == td_params_ptr->eptp_controls.raw, "Initialize EPTP to point to TDCS.SEPT_ROOT");
+        __CPROVER_assert(tdcs_ptr->executions_ctl_fields.eptp.raw == td_params_ptr->eptp_controls.raw, "Initialize EPTP to point to TDCS.SEPT_ROOT");
 
-     // SOPHIA: These are properties that I have decided to abstract away for now 
-     // __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
-     // __CPROVER_assert(true, "TD_PARAM TSC abstracted away")
-     // __CPROVER_assert(true, "TD_PARAM MRCONFIG ID, MROWNER, MROWNER config, crypto abstracted away")
-     __CPROVER_assert(true, "Initialize the TDCS measurement fields");
-     __CPROVER_assert(false, "False"); 
+        // SOPHIA: These are properties that I have decided to abstract away for now 
+        // __CPROVER_assert(true, "Initialize the MSR bitmaps based on ATTRIBUTES and XFAM");
+        // __CPROVER_assert(true, "TD_PARAM TSC abstracted away")
+        // __CPROVER_assert(true, "TD_PARAM MRCONFIG ID, MROWNER, MROWNER config, crypto abstracted away")
+        // __CPROVER_assert(true, "Initialize the TDCS measurement fields");
+        __CPROVER_assert(false, "False"); 
+     #endif // MODULAR_PROOF
+
+     #ifdef FLOW_PROOF
+        __CPROVER_assume((tdcs_ptr->management_fields.num_l2_vms == (uint16_t)td_params_ptr->num_l2_vms) &&
+                        (tdcs_ptr->management_fields.num_vcpus == 0U) &&
+                        (tdcs_ptr->management_fields.num_assoc_vcpus == 0U));
+        __CPROVER_assume(tdcs_ptr->management_fields.op_state == OP_STATE_INITIALIZED);
+
+        __CPROVER_assume(((td_params_ptr->attributes.raw & ~global_data.attributes_fixed0) == 0) &&
+             ((td_params_ptr->attributes.raw & global_data.attributes_fixed1) == global_data.attributes_fixed1)); 
+        ia32_xcr0_t temp;
+        temp.raw = td_params_ptr->xfam;
+        __CPROVER_assume( !((temp.raw & TDX_XFAM_FIXED1) != TDX_XFAM_FIXED1)||
+             (temp.avx3_kmask && !temp.avx) ||
+             (temp.avx3_kmask != temp.avx3_zmm_hi) ||
+             (temp.avx3_kmask != temp.avx3_zmm) ||
+             (temp.cet_s != temp.cet_u) ||
+             (temp.amx_xtilecfg != temp.amx_xtiledata)); 
+
+        // SOPHIA: EPTP config check
+        ia32e_eptp_t   target_eptp = { .raw = 0 };
+        target_eptp.raw = td_params_ptr->eptp_controls.raw;
+        ia32_vmx_ept_vpid_cap_t vpid_cap = { .raw = global_data.plt_common_config.ia32_vmx_ept_vpid_cap };
+        __CPROVER_assume(vpid_cap.pml5_supported == true);
+        __CPROVER_assume(( (target_eptp.fields.ept_ps_mt == MT_WB) &&
+            (target_eptp.fields.enable_ad_bits == 0) &&
+            (target_eptp.fields.enable_sss_control == 0) &&
+            (target_eptp.fields.reserved_0 == 0) &&
+            (target_eptp.fields.base_pa == 0) &&
+            (target_eptp.fields.reserved_1 == 0)));
+
+        __CPROVER_assume((target_eptp.fields.ept_pwl >= LVL_PML4) &&
+           (target_eptp.fields.ept_pwl <= LVL_PML5)); 
+
+        __CPROVER_assume(!(target_eptp.fields.ept_pwl == LVL_PML5) ||
+          !(global_data.max_pa < MIN_PA_FOR_PML5));
+        __CPROVER_assume(!(td_params_ptr->config_flags.gpaw && (target_eptp.fields.ept_pwl < LVL_PML5)));
+
+        __CPROVER_assume(tdcs_ptr->executions_ctl_fields.eptp.raw == td_params_ptr->eptp_controls.raw);
+
+     #endif // FLOW_PROOF
      return_val = TDX_SUCCESS; 
      return return_val;
  }

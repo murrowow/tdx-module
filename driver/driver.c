@@ -12,8 +12,6 @@ void driver_main() {
     __CPROVER_assume(global_data.hkid_mask == HKID_MASK);
     __CPROVER_havoc_object(&tables); 
     
-    // __CPROVER_printf("SOPHIA: size of pa: %d hkid_start_bit %d hkid_mask: %X hkid_min: %X hkid_max: %X", 
-    //     52, global_data.hkid_start_bit, global_data.hkid_mask, global_data.private_hkid_min, global_data.private_hkid_max);
     #ifdef SETUP
         __CPROVER_havoc_object(&tables);
         //init the kot table
