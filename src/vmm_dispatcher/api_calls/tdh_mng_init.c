@@ -1067,7 +1067,7 @@
      #endif // SOURCE
 
      #ifdef FLOW_PROOF
-         __CPROVER_assume(return_val == TDX_SUCCESS, "this should pass"); 
+         __CPROVER_assert(return_val == TDX_SUCCESS, "this should pass"); 
      #endif // SOURCE
  
      /**
@@ -1110,7 +1110,7 @@
 
      #ifdef FLOW_PROOF
         // SOPHIA: assume all the work has been done and no more configurable bits
-        __CPROVER_assert((config_value.raw == 0));
+        __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
      #endif // FLOW_PROOF
 
      // SOPHIA: Check to make sure the TD is immutable 
@@ -1130,7 +1130,7 @@
 
      #ifdef FLOW_PROOF
          __CPROVER_assert(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
-                          !(tdcs_ptr->management_fields.num_l2_vms > 0));
+                          !(tdcs_ptr->management_fields.num_l2_vms > 0), "Ensure TD is immutable");
      #endif // FLOW_PROOF
  
      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
@@ -1259,7 +1259,6 @@
         // __CPROVER_assert(true, "TD_PARAM TSC abstracted away")
         // __CPROVER_assert(true, "TD_PARAM MRCONFIG ID, MROWNER, MROWNER config, crypto abstracted away")
         // __CPROVER_assert(true, "Initialize the TDCS measurement fields");
-        __CPROVER_assert(false, "False"); 
      #endif // MODULAR_PROOF
 
      #ifdef FLOW_PROOF
