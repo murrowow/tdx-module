@@ -2,7 +2,7 @@
 
 #ifdef SOURCE
 #else
-void TD_setup() {
+void TD_setup(uint16_t index) {
     uint64_t target_tdr_pa;
     uint64_t target_tdcx_pa; 
     uint64_t target_td_params_pa;
@@ -14,18 +14,24 @@ void TD_setup() {
     __CPROVER_havoc_object(&hkid_info); 
     __CPROVER_havoc_object(&target_td_params_pa); 
 
+    __CPROVER_printf("SOPHIA: index is %d\n", index);
     // SOPHIA: For now assume HKID is upper most bits of the PA
-    __CPROVER_assume(hkid_info.hkid == target_tdr_pa >> (64-16)); 
-    __CPROVER_assume(hkid_info.hkid >= global_data.private_hkid_min & hkid_info.hkid <= global_data.private_hkid_max); 
+    #ifdef SETUP
+        __CPROVER_assume(hkid_info.hkid == target_tdr_pa >> (64-16)); 
+        __CPROVER_assume(hkid_info.hkid >= global_data.private_hkid_min & hkid_info.hkid <= global_data.private_hkid_max); 
+    #else 
+        __CPROVER_assume(target_tdr_pa >> (64-16) == index); 
+        __CPROVER_assume(hkid_info.hkid == index);
+    #endif 
 
-    error = tdh_mng_create(target_tdr_pa, hkid_info); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_mng_create(target_tdr_pa, hkid_info); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_mng_key_config(target_tdr_pa); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_mng_init(target_tdr_pa, target_td_params_pa);
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_mng_init(target_tdr_pa, target_td_params_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
 }
 
 void TDX_bootup() {

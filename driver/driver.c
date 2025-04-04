@@ -36,14 +36,17 @@ void driver_main() {
         __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
         __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
 
-        for (int i = 0; i < HKID_SIZE; i++) {
-            __CPROVER_havoc_object(&tables[i]);
-        }
+        uint16_t index = 0;
+        
         // Ensure at least one element has pamt_entry.pt set to PT_TDR
         bool_t found = false;
         for (int i = 0; i < HKID_SIZE; i++) {
-            if (tables[i].pamt_entry.pt == PT_TDR) {
+            if ((tables[i].pamt_entry.pt == PT_TDR) &&
+                !tables[i].tdr_table.management_fields.fatal &&
+                (tables[i].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED) &&
+                !(tables[i].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)))) {
                 found = true;
+                index = i;
                 break;
             }
         }
@@ -75,21 +78,21 @@ void driver_main() {
 
     #ifdef INIT_SETUP
 
-    // Ensure at least one element is as we need it
-    bool_t found = false;
-    for (int i = 0; i < HKID_SIZE; i++) {
-        if (tables[i].pamt_entry.pt == PT_TDR 
-            && tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED 
-            && tables[i].tdr_table.management_fields.fatal == false);  {
-            found = true;
-            break;
+        // Ensure at least one element is as we need it
+        bool_t found = false;
+        for (int i = 0; i < HKID_SIZE; i++) {
+            if (tables[i].pamt_entry.pt == PT_TDR 
+                && tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED 
+                && tables[i].tdr_table.management_fields.fatal == false);  {
+                found = true;
+                break;
+            }
         }
-    }
-    // TDR page metadata in the PAMT must be correct (PT must be PT_TDR)
-    // TD is not in a fatal state
-    // TD keys are configured on the hardware
-    __CPROVER_assume(found);
+        // TDR page metadata in the PAMT must be correct (PT must be PT_TDR)
+        // TD is not in a fatal state
+        // TD keys are configured on the hardware
+        __CPROVER_assume(found);
     #endif // INIT_SETUP
-    TD_setup();
+    TD_setup(index);
 }
 #endif // not SOURCE

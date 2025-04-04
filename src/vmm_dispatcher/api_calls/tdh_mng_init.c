@@ -893,7 +893,7 @@
      #endif // MODULAR_PROOF
 
      #ifdef FLOW_PROOF
-        __CPROVER_havoc_slice(local_data.vmm_regs.rcx, sizeof(uint64_t)); 
+        __CPROVER_havoc_slice(&(local_data.vmm_regs.rcx), sizeof(uint64_t)); 
         __CPROVER_assume(local_data.vmm_regs.rcx == 0ULL);
      #endif 
 
@@ -926,9 +926,10 @@
          goto EXIT;
          }
      #else
-         tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
-         tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr_table);
-         tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcx_table);
+         uint16_t td_hkid = tdr_pa.raw >> 48; 
+         tdr_pamt_entry_ptr = &(tables[td_hkid & HKID_MASK].pamt_entry);
+         tdr_ptr = &(tables[td_hkid & HKID_MASK].tdr_table);
+         tdcs_ptr = &(tables[td_hkid & HKID_MASK].tdcx_table);
      #endif // SOURCE */
  
      #ifdef MODULAR_PROOF

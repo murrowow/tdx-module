@@ -18,7 +18,7 @@
 #include "stdio.h"
 #include "stdint.h"
 
-void TD_setup();
+void TD_setup(uint16_t);
 void TDX_bootup(); 
 
 #endif 
