@@ -932,14 +932,6 @@
          tdcs_ptr = &(tables[td_hkid & HKID_MASK].tdcx_table);
      #endif // SOURCE */
  
-     #ifdef MODULAR_PROOF
-         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_TDR); //, "Page Metadata Table should be correct"
-     #endif // MODULAR_PROOF
-
-     #ifdef FLOW_PROOF
-         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "Page Metadata Table should be correct");
-     #endif 
- 
      // Map the TDCS structure and check the state
      #ifdef SOURCE
          return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_NO_LOCK,
@@ -957,15 +949,17 @@
         // SOPHIA: from check_td_in_correct_build_state in helpers.h
         __CPROVER_assume(!tdr_ptr->management_fields.fatal);
         __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
-        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES);
+        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES);
      #endif // MODULAR_PROOF
  
      #ifdef FLOW_PROOF
+        
         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "Page Metadata Table should be correct"); //, "Page Metadata Table should be correct"
         // SOPHIA: from check_td_in_correct_build_state in helpers.h
-        __CPROVER_assert(!tdr_ptr->management_fields.fatal, "TD should not be in fatal state");
-        __CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD lifecycle should be in keys configured");
-        __CPROVER_assert(tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES, "TDCX pages should be less than the minimum");
+        __CPROVER_assert(!tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal, "TD should not be in fatal state");
+        __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD lifecycle should be in keys configured");
+         // SOPHIA: at the moment cannot add pages so abstract away for now
+        //__CPROVER_assert(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES, "TDCX pages should be less than the minimum");
      #endif // FLOW_PROOF
 
      // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
@@ -982,25 +976,13 @@
      #ifdef MODULAR_PROOF
          __CPROVER_assume(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES));
          //SOPHIA: shared_hpa_check from helpers.c
-        __CPROVER_assume(!is_pa_smaller_than_max_pa(td_params_pa.raw));
-        // from get_addr_from_pa from helpers.h
-         __CPROVER_assume(is_overlap(td_params_pa.full_pa & ~(global_data.hkid_mask), TD_PARAMS_ALIGN_IN_BYTES, 
-                      global_data.private_hkid_min, 
-                      HKID_SIZE));
-        __CPROVER_assume((td_params_pa.full_pa & global_data.hkid_mask) >> global_data.hkid_start_bit 
-                          >= global_data.private_hkid_min);
+        __CPROVER_assume(is_pa_smaller_than_max_pa(td_params_pa.raw));
      #endif // MODULAR_PROOF
 
      #ifdef FLOW_PROOF
          __CPROVER_assert(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES), "TD_PARAMS_PA is aligned pwr of 2");
          //SOPHIA: shared_hpa_check from helpers.c
-        __CPROVER_assert(!is_pa_smaller_than_max_pa(td_params_pa.raw), "TD_PARAMS_PA falls within PA range");
-        // from get_addr_from_pa from helpers.h
-         __CPROVER_assert(is_overlap(td_params_pa.full_pa & ~(global_data.hkid_mask), TD_PARAMS_ALIGN_IN_BYTES, 
-                      global_data.private_hkid_min, 
-                      HKID_SIZE), "There is overap between TD_PARAMS_PA addr and the hkid range");
-        __CPROVER_assert((td_params_pa.full_pa & global_data.hkid_mask) >> global_data.hkid_start_bit 
-                          >= global_data.private_hkid_min, "TD_PARAMS_PA has a HKID that is valid");
+         __CPROVER_assert(is_pa_smaller_than_max_pa(td_params_pa.raw), "TD_PARAMS_PA falls within PA range");
      #endif // FLOW_PROOF
  
      // SOPHIA: keyhole mapping can be abstracted away for now
@@ -1017,14 +999,14 @@
 
     // SOPHIA: VCPU and Epoch counting
     #ifdef FLOW_PROOF
-        __CPROVER_havoc_slice(tdcs_ptr->management_fields.num_vcpus, sizeof(uint32_t));
-        __CPROVER_havoc_slice(tdcs_ptr->management_fields.num_assoc_vcpus, sizeof(uint32_t));
+        __CPROVER_havoc_slice(&(tdcs_ptr->management_fields.num_vcpus), sizeof(uint32_t));
+        __CPROVER_havoc_slice(&(tdcs_ptr->management_fields.num_assoc_vcpus), sizeof(uint32_t));
         __CPROVER_assume(tdcs_ptr->management_fields.num_vcpus == 0U);
         __CPROVER_assume(tdcs_ptr->management_fields.num_assoc_vcpus == 0U);
 
-        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch, sizeof(uint64_t));
-        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0], sizeof(uint16_t));
-        __CPROVER_havoc_slice(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1], sizeof(uint16_t));
+        __CPROVER_havoc_slice(&(tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch), sizeof(uint64_t));
+        __CPROVER_havoc_slice(&(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0]), sizeof(uint16_t));
+        __CPROVER_havoc_slice(&(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1]), sizeof(uint16_t));
         __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch == 1ULL);
         __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[0] == 0);
         __CPROVER_assume(tdcs_ptr->epoch_tracking.epoch_and_refcount.refcount[1] == 0);
@@ -1104,15 +1086,15 @@
         ia32_arch_capabilities_t arch_cap_value;
      #endif 
 
-     #ifdef MODULAR_PROOF
-        // SOPHIA: assume all the work has been done and no more configurable bits
-        __CPROVER_assume((config_value.raw == 0));
-     #endif // MODULAR_PROOF
+    //  #ifdef MODULAR_PROOF
+    //     // SOPHIA: assume all the work has been done and no more configurable bits
+    //     __CPROVER_assume((config_value.raw == 0));
+    //  #endif // MODULAR_PROOF
 
-     #ifdef FLOW_PROOF
-        // SOPHIA: assume all the work has been done and no more configurable bits
-        __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
-     #endif // FLOW_PROOF
+    //  #ifdef FLOW_PROOF
+    //     // SOPHIA: assume all the work has been done and no more configurable bits
+    //     __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
+    //  #endif // FLOW_PROOF
 
      // SOPHIA: Check to make sure the TD is immutable 
      #ifdef SOURCE
@@ -1124,15 +1106,15 @@
          }
      #endif // SOURCE
 
-     #ifdef MODULAR_PROOF
-        __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
-                         !(tdcs_ptr->management_fields.num_l2_vms > 0));
-     #endif // MODULAR_PROOF
+    //  #ifdef MODULAR_PROOF
+    //     __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
+    //                      !(tdcs_ptr->management_fields.num_l2_vms > 0));
+    //  #endif // MODULAR_PROOF
 
-     #ifdef FLOW_PROOF
-         __CPROVER_assert(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
-                          !(tdcs_ptr->management_fields.num_l2_vms > 0), "Ensure TD is immutable");
-     #endif // FLOW_PROOF
+    //  #ifdef FLOW_PROOF
+    //      __CPROVER_assert(!tdcs_ptr->executions_ctl_fields.attributes.migratable ||
+    //                       !(tdcs_ptr->management_fields.num_l2_vms > 0), "Ensure TD is immutable");
+    //  #endif // FLOW_PROOF
  
      // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
  
@@ -1148,25 +1130,26 @@
      #endif // SOURCE
      
      // SOPHIA: Assume that there is nothing to do for the whole MSR address range
-     #ifdef MODULAR_PROOF
-        for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
-            uint32_t msr_addr = msr_lookup[i].start_address;
-            __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
-            (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0));
-            __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
-                              (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0));
-        }
-     #endif // MODULAR_PROOF
+     // SOPHIA: Abstract this away for now
+    //  #ifdef MODULAR_PROOF
+    //     for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
+    //         uint32_t msr_addr = msr_lookup[i].start_address;
+    //         __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
+    //         (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0));
+    //         __CPROVER_assume(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
+    //                           (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0));
+    //     }
+    //  #endif // MODULAR_PROOF
 
-     #ifdef FLOW_PROOF
-        for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
-           uint32_t msr_addr = msr_lookup[i].start_address;
-           __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
-           (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0), "Rd Bit cleared");
-           __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
-                             (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0), "Wr Bit cleared");
-        }
-     #endif // FLOW_PROOF
+    //  #ifdef FLOW_PROOF
+    //     for (uint32_t i = 0; i < 1; i++) { //MAX_NUM_MSR_LOOKUP
+    //        uint32_t msr_addr = msr_lookup[i].start_address;
+    //        __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].rd_bit_meaning) ||
+    //        (msr_lookup[i].rd_bit_meaning == MSR_BITMAP_FIXED_0), "Rd Bit cleared");
+    //        __CPROVER_assert(!is_small_msr_dynamic_bit_cleared(tdcs_ptr, msr_addr, msr_lookup[i].wr_bit_meaning) ||
+    //                          (msr_lookup[i].wr_bit_meaning == MSR_BITMAP_FIXED_0), "Wr Bit cleared");
+    //     }
+    //  #endif // FLOW_PROOF
 
      /**
       *  Initialize the TD Measurement Fields

@@ -330,6 +330,9 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
             unsigned val : 2;
         } tdcx_pa_two_bit;
         tdcx_pa_two_bit.val = tdcx_pa.raw & ((HKID_SIZE << 1) - 1);
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal == false);
+        // SOPHIA: need to preserve state after the previous havoc
+        __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED);
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == tdcx_pa_two_bit.val);
 
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == tdcx_index_num + 1);
@@ -367,6 +370,7 @@ EXIT:
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val == (tdcx_pa.raw & ((HKID_SIZE << 1) - 1)), "Set the TDCX pointer entry in the TDR.TDCX_PA array");
     #endif //MODULAR_PROOF
 
+    __CPROVER_printf("SOPHIA: index: %d, tables.fatal: %d, lifecycle: %d", td_hkid & HKID_MASK, tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal, tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state);
     return_val = TDX_SUCCESS;
     return return_val;
 }
