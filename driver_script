@@ -1,6 +1,7 @@
 FILES="src/common/memory_handlers/keyhole_manager.c \
        src/common/memory_handlers/pamt_manager.c \
        src/common/helpers/helpers.c \
+       include/auto_gen/op_state_lookup.c \
        driver/driver.c \
        driver/flows/flows.c \
        src/vmm_dispatcher/api_calls/tdh_mng_create.c \
