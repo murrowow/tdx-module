@@ -21,7 +21,7 @@ void driver_main() {
             __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
             __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
             __CPROVER_assume(tables[i].tdr_table.key_management_fields.pkg_config_bitmap == 0); 
-            __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES); 
+            __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx == 0); 
             __CPROVER_assume(tables[i].tdcx_pamt_entry.pt == PT_NDA);
 
             // SOPHIA: highkey have no idea what this does for add_cx

@@ -104,7 +104,6 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         __CPROVER_assert(!tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal, "Not in a fatal state");
     #endif //FLOW_PROOF
 
-    __CPROVER_printf("SOPHIA: td_hkid = %d", td_hkid); 
     // Verify LIFECYCLE_STATE
     #ifdef SOURCE
     if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
@@ -199,8 +198,7 @@ EXIT:
         }
     #endif //SOURCE
 
-    #ifdef MODULAR_PROOF
-        __CPROVER_assert(false, "false");        
+    #ifdef MODULAR_PROOF     
         __CPROVER_assert((tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & BIT(local_data.lp_info.pkg)) != 0, "current package configured");
         __CPROVER_assert(((tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && (tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED))
                         || (!(tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == global_data.pkg_config_bitmap) && !(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == (uint8_t)TD_KEYS_CONFIGURED)),

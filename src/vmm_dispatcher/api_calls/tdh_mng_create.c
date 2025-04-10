@@ -269,7 +269,6 @@ EXIT:
         __CPROVER_assert(tables[td_hkid & HKID_MASK].pamt_entry.pt == PT_TDR, "hardware pamt was set correctly");
         __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state ==  KOT_STATE_HKID_ASSIGNED, "hardware  pamt was set correctly");
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
-        __CPROVER_assert(false, "False"); 
     #endif //MODULAR_PROOF
 
     return_val = TDX_SUCCESS;

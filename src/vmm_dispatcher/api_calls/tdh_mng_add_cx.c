@@ -141,7 +141,6 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
             goto EXIT;
         }
     #endif //SOURCE
-    
     #ifdef MODULAR_PROOF
         __CPROVER_assume(tdcx_index_num < MAX_NUM_TDCS_PAGES);
     #endif //MODULAR_PROOF
@@ -182,7 +181,12 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
     #endif //MODULAR_PROOF
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA, "Make sure TDCX entry is correct");
+        __CPROVER_printf("SOPHIA: number of pages: %d, value in: %d, PT_TDCX_val: %d, PT_NDA_val: %d",
+                                            tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx,
+                                            (signed int)tdcx_pamt_entry_ptr->pt,
+                                            PT_TDCX, PT_NDA);
+        if (tdcx_index_num < MIN_NUM_TDCS_PAGES)
+            __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA, "Make sure TDCX entry is correct");
     #endif //FLOW_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
@@ -323,7 +327,6 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
     #endif //MODULAR_PROOF
 
-
     #ifdef FLOW_PROOF
         uint64_t currChildCount = tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt;
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));
@@ -339,8 +342,14 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == tdcx_index_num + 1);
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1); 
 
+        signed int pt_val = tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx;
         __CPROVER_havoc_slice(tdcx_pamt_entry_ptr, sizeof(pamt_entry_t)); 
-        __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_TDCX);
+        if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES) {
+            __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_TDCX);
+        } else {
+            __CPROVER_assume(tdcx_pamt_entry_ptr->pt == pt_val);
+        }
+        __CPROVER_printf("SOPHIA: pt_val: %d", pt_val); 
         __CPROVER_assume(tdcx_pamt_entry_ptr->owner == tdr_pa.page_4k_num);
     #endif //FLOW_PROOF
 

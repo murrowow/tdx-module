@@ -958,8 +958,8 @@
         // SOPHIA: from check_td_in_correct_build_state in helpers.h
         __CPROVER_assert(!tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal, "TD should not be in fatal state");
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD lifecycle should be in keys configured");
-         // SOPHIA: at the moment cannot add pages so abstract away for now
-        //__CPROVER_assert(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES, "TDCX pages should be less than the minimum");
+        // SOPHIA: at the moment cannot add pages so abstract away for now
+        __CPROVER_assert(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES, "TDCX pages should be less than the minimum");
      #endif // FLOW_PROOF
 
      // Check that TD PARAMS page is TD_PARAMS_ALIGN_IN_BYTES
@@ -1086,15 +1086,15 @@
         ia32_arch_capabilities_t arch_cap_value;
      #endif 
 
-    //  #ifdef MODULAR_PROOF
-    //     // SOPHIA: assume all the work has been done and no more configurable bits
-    //     __CPROVER_assume((config_value.raw == 0));
-    //  #endif // MODULAR_PROOF
+     #ifdef MODULAR_PROOF
+        // SOPHIA: assume all the work has been done and no more configurable bits
+        __CPROVER_assume((config_value.raw == 0));
+     #endif // MODULAR_PROOF
 
-    //  #ifdef FLOW_PROOF
-    //     // SOPHIA: assume all the work has been done and no more configurable bits
-    //     __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
-    //  #endif // FLOW_PROOF
+     #ifdef FLOW_PROOF
+        // SOPHIA: assume all the work has been done and no more configurable bits
+        __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
+     #endif // FLOW_PROOF
 
      // SOPHIA: Check to make sure the TD is immutable 
      #ifdef SOURCE

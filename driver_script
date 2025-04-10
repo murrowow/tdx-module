@@ -9,4 +9,4 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mng_add_cx.c \
        src/vmm_dispatcher/api_calls/tdh_mng_init.c"
 
-cbmc -DFLOW_PROOF -DSETUP driver/driver.c --function driver_main $FILES -I "$PWD" --trace > driver_log.txt
+cbmc -DFLOW_PROOF -DSETUP -DWHOLE_FLOW driver/driver.c --function driver_main $FILES -I "$PWD" --trace > driver_log.txt
