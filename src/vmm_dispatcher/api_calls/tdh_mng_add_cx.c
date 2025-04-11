@@ -342,14 +342,12 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx == tdcx_index_num + 1);
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt == currChildCount + 1); 
 
-        signed int pt_val = tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx;
         __CPROVER_havoc_slice(tdcx_pamt_entry_ptr, sizeof(pamt_entry_t)); 
         if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES) {
             __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_TDCX);
         } else {
-            __CPROVER_assume(tdcx_pamt_entry_ptr->pt == pt_val);
+            __CPROVER_assume(tdcx_pamt_entry_ptr->pt == PT_NDA);
         }
-        __CPROVER_printf("SOPHIA: pt_val: %d", pt_val); 
         __CPROVER_assume(tdcx_pamt_entry_ptr->owner == tdr_pa.page_4k_num);
     #endif //FLOW_PROOF
 
