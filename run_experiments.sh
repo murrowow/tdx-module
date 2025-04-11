@@ -13,8 +13,8 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mng_init.c"
 
 PARAMETERS=("-DMODULAR_PROOF" "-DFLOW_PROOF")
-SETUP=("-DSETUP" "-DKEY_CONFIG_SETUP" "-DADD_CX_SETUP" "-DINIT_SETUP")
-EXPERIMENT=("-DCREATE" "-DKEY_CONFIG" "-DADD_CX" "-DINIT")
+SETUP=("-DSETUP" "-DSETUP" "-DKEY_CONFIG_SETUP" "-DADD_CX_SETUP" "-DINIT_SETUP")
+EXPERIMENT=("-DWHOLE_FLOW" "-DCREATE" "-DKEY_CONFIG" "-DADD_CX" "-DINIT")
 
 # Output CSV file to store execution times
 output_file="execution_times.csv"
@@ -22,10 +22,16 @@ temp_file="temp.txt"
 
 echo "INSTR, PROOF_TYPE, TIME, MEMORY" > $output_file
 
-#
 for i in "${!EXPERIMENT[@]}"; do
     for j in "${!PARAMETERS[@]}"; do
-        process_command="cbmc ${PARAMETERS[$j]} ${SETUP[$i]}} ${EXPERIMENT[$i]} driver/driver.c --function driver_main $FILES -I "$PWD" --trace > traces/${PARAMETERS[$j]}_${SETUP[$i]}}_${EXPERIMENT[$i]}.txt" 
+
+        if [ "${EXPERIMENT[$i]}" = "-DWHOLE_FLOW" ]; then
+            if [ "${PARAMETERS[$j]}" = "-DMODULAR_PROOF" ]; then
+                continue
+            fi 
+        fi
+
+        process_command="cbmc ${PARAMETERS[$j]} ${SETUP[$i]}} ${EXPERIMENT[$i]} driver/driver.c --function driver_main $FILES -I "$PWD" --trace" 
         time_command="/usr/bin/time -h -l $process_command"
         $time_command 2> $temp_file
         # Extract user time (e.g., "0.00s user")
@@ -35,18 +41,8 @@ for i in "${!EXPERIMENT[@]}"; do
         max_rss=$(grep 'maximum resident set size' "$temp_file" | awk '{print $1}')
 
         echo "${EXPERIMENT[$i]}, ${PARAMETERS[$j]}, $user_time, $max_rss" >> $output_file
+
     done
 done
-
-process_command="cbmc -DFLOW_PROOF -DSETUP -DWHOLE_FLOW driver/driver.c --function driver_main $FILES -I "$PWD --trace > traces/FLOWPROOF_SETUP_WHOLEFLOW.txt"
-time_command="/usr/bin/time -h -l $process_command"
-$time_command 2> $temp_file
-
-user_time=$(awk '/user/ { for(i=1;i<=NF;i++) if($i=="user") print $(i-1) }' "$temp_file")
-
-Extract maximum resident set size
-max_rss=$(grep 'maximum resident set size' "$temp_file" | awk '{print $1}')
-
-echo "WHOLE_FLOW, -FLOW_PROOF, $user_time, $max_rss" >> $output_file
 
 rm -f $temp_file
