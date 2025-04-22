@@ -1186,18 +1186,32 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
         sysinfo_table_t* sysinfo_table_ptr = get_sysinfo_table();
     #else
         sysinfo_table_t* sysinfo_table_ptr = &sysinfo;
-    #endif
+    #endif // SOURCE 
 
-    //NUM_LPS
-    tdx_global_data_ptr->num_of_lps = sysinfo_table_ptr->mcheck_fields.tot_num_lps;
+    // AHMAD: Related to CPU configuration
+    #ifdef SOURCE
+        //NUM_LPS
+        tdx_global_data_ptr->num_of_lps = sysinfo_table_ptr->mcheck_fields.tot_num_lps;
 
-    //NUM_PKGS
-    tdx_global_data_ptr->num_of_pkgs = sysinfo_table_ptr->mcheck_fields.tot_num_sockets;
+        //NUM_PKGS
+        tdx_global_data_ptr->num_of_pkgs = sysinfo_table_ptr->mcheck_fields.tot_num_sockets;
 
-    //NUM_INIT_PKGS
-    tdx_global_data_ptr->num_of_init_pkgs = (uint32_t)0;
+        //NUM_INIT_PKGS
+        tdx_global_data_ptr->num_of_init_pkgs = (uint32_t)0;
 
-    tdx_global_data_ptr->pkg_config_bitmap = (uint32_t)0;
+        tdx_global_data_ptr->pkg_config_bitmap = (uint32_t)0;
+    #else
+        //NUM_LPS
+        tdx_global_data_ptr->num_of_lps = 1;
+
+        //NUM_PKGS
+        tdx_global_data_ptr->num_of_pkgs = 1;
+
+        //NUM_INIT_PKGS
+        tdx_global_data_ptr->num_of_init_pkgs = (uint32_t)0;
+
+        tdx_global_data_ptr->pkg_config_bitmap = (uint32_t)0;
+    #endif // SOURCE 
 
     // INIT SEAMRR base and size
     #ifdef SOURCE
@@ -1205,7 +1219,7 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
 
         uint64_t seamrr_mask = ia32_rdmsr(IA32_SEAMRR_MASK_MSR_ADDR) & IA32_SEAMRR_BASE_AND_MASK_MASK;
         tdx_global_data_ptr->seamrr_size = mask_to_size(seamrr_mask);
-    #endif
+    #endif // SOURCE 
 
     #ifdef MODULAR_SOURCE
         uint64_t seamrr_base;
@@ -1216,7 +1230,6 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
         seamrr_mask &= IA32_SEAMRR_BASE_AND_MASK_MASK;
         __CPROVER_assume(seamrr_mask != 0)
         tdx_global_data_ptr->seamrr_size = BIT(__builtin_ctzll(seamrr_mask));
-
     #endif
 
     tdx_global_data_ptr->num_of_init_lps = 0;
@@ -1228,11 +1241,11 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
     tdx_global_data_ptr->xbuf.xsave_header.xcomp_bv = BIT(63);
     #ifdef SOURCE
         basic_memset_to_zero(&tdx_global_data_ptr->xbuf.xsave_header.reserved, sizeof(tdx_global_data_ptr->xbuf.xsave_header.reserved));
-    else
+    #else
         for (int i = 0; i < 48; i++) {
             tdx_global_data_ptr->xbuf.xsave_header.reserved[i] = 0;
         }
-    #endif
+    #endif // SOURCE 
 
     // VMCS host fields
     #ifdef SOURCE
@@ -1280,7 +1293,7 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
 
         host_fields_ptr->GDTR_BASE.encoding  = VMX_HOST_GDTR_BASE_ENCODE;
         host_fields_ptr->GDTR_BASE.value     = vmcs.HOST_GDTR_BASE;
-    #endif
+    #endif // SOURCE 
 
     tdx_global_data_ptr->num_rdseed_retries = 6;
     tdx_global_data_ptr->num_rdseed_pauses = 32;
@@ -1298,22 +1311,23 @@ _STATIC_INLINE_ api_error_type tdx_init_stack_canary(void)
     #else
         __CPROVER_havoc_object(&canary);
         __CPROVER_assume(canary != 0);
-    #endif
+    #endif // SOURCE 
 
     #ifdef SOURCE
         sysinfo_table_t* sysinfo_table = get_sysinfo_table();
     #else
         sysinfo_table_t* sysinfo_table = &sysinfo;
-    #endif
+    #endif // SOURCE 
     
+    // AHMAD: I dont think the address matters since we abstracted away the need for the exact address but it is stored so for consistency I'll leave it for now
     uint64_t last_page_addr = sysinfo_table->data_rgn_base + sysinfo_table->data_rgn_size - _4KB;
-    last_page_ptr = (sysinfo_table_t*)(last_page_addr);;
+    sysinfo_table_t* last_page_ptr = last_page_ptr = &tdx_mem[(sizeof(tdx_mem) / sizeof(tdx_mem[0])) - 1];
     last_page_ptr->stack_canary.canary = canary;
     #ifdef SOURCE
         ia32_vmwrite(VMX_HOST_FS_BASE_ENCODE, last_page_addr);
     #else
         vmcs.HOST_FS_BASE = last_page_addr;
-    #endif
+    #endif // SOURCE 
 
     //Copy SYS_INFO_TABLE information that is being used in other flows
     for (uint64_t i = 0; i < MAX_CMR; i++)
@@ -1370,7 +1384,7 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
             TDX_ERROR("Incompatible TD preserving defs\n");
             return TDX_SYS_INCOMPATIBLE_SIGSTRUCT;
         }        
-    #endif
+    #endif // SOURCE 
 
     #ifdef MODULAR_PROOF    
         global_data.module_hv         = sysinfo.module_hv;
@@ -1388,7 +1402,21 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
             (global_data.min_update_hv >= 0) &&
             ((global_data.no_downgrade != 0) || (0 != 1)) &&
             ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES));
-    #endif
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF    
+        global_data.module_hv         = sysinfo.module_hv;
+        global_data.min_update_hv     = sysinfo.min_update_hv;
+        global_data.no_downgrade      = sysinfo.no_downgrade;
+        global_data.num_handoff_pages = sysinfo.num_handoff_pages;
+
+        // AHMAD: REPLACE MAKEFILE VARS WITH 0 FOR NOW IN REALITY SET AT COMPILE TIME
+        __CPROVER_assert((global_data.module_hv == 0) &&
+            (global_data.min_update_hv >= 0) &&
+            ((global_data.no_downgrade != 0) || (0 != 1)) &&
+            ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES), "Failed build time checks");
+
+    #endif // FLOW_PROOF
 
     return TDX_SUCCESS;
 }
@@ -1402,7 +1430,7 @@ api_error_type tdh_sys_init(void)
     #else
         tdx_module_global_t *tdx_global_data_ptr = &global_data;
         tdx_module_local_t *tdx_local_data_ptr = &local_data;
-    #endif
+    #endif // SOURCE
     api_error_type retval = TDX_SYS_BUSY;
     api_error_type err;
 
@@ -1432,7 +1460,7 @@ api_error_type tdh_sys_init(void)
             goto EXIT;
         }
         global_lock_acquired = true;
-    #endif
+    #endif // SOURCE 
 
     #ifdef SOURCE
     // RCX should be reserved
@@ -1442,11 +1470,15 @@ api_error_type tdh_sys_init(void)
         retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
-    #endif
+    #endif // SOURCE 
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(reserved_rcx == 0);
-    #endif
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(reserved_rcx == 0, "RCX should be reserved");
+    #endif // FLOW_PROOF
 
     #ifdef SOURCE
     // Check the system state
@@ -1456,11 +1488,15 @@ api_error_type tdh_sys_init(void)
         retval = TDX_SYS_INIT_NOT_PENDING;
         goto EXIT;
     }
-    #endif
+    #endif // SOURCE 
     
     #ifdef MODULAR_PROOF
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_PENDING);
-    #endif
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(global_data.global_state.sys_state == SYSINIT_PENDING, "sys_init state should be pending");
+    #endif // FLOW_PROOF
 
 
     // AHMAD: Abstract away cpu config stuff
@@ -1472,7 +1508,7 @@ api_error_type tdh_sys_init(void)
         retval = err;
         goto EXIT;
     }
-    #endif
+    #endif // SOURCE 
 
     #ifdef SOURCE
         seam_ops_capabilities_t caps = {.raw = ia32_seamops_capabilities()};
@@ -1487,7 +1523,7 @@ api_error_type tdh_sys_init(void)
         seam_ops_capabilities_t caps;
         __CPROVER_havoc_object(&caps);
         __CPROVER_assume(is_td_preserving_available(caps));
-    #endif
+    #endif // SOURCE 
 
     tdx_global_data_ptr->seam_capabilities = caps;
 
@@ -1500,11 +1536,15 @@ api_error_type tdh_sys_init(void)
         retval = err;
         goto EXIT;
     }
-    #endif
+    #endif // SOURCE 
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume((err = check_module_build_time_defs(tdx_global_data_ptr)) == TDX_SUCCESS);
-    #endif
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert((err = check_module_build_time_defs(tdx_global_data_ptr)) == TDX_SUCCESS, "Failed to check module build time defs");
+    #endif // FLOW_PROOF
 
     #ifdef SOURCE
     uint64_t result = ia32_seamops_seamdb_getref(&tdx_global_data_ptr->seamdb_index,
@@ -1516,7 +1556,7 @@ api_error_type tdh_sys_init(void)
         __CPROVER_havoc_slice(&(tdx_global_data_ptr->seamdb_index), sizeof(uint64_t)); 
         __CPROVER_havoc_slice(&(tdx_global_data_ptr->seamdb_nonce), sizeof(uint256_t)); 
         __CPROVER_havoc_slice(&seamdb_size, sizeof(uint64_t)); 
-    #endif
+    #endif // SOURCE 
 
     tdx_global_data_ptr->seamverifyreport_available = ((caps.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
     /*
@@ -1550,11 +1590,15 @@ api_error_type tdh_sys_init(void)
             retval = TDX_RND_NO_ENTROPY;
             goto EXIT;
         }
-    #endif
+    #endif // SOURCE 
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(tdx_init_stack_canary() == TDX_SUCCESS);
-    #endif
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdx_init_stack_canary() == TDX_SUCCESS, "failed stack canary initialization");
+    #endif // FLOW_PROOF
 
     tdx_init_global_data(tdx_global_data_ptr);
 
@@ -1574,9 +1618,15 @@ api_error_type tdh_sys_init(void)
         {
             release_sharex_lock_ex(&tdx_global_data_ptr->global_lock);
         }
+    #endif // SOURCE 
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assert(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE, "sys_state == SYSINIT_DONE");
+        __CPROVER_assert(tdx_global_data_ptr->seam_capabilities.raw & TD_PRESERVING_CAPABILITIES, "TD-preserving capability must be set");
+        __CPROVER_assert(tdx_global_data_ptr->seamverifyreport_available == ((tdx_global_data_ptr->seam_capabilities.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0), "seamverifyreport_available set according to caps");
+        __CPROVER_assert((tdx_global_data_ptr->max_pa <= 48) ? (tdx_global_data_ptr->config_flags_fixed1.gpaw == 0) : true, "gpaw bit must be cleared if max_pa <= 48");
     #endif
 
-    __CPROVER_assert(false, "false");
     return TDX_SUCCESS;
 }
 
