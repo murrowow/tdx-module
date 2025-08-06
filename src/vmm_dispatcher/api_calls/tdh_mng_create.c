@@ -71,7 +71,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //SOURCE
 
     #ifdef FLOW_PROOF
-        //__CPROVER_assert((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max), "hkid within valid bounds");
         if (!(td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)) {
             return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
             goto EXIT; 
@@ -114,7 +113,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        // __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "the pamt table is PT_NDA"); 
         if (tdr_pamt_entry_ptr->pt != PT_NDA) {
             return_val = TDX_PAGE_METADATA_INCORRECT;
             goto EXIT; 
@@ -136,7 +134,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(global_data.kot.lock.raw == SHAREX_FREE, "TDX LOCK is available");
         if (global_data.kot.lock.raw != SHAREX_FREE) {
             return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
             goto EXIT;
@@ -161,11 +158,10 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE, "Kot is free"); 
-        /*if (global_data.kot.entries[td_hkid & HKID_MASK].state != KOT_STATE_HKID_FREE) {
+        if (global_data.kot.entries[td_hkid & HKID_MASK].state != KOT_STATE_HKID_FREE) {
             return_val = TDX_HKID_NOT_FREE; 
+            goto EXIT; 
         } 
-        goto EXIT; */
     #endif // FLOW_PROOF
 
     // Clear the content of the TDR page using direct writes
