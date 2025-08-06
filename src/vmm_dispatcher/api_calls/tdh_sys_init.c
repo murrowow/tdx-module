@@ -43,6 +43,7 @@
 #include "include/auto_gen/cpuid_configurations.h"
 
 #include "driver/driver.h"
+#include "src/common/x86_defs/vmcs_defs.h"
 
 /*
  * check_allowed_vmx_ctls
@@ -1251,48 +1252,49 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
     #ifdef SOURCE
         save_vmcs_non_lp_host_fields(&tdx_global_data_ptr->seam_vmcs_host_values);
     #else
+        // array of vmcs 
         vmcs_host_values_t* host_fields_ptr = &tdx_global_data_ptr->seam_vmcs_host_values;
         host_fields_ptr->CR0.encoding        = VMX_HOST_CR0_ENCODE;
-        host_fields_ptr->CR0.value           = vmcs.HOST_CR0;
+        host_fields_ptr->CR0.value           = vmcs.CR0.value;
 
         host_fields_ptr->CR3.encoding        = VMX_HOST_CR3_ENCODE;
-        host_fields_ptr->CR3.value           = vmcs.HOST_CR3;
+        host_fields_ptr->CR3.value           = vmcs.CR3.value;
 
         host_fields_ptr->CR4.encoding        = VMX_HOST_CR4_ENCODE;
-        host_fields_ptr->CR4.value           = vmcs.HOST_CR4;
+        host_fields_ptr->CR4.value           = vmcs.CR4.value;
 
         host_fields_ptr->CS.encoding         = VMX_HOST_CS_SELECTOR_ENCODE;
-        host_fields_ptr->CS.value            = vmcs.HOST_CS_SELECTOR;
+        host_fields_ptr->CS.value            = vmcs.CS.value;
 
         host_fields_ptr->SS.encoding         = VMX_HOST_SS_SELECTOR_ENCODE;
-        host_fields_ptr->SS.value            = vmcs.HOST_SS_SELECTOR;
+        host_fields_ptr->SS.value            = vmcs.SS.value;
 
         host_fields_ptr->FS.encoding         = VMX_HOST_FS_SELECTOR_ENCODE;
-        host_fields_ptr->FS.value            = vmcs.HOST_FS_SELECTOR;
+        host_fields_ptr->FS.value            = vmcs.FS.value;
 
         host_fields_ptr->GS.encoding         = VMX_HOST_GS_SELECTOR_ENCODE;
-        host_fields_ptr->GS.value            = vmcs.HOST_GS_SELECTOR;
+        host_fields_ptr->GS.value            = vmcs.GS.value;
 
         host_fields_ptr->TR.encoding         = VMX_HOST_TR_SELECTOR_ENCODE;
-        host_fields_ptr->TR.value            = vmcs.HOST_TR_SELECTOR;
+        host_fields_ptr->TR.value            = vmcs.TR.value;
 
         host_fields_ptr->IA32_S_CET.encoding = VMX_HOST_IA32_S_CET_ENCODE;
-        host_fields_ptr->IA32_S_CET.value    = vmcs.HOST_IA32_S_CET;
+        host_fields_ptr->IA32_S_CET.value    = vmcs.IA32_S_CET.value;
 
         host_fields_ptr->IA32_PAT.encoding   = VMX_HOST_IA32_PAT_FULL_ENCODE;
-        host_fields_ptr->IA32_PAT.value      = vmcs.HOST_IA32_PAT;
+        host_fields_ptr->IA32_PAT.value      = vmcs.IA32_PAT.value;
 
         host_fields_ptr->IA32_EFER.encoding  = VMX_HOST_IA32_EFER_FULL_ENCODE;
-        host_fields_ptr->IA32_EFER.value     = vmcs.HOST_IA32_EFER;
+        host_fields_ptr->IA32_EFER.value     = vmcs.IA32_EFER.value;
 
         host_fields_ptr->FS_BASE.encoding    = VMX_HOST_FS_BASE_ENCODE;
-        host_fields_ptr->FS_BASE.value       = vmcs.HOST_FS_BASE;
+        host_fields_ptr->FS_BASE.value       = vmcs.FS_BASE.value;
 
         host_fields_ptr->IDTR_BASE.encoding  = VMX_HOST_IDTR_BASE_ENCODE;
-        host_fields_ptr->IDTR_BASE.value     = vmcs.HOST_IDTR_BASE;
+        host_fields_ptr->IDTR_BASE.value     = vmcs.IDTR_BASE.value;
 
         host_fields_ptr->GDTR_BASE.encoding  = VMX_HOST_GDTR_BASE_ENCODE;
-        host_fields_ptr->GDTR_BASE.value     = vmcs.HOST_GDTR_BASE;
+        host_fields_ptr->GDTR_BASE.value     = vmcs.GDTR_BASE.value;
     #endif // SOURCE 
 
     tdx_global_data_ptr->num_rdseed_retries = 6;
@@ -1318,17 +1320,19 @@ _STATIC_INLINE_ api_error_type tdx_init_stack_canary(void)
     #else
         sysinfo_table_t* sysinfo_table = &sysinfo;
     #endif // SOURCE 
-    
-    // AHMAD: I dont think the address matters since we abstracted away the need for the exact address but it is stored so for consistency I'll leave it for now
-    uint64_t last_page_addr = sysinfo_table->data_rgn_base + sysinfo_table->data_rgn_size - _4KB;
-    sysinfo_table_t* last_page_ptr = last_page_ptr = &tdx_mem[(sizeof(tdx_mem) / sizeof(tdx_mem[0])) - 1];
-    last_page_ptr->stack_canary.canary = canary;
+
     #ifdef SOURCE
+        uint64_t last_page_addr = sysinfo_table->data_rgn_base + sysinfo_table->data_rgn_size - _4KB;
+        sysinfo_table_t* last_page_ptr = (sysinfo_table_t*)(last_page_addr);
+        last_page_ptr->stack_canary.canary = canary;
         ia32_vmwrite(VMX_HOST_FS_BASE_ENCODE, last_page_addr);
     #else
-        vmcs.HOST_FS_BASE = last_page_addr;
+        // sysinfo_table_t* last_page_ptr = &tdx_mem[(sizeof(tdx_mem) / sizeof(tdx_mem[0])) - 1];
+        // right now only an array of 1 so will need to expand to multiple later on
+        vmcs.FS.value = 1; // only one right now need to change into an array of some 
     #endif // SOURCE 
 
+    #ifdef SOURCE
     //Copy SYS_INFO_TABLE information that is being used in other flows
     for (uint64_t i = 0; i < MAX_CMR; i++)
     {
@@ -1352,6 +1356,7 @@ _STATIC_INLINE_ api_error_type tdx_init_stack_canary(void)
     last_page_ptr->num_handoff_pages = sysinfo_table->num_handoff_pages;
     last_page_ptr->stack_rgn_base = sysinfo_table->stack_rgn_base;
     last_page_ptr->stack_rgn_size = sysinfo_table->stack_rgn_size;
+    #endif
 
     return TDX_SUCCESS;
 }

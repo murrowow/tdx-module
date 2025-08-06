@@ -24,26 +24,28 @@
  * @file tdH_sys_lp_init.c
  * @brief TDHSYSLPINIT API handler
  */
-#include "tdx_api_defs.h"
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
-#include "tdx_vmm_api_handlers.h"
-#include "auto_gen/tdx_error_codes_defs.h"
+#include "include/tdx_api_defs.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
 
-#include "data_structures/tdx_global_data.h"
-#include "data_structures/tdx_local_data.h"
-#include "data_structures/loader_data.h"
-#include "helpers/tdx_locks.h"
-#include "helpers/helpers.h"
-#include "x86_defs/x86_defs.h"
-#include "x86_defs/vmcs_defs.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
-#include "accessors/vt_accessors.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/data_structures/loader_data.h"
+#include "src/common/helpers/tdx_locks.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/vt_accessors.h"
 
-#include "helpers/smrrs.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "auto_gen/cpuid_configurations.h"
+#include "src/common/helpers/smrrs.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "include/auto_gen/cpuid_configurations.h"
+
+#include "driver/driver.h"
 
 _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_ptr)
 {
@@ -455,8 +457,14 @@ api_error_type tdh_sys_lp_init(void)
 {
 
     bool_t tmp_global_lock_acquired = false;
-    tdx_module_global_t* tdx_global_data_ptr = get_global_data();
-    tdx_module_local_t* tdx_local_data_ptr = get_local_data();
+
+    #ifdef SOURCE
+        tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+        tdx_module_local_t* tdx_local_data_ptr = get_local_data();
+    #else 
+        tdx_module_global_t* tdx_global_data_ptr = &global_data;
+        tdx_module_local_t* tdx_local_data_ptr = &local_data;
+    #endif // SOURCE
 
     api_error_type retval = TDX_SYS_BUSY;
 
@@ -468,28 +476,35 @@ api_error_type tdh_sys_lp_init(void)
     tdx_local_data_ptr->vmm_regs.rdx = 0ULL;
     tdx_local_data_ptr->vmm_regs.r8 = 0ULL;
 
-    if (acquire_sharex_lock_sh(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
-    {
-        TDX_ERROR("Failed to acquire global lock for LP\n");
-        retval = TDX_SYS_BUSY;
-        goto EXIT;
-    }
-    tmp_global_lock_acquired = true;
+    #ifdef SOURCE
+        if (acquire_sharex_lock_sh(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
+        {
+            TDX_ERROR("Failed to acquire global lock for LP\n");
+            retval = TDX_SYS_BUSY;
+            goto EXIT;
+        }
+        tmp_global_lock_acquired = true;
+    #endif // SOURCE 
 
-    if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
-    {
-        TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
-        retval = TDX_SYS_LP_INIT_NOT_PENDING;
-        goto EXIT;
-    }
+    #ifdef SOURCE
+        if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
+        {
+            TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
+            retval = TDX_SYS_LP_INIT_NOT_PENDING;
+            goto EXIT;
+        }
 
-    //Check current LP state
-    if (tdx_local_data_ptr->lp_is_init)
-    {
-        TDX_ERROR("LP is already initialized\n");
-        retval = TDX_SYS_LP_INIT_DONE;
-        goto EXIT;
-    }
+        //Check current LP state
+        if (tdx_local_data_ptr->lp_is_init)
+        {
+            TDX_ERROR("LP is already initialized\n");
+            retval = TDX_SYS_LP_INIT_DONE;
+            goto EXIT;
+        }
+    #else 
+        __CPROVER_assume(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE);
+        __CPROVER_assume(tdx_local_data_ptr->lp_is_init);
+    #endif 
 
     // Explicit LP-scope state initialization
     tdx_local_data_ptr->vp_ctx.last_tdvpr_pa.raw = NULL_PA;

@@ -58,6 +58,8 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     tdr_pa.raw = target_tdr_pa;
     td_hkid = hkid_info.hkid;
 
+    // locking discipline inherent acquired released (checking at a specific time) check 
+    // done correctly? 
     #ifdef SOURCE
     // Verify HKID
         if ((hkid_info.reserved != 0) || !is_private_hkid(td_hkid))
@@ -69,7 +71,11 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //SOURCE
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max), "hkid within valid bounds");
+        //__CPROVER_assert((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max), "hkid within valid bounds");
+        if (!(td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)) {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT; 
+        }
     #endif //FLOW_PROOF
 
     #ifdef MODULAR_PROOF
@@ -106,8 +112,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #ifdef MODULAR_PROOF
         __CPROVER_assume(tdr_pamt_entry_ptr->pt == PT_NDA); //"the pamt table is PT_NDA" 
     #endif //MODULAR_PROOF
+
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "the pamt table is PT_NDA"); 
+        // __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "the pamt table is PT_NDA"); 
+        if (tdr_pamt_entry_ptr->pt != PT_NDA) {
+            return_val = TDX_PAGE_METADATA_INCORRECT;
+            goto EXIT; 
+        }
     #endif //FLOW_PROOF
 
     // Acquire exclusive access to KOT
@@ -119,6 +130,18 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
             goto EXIT;
         }
     #endif //SOURCE
+
+    #ifdef MODULAR_RPOOF
+        __CPROVER_assume(global_data->kot.lock.raw == SHAREX_FREE);
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(global_data.kot.lock.raw == SHAREX_FREE, "TDX LOCK is available");
+        if (global_data.kot.lock.raw != SHAREX_FREE) {
+            return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
+            goto EXIT;
+        } 
+    #endif //FLOW_PROOF 
     
     // Protection against speculation attacks with out-of-bound td_hkid user input value
     lfence();
@@ -131,15 +154,18 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
             return_val = TDX_HKID_NOT_FREE;
             goto EXIT;
         }
-        #endif //SOURCE
+    #endif //SOURCE
 
-    
     #ifdef MODULAR_PROOF
         __CPROVER_assume(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE); //"HKID in KOT has the correct value in the table"
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE, "HKID in KOT has the correct value in the table"); //"HKID in KOT has the correct value in the table"
+        __CPROVER_assert(global_data.kot.entries[td_hkid & HKID_MASK].state == KOT_STATE_HKID_FREE, "Kot is free"); 
+        /*if (global_data.kot.entries[td_hkid & HKID_MASK].state != KOT_STATE_HKID_FREE) {
+            return_val = TDX_HKID_NOT_FREE; 
+        } 
+        goto EXIT; */
     #endif // FLOW_PROOF
 
     // Clear the content of the TDR page using direct writes
@@ -152,7 +178,6 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         tables[td_hkid & HKID_MASK].tdr_mem = 0; 
     #endif // MODULAR_PROOF
 
-    
     /**
      * Initialize the TD Management and Key Management Fields.
      * Fields which are initialized to zero are implicitly zero'd in the
@@ -244,6 +269,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_mem == 0);
     #endif // FLOW_PROOF
 
+    return_val = TDX_SUCCESS;
 EXIT:
     // Release all acquired locks and free keyhole mappings
     #ifdef SOURCE
@@ -271,7 +297,6 @@ EXIT:
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_mem == 0, "memory at tdr correctly zeroed out");
     #endif //MODULAR_PROOF
 
-    return_val = TDX_SUCCESS;
     return return_val;
     
 }

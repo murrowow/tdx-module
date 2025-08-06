@@ -63,6 +63,32 @@ void TD_setup(uint16_t index) {
 }
 
 void TDX_bootup() {
+    md_field_id_t field_id; 
+    uint64_t tdmr_info_array_pa;
+    uint64_t num_of_tdmr_entries;
+    hkid_api_input_t global_private_hkid;
+
+    __CPROVER_havoc_object(&field_id);
+    __CPROVER_havoc_object(&tdmr_info_array_pa);
+    __CPROVER_havoc_object(&num_of_tdmr_entries);
+    __CPROVER_havoc_object(&global_private_hkid);
+
     api_error_type error = UNINITIALIZE_ERROR;
+    error = tdh_sys_init(); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_sys_lp_init(); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    error = tdh_sys_rd(field_id); 
+    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_sys_key_config();
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error code coverage, find a sequence that goes through every one 
+
+    /*
+    error = tdh_sys_key_config(); 
+    */
+
 }
 #endif // not SOURCE

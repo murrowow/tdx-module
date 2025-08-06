@@ -30,8 +30,8 @@
 
 
 
-#include "tdx_api_defs.h"
-#include "metadata_handlers/metadata_generic.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/metadata_handlers/metadata_generic.h"
 
 
 #define MAX_NUM_GLOBAL_SYS_LOOKUP 66

@@ -118,6 +118,12 @@ tdx_module_local_t  local_data;
 //pamt entry table
 struct hardware_states tables[HKID_SIZE];
 
+//sysinfo table
+sysinfo_table_t sysinfo; 
+
+//vmcs 
+vmcs_host_values_t vmcs;
+
 char kot_lock;
 
 //PAMT TABLE

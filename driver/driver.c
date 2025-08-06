@@ -5,16 +5,19 @@
 #ifdef SOURCE
 #else 
 void driver_main() {
+
     __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
     __CPROVER_assume((global_data.private_hkid_min == 0x00000000));  //&& (global_data.private_hkid_min < (0xFFFFFFFF - (HKID_SIZE)))); 
     __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE))); //&& (global_data.private_hkid_max < 0xFFFFFFFF)); 
     __CPROVER_assume(global_data.hkid_start_bit == (32 - (HKID_SIZE))); 
     __CPROVER_assume(global_data.hkid_mask == HKID_MASK);
     __CPROVER_havoc_object(&tables); 
+    __CPROVER_havoc_object(&vmcs);
     
     uint16_t index = 0; 
     #ifdef SETUP
         __CPROVER_havoc_object(&tables);
+        __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE);
         //init the kot table
         for (int i = 0; i < HKID_SIZE; i++) {
             __CPROVER_assume(global_data.kot.entries[i].state == KOT_STATE_HKID_FREE);
@@ -110,6 +113,8 @@ void driver_main() {
 
         __CPROVER_assume(found);
     #endif // INIT_SETUP
-    TD_setup(index);
+
+    //TDX_bootup(); 
+    TD_setup(index); 
 }
 #endif // not SOURCE
