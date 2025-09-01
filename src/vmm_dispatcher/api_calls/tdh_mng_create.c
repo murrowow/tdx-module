@@ -139,13 +139,14 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
             goto EXIT;
         } 
     #endif //FLOW_PROOF 
-    
+    kot_locked_flag = true;
+
     // Protection against speculation attacks with out-of-bound td_hkid user input value
     lfence();
 
     // Check the provided HKID entry in KOT
     #ifdef SOURCE
-        if (global_data->kot.entries[td_hkid & HKID_MASK].state != KOT_STATE_HKID_FREE)
+        if (global_data->kot.entries[td_hkid].state != KOT_STATE_HKID_FREE)
         {
             TDX_ERROR("Given HKID %d is not free in KOT\n", td_hkid);
             return_val = TDX_HKID_NOT_FREE;
@@ -263,6 +264,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         __CPROVER_assume(tdr_pamt_entry_ptr->owner == 0);
 
         __CPROVER_assume(tables[td_hkid & HKID_MASK].tdr_mem == 0);
+        __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE);
     #endif // FLOW_PROOF
 
     return_val = TDX_SUCCESS;
@@ -272,12 +274,6 @@ EXIT:
         if (kot_locked_flag)
         {
             release_sharex_lock_ex(&global_data->kot.lock);
-        }
-
-        if (kot_locked_flag)
-        {
-            //release_sharex_lock_ex(&global_data->kot.lock);
-            global_data.kot.lock.raw = SHAREX_FREE; 
         }
 
         if (tdr_locked_flag)

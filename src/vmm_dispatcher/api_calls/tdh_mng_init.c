@@ -1093,6 +1093,7 @@
 
      #ifdef FLOW_PROOF
         // SOPHIA: assume all the work has been done and no more configurable bits
+        __CPROVER_printf("SOPHIA config_val.raw: %d, %llx", config_value.raw, config_value.raw);
         __CPROVER_assert((config_value.raw == 0), "No more configurable bits");
      #endif // FLOW_PROOF
 
