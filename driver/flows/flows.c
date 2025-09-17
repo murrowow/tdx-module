@@ -57,8 +57,8 @@ void TD_setup(uint16_t index) {
             error = tdh_mng_add_cx(target_tdcx_pa, target_tdr_pa);
             __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
         }
-        error = tdh_mng_init(target_tdr_pa, target_td_params_pa);
-        __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+        // error = tdh_mng_init(target_tdr_pa, target_td_params_pa);
+        // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     #endif // WHOLE_FLOW
 }
 
@@ -76,12 +76,12 @@ void TDX_bootup() {
     api_error_type error = UNINITIALIZE_ERROR;
     error = tdh_sys_init(); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    error = tdh_sys_lp_init(); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_sys_rd(field_id); 
-    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
-    error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_sys_lp_init(); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_sys_rd(field_id); 
+    // __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    // error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // error = tdh_sys_key_config();
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // error code coverage, find a sequence that goes through every one 

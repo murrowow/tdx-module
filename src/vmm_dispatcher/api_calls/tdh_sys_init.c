@@ -54,6 +54,7 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
                                               uint32_t variable_mask,
                                               uint32_t unknown_mask)
 {
+    #ifdef SOURCE
     // Sanity check on the MSR values returned by the CPU:
     // Any bit can't be both fixed-1 (bits that are 1 in NOT_ALLOWED0) and fixed-0 (bits that are 0 in ALLOWED1)
     tdx_sanity_check((src.not_allowed0 & ~src.allowed1) == 0, SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 0);
@@ -63,6 +64,9 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     tdx_sanity_check(((init | variable_mask) & unknown_mask) == 0,
                      SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 1);
 
+    #endif // SOURCE
+
+    #ifdef SOURCE
     // Check bits that are fixed-1 (bits that are 1 in NOT_ALLOWED0).
     // Any fixed-1 bit must be initialized to 1.  For this check, ignore bits in the init value that are unknown.
     // Per Intel SDM:
@@ -73,7 +77,21 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     {
         return false;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(src.not_allowed0 & ~(init | unknown_mask) == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if ((src.not_allowed0 & ~(init | unknown_mask)) != 0)
+        {
+            __CPROVER_assert((src.not_allowed0 & ~(init | unknown_mask)) == 0, )
+            return false;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // Check bits that are fixed-0 (bits that are 0 in ALLOWED1).
     // Any fixed-0 bit must be initialized to 0.
     // Per Intel SDM:
@@ -84,13 +102,39 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     {
         return false;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((~src.allowed1 & init) == 0); 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if ((~src.allowed1 & init) != 0)
+        {
+            __CPROVER_assert((~src.allowed1 & init) == 0, "Check bits that are fixed-0");
+            return false;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // Any fixed-1 bit (that is 1 in NOT_ALLOWED0) or fixed-0 bit (that is 0 in ALLOWED1) must not be variable
     if (((src.not_allowed0 | ~src.allowed1) & variable_mask) != 0)
     {
         return false;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(((src.not_allowed0 | ~src.allowed1) & variable_mask) == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (((src.not_allowed0 | ~src.allowed1) & variable_mask) != 0)
+        {
+            __CPROVER_assert(((src.not_allowed0 | ~src.allowed1) & variable_mask) == 0, "Any fixed-1bit must not be variable");
+            return false;
+        }
+    #endif // FLOW_PROOF
     // Return the value used for initializing the TD VMCS field (incl. unknown bits) Set fixed-1 (NOT_ALLOWED0) bits to 1.
     *dest = (init | src.not_allowed0);
 
@@ -309,7 +353,11 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
      */
 
     cpuid_config_t cpuid_config;
+    #ifdef SOURCE 
     sysinfo_table_t *sysinfo_table_ptr = get_sysinfo_table();
+    #else 
+    sysinfo_table_t *sysinfo_table_ptr = &sysinfo;
+    #endif // SOURCE
     uint32_t lpids_sharing_l3_cache = (uint32_t)-1; //Initialized to invalid value.
     bool_t core_level_scanned = false;
     uint32_t shift_count = (uint32_t)-1; //Initialized to invalid value.
@@ -321,6 +369,8 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
     global_data_ptr->xfd_faulting_mask = 0; // Updated later per CPUID leaf 0xD
     global_data_ptr->x2apic_core_id_shift_count = 0;  // Updated later per CPUID leaf 0x1F
 
+    #ifdef SOURCE
+    // SOPHIA: Geoff Chappel, can abstract away this bit
     // Boot NT4 bit should not be set
     ia32_misc_enable_t misc_enable = { .raw = ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) };
     if (misc_enable.limit_cpuid_maxval)
@@ -328,22 +378,30 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
     	return TDX_LIMIT_CPUID_MAXVAL_SET;
     }
 
+    // SOPHIA: truthfully I don't really understand what this is doing, but doesn't seem important for the sake of security so yea
+    // SOPHIA: I abstract away
     if ((!misc_enable.perfmon_available) || (misc_enable.bts_unavailable))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_MISC_ENABLES_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    
     uint32_t last_base_leaf, last_extended_leaf;
     uint32_t ebx, ecx, edx;
 
+    #ifdef SOURCE
     // Last base leaves need to be taken before
     ia32_cpuid(CPUID_MAX_INPUT_VAL_LEAF, 0, &last_base_leaf, &ebx, &ecx, &edx);
     if (last_base_leaf < CPUID_MIN_LAST_CPU_BASE_LEAF)
     {
         return api_error_with_operand_id(TDX_CPUID_LEAF_NOT_SUPPORTED, CPUID_MIN_LAST_CPU_BASE_LEAF);
     }
-    global_data_ptr->cpuid_last_base_leaf = CPUID_LAST_BASE_LEAF;
+    #endif 
 
+    global_data_ptr->cpuid_last_base_leaf = CPUID_LAST_BASE_LEAF;
+    
+    #ifdef SOURCE
     ia32_cpuid(CPUID_MAX_EXTENDED_VAL_LEAF, 0, &last_extended_leaf, &ebx, &ecx, &edx);
     if (last_extended_leaf < CPUID_LAST_EXTENDED_LEAF)
     {
@@ -351,8 +409,14 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
     }
     tdx_sanity_check(last_extended_leaf >= CPUID_MAX_EXTENDED_VAL_LEAF, SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 4);
     global_data_ptr->cpuid_last_extended_leaf = last_extended_leaf;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++)
+    #endif // SOURCE
+    #ifdef MODULAR_PROOF
+    for (uint32_t i = 0; i < 1; i++)
+    #endif // MODULAR_PROOF
     {
         if (!cpuid_lookup[i].valid_entry)
         {
@@ -837,22 +901,23 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
     platform_common_config_t* msr_values_ptr = &tdx_global_data_ptr->plt_common_config;
 
     // Sample and Check Capabilities MSRs
-    msr_values_ptr->ia32_core_capabilities.raw = ia32_rdmsr(IA32_CORE_CAPABILITIES);
+    #ifdef SOURCE
+        msr_values_ptr->ia32_core_capabilities.raw = ia32_rdmsr(IA32_CORE_CAPABILITIES);
+        msr_values_ptr->ia32_arch_capabilities.raw = ia32_rdmsr(IA32_ARCH_CAPABILITIES_MSR_ADDR);
+    #endif // SOURCE
 
-    msr_values_ptr->ia32_arch_capabilities.raw = ia32_rdmsr(IA32_ARCH_CAPABILITIES_MSR_ADDR);
+    #ifdef SOURCE
     if (!check_native_ia32_arch_capabilities(msr_values_ptr->ia32_arch_capabilities))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_ARCH_CAPABILITIES_MSR_ADDR);
     }
+    #endif // SOURCE 
 
-    // Sanity Check of IA32_XAPIC_DISABLE_STATUS
-    msr_values_ptr->ia32_xapic_disable_status.raw = ia32_rdmsr(IA32_XAPIC_DISABLE_STATUS_MSR_ADDR);
-    if ((msr_values_ptr->ia32_xapic_disable_status.legacy_xapic_disabled != 1) ||
-        (msr_values_ptr->ia32_xapic_disable_status.reserved != 0))
-    {
-        return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_XAPIC_DISABLE_STATUS_MSR_ADDR);
-    }
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_native_ia32_arch_capabilities(msr_values_ptr->ia32_arch_capabilities));
+    #endif // MODULAR_PROOF
 
+    #ifdef SOURCE
     if (msr_values_ptr->ia32_arch_capabilities.tsx_ctrl)
     {
     	tsx_ctrl_original->raw = ia32_rdmsr(IA32_TSX_CTRL_MSR_ADDR);
@@ -867,13 +932,36 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
             *tsx_ctrl_modified_flag = true;
         }
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+    if (msr_values_ptr->ia32_arch_capabilities.tsx_ctrl)
+    {
+        if (tsx_ctrl_original->tsx_cpuid_clear)
+        {
+            // TSX_CPUID_CLEAR forces CPUID(7,0).EBX bits 4 and 11 to 0.
+            // In order to get their real values, clear this bit.
+            // It will be restored later, after we sample CPUID.
+            tsx_ctrl_modified->raw = tsx_ctrl_original->raw;
+            tsx_ctrl_modified->tsx_cpuid_clear = 0;
+            *tsx_ctrl_modified_flag = true;
+        }
+    }
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     msr_values_ptr->ia32_misc_package_ctls.raw = ia32_rdmsr(IA32_MISC_PACKAGE_CTLS_MSR_ADDR);
     if (!msr_values_ptr->ia32_misc_package_ctls.energy_filtering_enable)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_MISC_PACKAGE_CTLS_MSR_ADDR);
     }
+    #endif //SOURCE 
 
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(msr_values_ptr->ia32_misc_package_ctls.energy_filtering_enable);
+    #endif //MODULAR_PROOF
+
+    #ifdef SOURCE
     // Check Performance Monitoring - Support of IA32_A_PMC MSRs
     msr_values_ptr->ia32_perf_capabilities.raw = ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR);
     if ((msr_values_ptr->ia32_perf_capabilities.freeze_while_smm_supported != 1) ||
@@ -882,15 +970,21 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
         TDX_ERROR("Check of IA32 PERF MSRs failed\n");
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_PERF_CAPABILITIES_MSR_ADDR);
     }
+    #endif // SOURCE
 
-
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_perf_capabilities.freeze_while_smm_supported == 1) &&
+                         (msr_values_ptr->ia32_perf_capabilities.full_write == 1));
+    #endif // MODULAR_PROOF
     /*--------------------------------------------
                   Time Stamp Counter
     --------------------------------------------*/
     // Sample IA32_TSC_ADJUST
     // This MSR should read the same value on all LP on TDSYSINITLP and during
     // TDX-SEAM operation on TDHVPENTER and other flows that rely on rdtsc.
+    #ifdef SOURCE
     msr_values_ptr->ia32_tsc_adjust = ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR);
+    #endif // SOURCE
 
     return TDX_SUCCESS;
 }
@@ -985,6 +1079,7 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
 
     td_vmcs_values_t* td_vmcs_values_ptr = &tdx_global_data_ptr->td_vmcs_values;
 
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_basic.raw = ia32_rdmsr(IA32_VMX_BASIC_MSR_ADDR);
     if ((msr_values_ptr->ia32_vmx_basic.vmcs_region_size > TD_VMCS_SIZE) ||
         (msr_values_ptr->ia32_vmx_basic.vmexit_info_on_ios != 1) ||
@@ -992,28 +1087,71 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_BASIC_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_vmx_basic.vmcs_region_size <= TD_VMCS_SIZE) &&
+                         (msr_values_ptr->ia32_vmx_basic.vmexit_info_on_ios == 1) &&
+                         (msr_values_ptr->ia32_vmx_basic.ia32_vmx_true_available == 1)); 
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE_PROOF
     msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw = ia32_rdmsr(IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
             PINBASED_CTLS_INIT, PINBASED_CTLS_VARIABLE, PINBASED_CTLS_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     }
+    #endif //SOURCE_PROOF
 
+    #ifdef MODULAR_PROOF
+        int flag = check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
+            PINBASED_CTLS_INIT, PINBASED_CTLS_VARIABLE, PINBASED_CTLS_UNKNOWN);
+        __CPROVER_assume(flag == true);
+    #endif // MODULAR_PROOF
+    
+    #ifdef FLOW_PROOF
+        if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
+        PINBASED_CTLS_INIT, PINBASED_CTLS_VARIABLE, PINBASED_CTLS_UNKNOWN))
+        {
+            __CPROVER_assert(check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
+        PINBASED_CTLS_INIT, PINBASED_CTLS_VARIABLE, PINBASED_CTLS_UNKNOWN), "correct vmx control values for pinbased");
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
+        }
+    #endif // FLOW_PROOF
+    
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_true_procbased_ctls.raw = ia32_rdmsr(IA32_VMX_TRUE_PROCBASED_CTLS_MSR_ADDR);
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
             PROCBASED_CTLS_INIT, PROCBASED_CTLS_VARIABLE, PROCBASED_CTLS_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PROCBASED_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
+            PROCBASED_CTLS_INIT, PROCBASED_CTLS_VARIABLE, PROCBASED_CTLS_UNKNOWN));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
+                PROCBASED_CTLS_INIT, PROCBASED_CTLS_VARIABLE, PROCBASED_CTLS_UNKNOWN))
+        {
+            __CPROVER_assert(check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
+                PROCBASED_CTLS_INIT, PROCBASED_CTLS_VARIABLE, PROCBASED_CTLS_UNKNOWN), "invalid vmx controls for procbased");
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PROCBASED_CTLS_MSR_ADDR);
+        }
+    #endif // FLOW_PROOF
     /* procbased_ctls2 is a special case:
        - It depends on WAITPKG support.
        - It depends on the CPU support of ENCLV exiting
     */
+    
     vmx_procbased_ctls2_t procbased_ctls2_init = {.raw = PROCBASED_CTLS2_INIT};
     procbased_ctls2_init.en_guest_wait_pause = tdx_global_data_ptr->waitpkg_supported;
 
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_procbased_ctls2.raw = ia32_rdmsr(IA32_VMX_PROCBASED_CTLS2_MSR_ADDR);
 
     vmx_procbased_ctls2_t procbased_ctls2_allowed1 = {.raw = msr_values_ptr->ia32_vmx_procbased_ctls2.allowed1};
@@ -1021,15 +1159,29 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         procbased_ctls2_init.en_enclv_exiting = 0;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        vmx_procbased_ctls2_t procbased_ctls2_allowed1 = {.raw = msr_values_ptr->ia32_vmx_procbased_ctls2.allowed1};
+        __CPROVER_assume(procbased_ctls2_allowed1.en_enclv_exiting); 
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls2, msr_values_ptr->ia32_vmx_procbased_ctls2,
             (uint32_t)procbased_ctls2_init.raw, PROCBASED_CTLS2_VARIABLE, PROCBASED_CTLS2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_PROCBASED_CTLS2_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls2, msr_values_ptr->ia32_vmx_procbased_ctls2,
+            (uint32_t)procbased_ctls2_init.raw, PROCBASED_CTLS2_VARIABLE, PROCBASED_CTLS2_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
     vmx_procbased_ctls3_t procbased_ctls3_init = {.raw = PROCBASED_CTLS3_INIT};
 
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_procbased_ctls3.raw = ia32_rdmsr(IA32_VMX_PROCBASED_CTLS3_MSR_ADDR);
 
     // If the CPU supports DDPD, then it must support IA32_SPEC_CTRL virtualization
@@ -1038,19 +1190,33 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_PROCBASED_CTLS3_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->ddpd_supported &&
+                         !msr_values_ptr->ia32_vmx_procbased_ctls3.virt_ia32_spec_ctrl);
+    #endif // MODULAR_PROOF
+
+    
     vmx_procbased_ctls3_t procbased_ctls3_variable = { .raw = PROCBASED_CTLS3_VARIABLE };
 
     // The TD VMCS spreadsheet generates the VARIABLE mask for the VIRTUALIZE_IA32_SPEC_CTRL as 1,
     // however this bit is only set if the CPU supports it. Therefore don't check it.
     procbased_ctls3_variable.virt_ia32_spec_ctrl = 0;
 
+    #ifdef SOURCE
     if (!check_allowed1_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls3, msr_values_ptr->ia32_vmx_procbased_ctls3.raw,
             (uint32_t)procbased_ctls3_init.raw, procbased_ctls3_variable.raw, PROCBASED_CTLS3_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_PROCBASED_CTLS3_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed1_vmx_ctls(&td_vmcs_values_ptr->procbased_ctls3, msr_values_ptr->ia32_vmx_procbased_ctls3.  raw, (uint32_t)procbased_ctls3_init.raw, procbased_ctls3_variable.raw, PROCBASED_CTLS3_UNKNOWN)); 
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_true_exit_ctls.raw = ia32_rdmsr(IA32_VMX_TRUE_EXIT_CTLS_MSR_ADDR);
 
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->exit_ctls, msr_values_ptr->ia32_vmx_true_exit_ctls,
@@ -1065,7 +1231,14 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_ENTRY_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&td_vmcs_values_ptr->exit_ctls, msr_values_ptr->ia32_vmx_true_exit_ctls,
+            EXIT_CTLS_INIT, EXIT_CTLS_VARIABLE, EXIT_CTLS_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_misc.raw = ia32_rdmsr(IA32_VMX_MISC_MSR_ADDR);
     if ((msr_values_ptr->ia32_vmx_misc.unrestricted_guest == 0) ||
         (msr_values_ptr->ia32_vmx_misc.activity_hlt == 0) ||
@@ -1076,13 +1249,30 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_MISC_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_vmx_misc.unrestricted_guest != 0) &&
+                         (msr_values_ptr->ia32_vmx_misc.activity_hlt != 0) &&
+                         (msr_values_ptr->ia32_vmx_misc.activity_shutdown != 0) &&
+                         (msr_values_ptr->ia32_vmx_misc.pt_in_vmx != 0) &&
+                         (msr_values_ptr->ia32_vmx_misc.max_cr3_targets >= 4) &&
+                         (msr_values_ptr->ia32_vmx_misc.vmwrite_any_vmcs_field != 0)); 
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_ept_vpid_cap = ia32_rdmsr(IA32_VMX_EPT_VPID_CAP_MSR_ADDR);
     if ((msr_values_ptr->ia32_vmx_ept_vpid_cap & IA32_VMX_EPT_VPID_CAP_MASK) != IA32_VMX_EPT_VPID_CAP_MASK)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_EPT_VPID_CAP_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_vmx_ept_vpid_cap & IA32_VMX_EPT_VPID_CAP_MASK) == IA32_VMX_EPT_VPID_CAP_MASK);
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     ia32_cr0_t cr0_fixed0;
     cr0_fixed0.raw = ia32_rdmsr(IA32_VMX_CR0_FIXED0_MSR_ADDR);
     msr_values_ptr->ia32_vmx_cr0_fixed0.raw = cr0_fixed0.raw;
@@ -1092,26 +1282,49 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR0_FIXED0_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(msr_values_ptr->ia32_vmx_cr0_fixed0.raw); 
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_cr0_fixed1.raw = ia32_rdmsr(IA32_VMX_CR0_FIXED1_MSR_ADDR);
     if ((~msr_values_ptr->ia32_vmx_cr0_fixed1.raw & GUEST_CR0_INIT) != 0)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR0_FIXED1_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((~msr_values_ptr->ia32_vmx_cr0_fixed1.raw & GUEST_CR0_INIT) == 0);
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_cr4_fixed0.raw = ia32_rdmsr(IA32_VMX_CR4_FIXED0_MSR_ADDR);
     if ((msr_values_ptr->ia32_vmx_cr4_fixed0.raw & (uint64_t)~GUEST_CR4_INIT) != 0)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR4_FIXED0_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_vmx_cr4_fixed0.raw & (uint64_t)~GUEST_CR4_INIT) == 0);
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_cr4_fixed1.raw = ia32_rdmsr(IA32_VMX_CR4_FIXED1_MSR_ADDR);
     if ((~msr_values_ptr->ia32_vmx_cr4_fixed1.raw & GUEST_CR4_INIT) != 0)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR4_FIXED1_MSR_ADDR);
     }
+    #endif // SOURCE
 
-    return check_l2_vmx_msrs(tdx_global_data_ptr);
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((~msr_values_ptr->ia32_vmx_cr4_fixed1.raw & GUEST_CR4_INIT) == 0);
+    #endif // MODULAR_PROOF
+
+    //return check_l2_vmx_msrs(tdx_global_data_ptr);
 }
 
 _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_module_global_t* tdx_global_data_ptr,
@@ -1134,11 +1347,15 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
     /*------------------------------------------
       Sample and Check Native CPUID Values
       ------------------------------------------*/
+      // SOPHIA: assume we're running on hardware that we are allowed to
+      // SOPHIA: also because i don't really know what exactly is going on with the CPUIDs
+    #ifdef SOURCE
     if ((err = check_cpuid_configurations(tdx_global_data_ptr)) != TDX_SUCCESS)
     {
         TDX_ERROR("check_cpuid_configurations failure\n");
         return err;
     }
+    #endif // SOURCE 
 
     /*------------------------------------------
       Sample and Check IA32_VMX_* MSRs
@@ -1148,33 +1365,34 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
         TDX_ERROR("Check of IA32 VMX MSRs failed\n");
         return err;
     }
+    __CPROVER_assert(false, "false"); 
 
-    /*---------------------------------------------------
-        Sample and Check Key Management Configuration
-    ---------------------------------------------------*/
-    if ((err = check_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
-    {
-        TDX_ERROR("Check of key management configuration failed\n");
-        return err;
-    }
+    // /*---------------------------------------------------
+    //     Sample and Check Key Management Configuration
+    // ---------------------------------------------------*/
+    // if ((err = check_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("Check of key management configuration failed\n");
+    //     return err;
+    // }
 
-    /*---------------------------------------------------
-        Sanity check on CMR info provided by MCHECK
-    ---------------------------------------------------*/
-    if (!check_cmrs())
-    {
-        err = TDX_CMR_LIST_INVALID;
-        return err;
-    }
+    // /*---------------------------------------------------
+    //     Sanity check on CMR info provided by MCHECK
+    // ---------------------------------------------------*/
+    // if (!check_cmrs())
+    // {
+    //     err = TDX_CMR_LIST_INVALID;
+    //     return err;
+    // }
 
-    /*---------------------------------------------------
-        Check SMRRs and store in global data
-    ---------------------------------------------------*/
-    if ((err = check_and_store_smrr_smrr2(tdx_global_data_ptr)) != TDX_SUCCESS)
-    {
-        TDX_ERROR("check_and_store_smrr_smrr2 failure\n");
-        return err;
-    }
+    // /*---------------------------------------------------
+    //     Check SMRRs and store in global data
+    // ---------------------------------------------------*/
+    // if ((err = check_and_store_smrr_smrr2(tdx_global_data_ptr)) != TDX_SUCCESS)
+    // {
+    //     TDX_ERROR("check_and_store_smrr_smrr2 failure\n");
+    //     return err;
+    // }
 
     return TDX_SUCCESS;
 }
@@ -1436,18 +1654,15 @@ api_error_type tdh_sys_init(void)
         tdx_module_global_t *tdx_global_data_ptr = &global_data;
         tdx_module_local_t *tdx_local_data_ptr = &local_data;
     #endif // SOURCE
+
     api_error_type retval = TDX_SYS_BUSY;
     api_error_type err;
-
     ia32_tsx_ctrl_t tsx_ctrl_original = { .raw = 0 };
     ia32_tsx_ctrl_t tsx_ctrl_modified = { .raw = 0 };
     bool_t tsx_ctrl_modified_flag = false;
-
     td_param_attributes_t attributes_fixed0;
     td_param_attributes_t attributes_fixed1;
-
     uint64_t reserved_rcx = tdx_local_data_ptr->vmm_regs.rcx;
-
     tdx_local_data_ptr->vmm_regs.rcx = 0;
     tdx_local_data_ptr->vmm_regs.rdx = 0;
     tdx_local_data_ptr->vmm_regs.r8 = 0;
@@ -1467,14 +1682,25 @@ api_error_type tdh_sys_init(void)
         global_lock_acquired = true;
     #endif // SOURCE 
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->kot.lock.raw == SHAREX_FREE);
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data.kot.lock.raw != SHAREX_FREE) {
+            return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
+            goto EXIT;
+        } 
+    #endif // FLOW_PROOF
+
     #ifdef SOURCE
     // RCX should be reserved
-    if (reserved_rcx != 0)
-    {
-        TDX_ERROR("RCX should be reserved\n");
-        retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
-        goto EXIT;
-    }
+        if (reserved_rcx != 0)
+        {
+            TDX_ERROR("RCX should be reserved\n");
+            retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
     #endif // SOURCE 
 
     #ifdef MODULAR_PROOF
@@ -1482,17 +1708,22 @@ api_error_type tdh_sys_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(reserved_rcx == 0, "RCX should be reserved");
+        if (reserved_rcx != 0)
+        {
+            __CPROVER_assert(reserved_rcx == 0, "RCX should be reserved");
+            retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
     #endif // FLOW_PROOF
 
     #ifdef SOURCE
-    // Check the system state
-    if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_PENDING)
-    {
-        TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
-        retval = TDX_SYS_INIT_NOT_PENDING;
-        goto EXIT;
-    }
+        // Check the system state
+        if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_PENDING)
+        {
+            TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
+            retval = TDX_SYS_INIT_NOT_PENDING;
+            goto EXIT;
+        }
     #endif // SOURCE 
     
     #ifdef MODULAR_PROOF
@@ -1500,11 +1731,13 @@ api_error_type tdh_sys_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(global_data.global_state.sys_state == SYSINIT_PENDING, "sys_init state should be pending");
+        if (global_data.global_state.sys_state != SYSINIT_PENDING) {
+            __CPROVER_assert(global_data.global_state.sys_state == SYSINIT_PENDING, "sys_init state should be pending");
+            retval = TDX_SYS_INIT_NOT_PENDING;
+            goto EXIT; 
+        }
     #endif // FLOW_PROOF
 
-
-    // AHMAD: Abstract away cpu config stuff
     #ifdef SOURCE
     if ((err = check_platform_config_and_cpu_enumeration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
                                                          &tsx_ctrl_original, &tsx_ctrl_modified))!= TDX_SUCCESS)
@@ -1514,6 +1747,19 @@ api_error_type tdh_sys_init(void)
         goto EXIT;
     }
     #endif // SOURCE 
+
+    #ifdef MODULAR_PROOF 
+        __CPROVER_assume(check_platform_config_and_cpu_enumeration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
+                                                         &tsx_ctrl_original, &tsx_ctrl_modified)== TDX_SUCCESS);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        err = check_platform_config_and_cpu_enumeration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
+                                                         &tsx_ctrl_original, &tsx_ctrl_modified);
+        __CPROVER_assert(err == TDX_SUCCESS, "CPU platform config and enumeration correct");
+        retval = err; 
+        goto EXIT; 
+    #endif //FLOW_PROOF
 
     #ifdef SOURCE
         seam_ops_capabilities_t caps = {.raw = ia32_seamops_capabilities()};

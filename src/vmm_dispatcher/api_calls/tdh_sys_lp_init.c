@@ -485,6 +485,18 @@ api_error_type tdh_sys_lp_init(void)
         }
         tmp_global_lock_acquired = true;
     #endif // SOURCE 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
+        if (tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
+            retval = TDX_SYS_BUSY; 
+            goto EXIT; 
+        }
+        
+    #endif // FLOW_PROOF
 
     #ifdef SOURCE
         if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
@@ -501,10 +513,30 @@ api_error_type tdh_sys_lp_init(void)
             retval = TDX_SYS_LP_INIT_DONE;
             goto EXIT;
         }
-    #else 
+    #endif // SOURCE
+    
+    #ifdef MODULAR_PROOF
         __CPROVER_assume(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE);
         __CPROVER_assume(tdx_local_data_ptr->lp_is_init);
-    #endif 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE, "Wrong sys_init state\n");
+        __CPROVER_assert(tdx_local_data_ptr->lp_is_init, "LP is already initialized\n");
+
+        if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
+        {
+            retval = TDX_SYS_LP_INIT_NOT_PENDING;
+            goto EXIT;
+        }
+
+        //Check current LP state
+        if (tdx_local_data_ptr->lp_is_init)
+        {
+            retval = TDX_SYS_LP_INIT_DONE;
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
 
     // Explicit LP-scope state initialization
     tdx_local_data_ptr->vp_ctx.last_tdvpr_pa.raw = NULL_PA;
