@@ -64,9 +64,6 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     tdx_sanity_check(((init | variable_mask) & unknown_mask) == 0,
                      SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 1);
 
-    #endif // SOURCE
-
-    #ifdef SOURCE
     // Check bits that are fixed-1 (bits that are 1 in NOT_ALLOWED0).
     // Any fixed-1 bit must be initialized to 1.  For this check, ignore bits in the init value that are unknown.
     // Per Intel SDM:
@@ -80,9 +77,9 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     #endif // SOURCE
 
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(src.not_allowed0 & ~(init | unknown_mask) == 0);
+        __CPROVER_assume((src.not_allowed0 & ~(init | unknown_mask)) == 0);
     #endif // MODULAR_PROOF
-
+    
     #ifdef FLOW_PROOF
         if ((src.not_allowed0 & ~(init | unknown_mask)) != 0)
         {
@@ -107,7 +104,7 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     #ifdef MODULAR_PROOF
         __CPROVER_assume((~src.allowed1 & init) == 0); 
     #endif // MODULAR_PROOF
-
+    
     #ifdef FLOW_PROOF
         if ((~src.allowed1 & init) != 0)
         {
@@ -137,19 +134,23 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     #endif // FLOW_PROOF
     // Return the value used for initializing the TD VMCS field (incl. unknown bits) Set fixed-1 (NOT_ALLOWED0) bits to 1.
     *dest = (init | src.not_allowed0);
-
     return true;
 }
 
 _STATIC_INLINE_ bool_t check_allowed64_vmx_ctls(uint64_t not_allowed0, uint64_t allowed1,
                                                 uint64_t init, uint64_t variable_mask)
 {
+    #ifdef SOURCE
     tdx_sanity_check((not_allowed0 & ~allowed1) == 0, SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 2);
-
     if ((not_allowed0 & ~init) || (~allowed1 & init) || ((not_allowed0 | ~allowed1) & variable_mask))
     {
         return false;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!((not_allowed0 & ~init) || (~allowed1 & init) || ((not_allowed0 | ~allowed1) & variable_mask)));
+    #endif // MODULAR_PROOF
 
     return true;
 }
@@ -163,6 +164,7 @@ _STATIC_INLINE_ bool_t check_allowed1_vmx_ctls(uint64_t* dest,
                                               uint64_t  variable_mask,
                                               uint64_t  unknown_mask)
 {
+    #ifdef SOURCE
     /* Sanity check on the TDX-SEAM module's constants:
            Any unknown bits must be 0 in the init value and must not be variable */
     tdx_sanity_check(((init | variable_mask) & unknown_mask) == 0, SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 3);
@@ -179,10 +181,16 @@ _STATIC_INLINE_ bool_t check_allowed1_vmx_ctls(uint64_t* dest,
     {
         return false;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((~allowed1 & init) == 0);
+
+    // Any fixed-0 bit (that is 0 in ALLOWED1) must not be variable.
+        __CPROVER_assume((~allowed1 & variable_mask) == 0);
+    #endif //MODULAR_PROOF
     // Return the value used for initializing the TD VMCS field (incl. unknown bits)
     *dest = init;
-
     return true;
 }
 
@@ -994,18 +1002,32 @@ _STATIC_INLINE_ api_error_type check_l2_vmx_msrs(tdx_module_global_t* tdx_global
     platform_common_config_t* msr_values_ptr = &tdx_global_data_ptr->plt_common_config;
     td_vmcs_values_t* l2_vmcs_values_ptr = &tdx_global_data_ptr->l2_vmcs_values;
 
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&l2_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
             PINBASED_CTLS_L2_INIT, PINBASED_CTLS_L2_VARIABLE, PINBASED_CTLS_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&l2_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
+            PINBASED_CTLS_L2_INIT, PINBASED_CTLS_L2_VARIABLE, PINBASED_CTLS_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
             PROCBASED_CTLS_L2_INIT, PROCBASED_CTLS_L2_VARIABLE, PROCBASED_CTLS_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PROCBASED_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls, msr_values_ptr->ia32_vmx_true_procbased_ctls,
+            PROCBASED_CTLS_L2_INIT, PROCBASED_CTLS_L2_VARIABLE, PROCBASED_CTLS_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
     vmx_procbased_ctls2_t procbased_ctls2_init = { .raw = PROCBASED_CTLS2_L2_INIT };
 
     procbased_ctls2_init.en_guest_wait_pause = tdx_global_data_ptr->waitpkg_supported;
@@ -1014,52 +1036,89 @@ _STATIC_INLINE_ api_error_type check_l2_vmx_msrs(tdx_module_global_t* tdx_global
     {
         procbased_ctls2_init.en_enclv_exiting = 0;
     }
-
+    
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls2, msr_values_ptr->ia32_vmx_procbased_ctls2,
             (uint32_t)procbased_ctls2_init.raw, PROCBASED_CTLS2_L2_VARIABLE, PROCBASED_CTLS2_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_PROCBASED_CTLS2_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls2, msr_values_ptr->ia32_vmx_procbased_ctls2,
+            (uint32_t)procbased_ctls2_init.raw, PROCBASED_CTLS2_L2_VARIABLE, PROCBASED_CTLS2_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
     vmx_procbased_ctls3_t procbased_ctls3_init = { .raw = PROCBASED_CTLS3_L2_INIT };
 
     vmx_procbased_ctls3_t procbased_ctls3_variable = { .raw = PROCBASED_CTLS3_L2_VARIABLE };
     // The L2 VMCS spreadsheet generates the VARIABLE mask for the VIRTUALIZE_IA32_SPEC_CTRL as 1,
     // however this bit is only set if the CPU supports it. Therefore don't check it.
     procbased_ctls3_variable.virt_ia32_spec_ctrl = 0;
+    #ifdef SOURCE
 
     if (!check_allowed1_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls3, msr_values_ptr->ia32_vmx_procbased_ctls3.raw,
             (uint32_t)procbased_ctls3_init.raw, procbased_ctls3_variable.raw, PROCBASED_CTLS3_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_PROCBASED_CTLS3_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    // SOPHIA: this has problems not sure why
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed1_vmx_ctls(&l2_vmcs_values_ptr->procbased_ctls3, msr_values_ptr->ia32_vmx_procbased_ctls3.raw,
+                (uint32_t)procbased_ctls3_init.raw, procbased_ctls3_variable.raw, PROCBASED_CTLS3_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&l2_vmcs_values_ptr->exit_ctls, msr_values_ptr->ia32_vmx_true_exit_ctls,
             EXIT_CTLS_L2_INIT, EXIT_CTLS_L2_VARIABLE, EXIT_CTLS_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_EXIT_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&l2_vmcs_values_ptr->exit_ctls, msr_values_ptr->ia32_vmx_true_exit_ctls,
+            EXIT_CTLS_L2_INIT, EXIT_CTLS_L2_VARIABLE, EXIT_CTLS_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     if (!check_allowed_vmx_ctls(&l2_vmcs_values_ptr->entry_ctls, msr_values_ptr->ia32_vmx_true_entry_ctls,
             ENTRY_CTLS_L2_INIT, ENTRY_CTLS_L2_VARIABLE, ENTRY_CTLS_L2_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_ENTRY_CTLS_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed_vmx_ctls(&l2_vmcs_values_ptr->entry_ctls, msr_values_ptr->ia32_vmx_true_entry_ctls,
+            ENTRY_CTLS_L2_INIT, ENTRY_CTLS_L2_VARIABLE, ENTRY_CTLS_L2_UNKNOWN));
+    #endif // MODULAR_PROOF
+    
     ia32_cr0_t cr0_fixed0;
     cr0_fixed0.raw = msr_values_ptr->ia32_vmx_cr0_fixed0.raw;
     cr0_fixed0.pe = 0;
     cr0_fixed0.pg = 0;
 
+    #ifdef SOURCE
     // CR0 checks for L2 don't depend on each TD configuration, thus they are done here
     if (!check_allowed64_vmx_ctls(cr0_fixed0.raw, msr_values_ptr->ia32_vmx_cr0_fixed1.raw,
                                   GUEST_CR0_L2_INIT, GUEST_CR0_L2_VARIABLE))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR0_FIXED0_MSR_ADDR);
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_allowed64_vmx_ctls(cr0_fixed0.raw, msr_values_ptr->ia32_vmx_cr0_fixed1.raw,
+                                  GUEST_CR0_L2_INIT, GUEST_CR0_L2_VARIABLE));
+    #endif //MODULAR_PROOF
 
     // CR4 checks for L2 are only for the init values.
     // Actual variable bits mask depend on each TD configuration and is therefore calculated on TD init and import.
+    #ifdef SOURCE
     if ((msr_values_ptr->ia32_vmx_cr4_fixed0.raw & (uint64_t)~GUEST_CR4_L2_INIT) != 0)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR4_FIXED0_MSR_ADDR);
@@ -1069,6 +1128,12 @@ _STATIC_INLINE_ api_error_type check_l2_vmx_msrs(tdx_module_global_t* tdx_global
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_CR4_FIXED1_MSR_ADDR);
     }
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((msr_values_ptr->ia32_vmx_cr4_fixed0.raw & (uint64_t)~GUEST_CR4_L2_INIT) == 0);
+        __CPROVER_assume((~msr_values_ptr->ia32_vmx_cr4_fixed1.raw & GUEST_CR4_L2_INIT) == 0);
+    #endif // MODULAR_PROOF
 
     return TDX_SUCCESS;
 }
@@ -1095,14 +1160,14 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
                          (msr_values_ptr->ia32_vmx_basic.ia32_vmx_true_available == 1)); 
     #endif // MODULAR_PROOF
     
-    #ifdef SOURCE_PROOF
+    #ifdef SOURCE
     msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw = ia32_rdmsr(IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
             PINBASED_CTLS_INIT, PINBASED_CTLS_VARIABLE, PINBASED_CTLS_UNKNOWN))
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     }
-    #endif //SOURCE_PROOF
+    #endif //SOURCE
 
     #ifdef MODULAR_PROOF
         int flag = check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
@@ -1196,8 +1261,7 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
         __CPROVER_assume(tdx_global_data_ptr->ddpd_supported &&
                          !msr_values_ptr->ia32_vmx_procbased_ctls3.virt_ia32_spec_ctrl);
     #endif // MODULAR_PROOF
-
-    
+ 
     vmx_procbased_ctls3_t procbased_ctls3_variable = { .raw = PROCBASED_CTLS3_VARIABLE };
 
     // The TD VMCS spreadsheet generates the VARIABLE mask for the VIRTUALIZE_IA32_SPEC_CTRL as 1,
@@ -1237,7 +1301,7 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
         __CPROVER_assume(check_allowed_vmx_ctls(&td_vmcs_values_ptr->exit_ctls, msr_values_ptr->ia32_vmx_true_exit_ctls,
             EXIT_CTLS_INIT, EXIT_CTLS_VARIABLE, EXIT_CTLS_UNKNOWN));
     #endif // MODULAR_PROOF
-    
+
     #ifdef SOURCE
     msr_values_ptr->ia32_vmx_misc.raw = ia32_rdmsr(IA32_VMX_MISC_MSR_ADDR);
     if ((msr_values_ptr->ia32_vmx_misc.unrestricted_guest == 0) ||
@@ -1324,7 +1388,7 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
         __CPROVER_assume((~msr_values_ptr->ia32_vmx_cr4_fixed1.raw & GUEST_CR4_INIT) == 0);
     #endif // MODULAR_PROOF
 
-    //return check_l2_vmx_msrs(tdx_global_data_ptr);
+    return check_l2_vmx_msrs(tdx_global_data_ptr);
 }
 
 _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_module_global_t* tdx_global_data_ptr,
@@ -1356,16 +1420,24 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
         return err;
     }
     #endif // SOURCE 
-
+    
     /*------------------------------------------
       Sample and Check IA32_VMX_* MSRs
       ------------------------------------------*/
+    #ifdef SOURCE
     if ((err = check_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
     {
         TDX_ERROR("Check of IA32 VMX MSRs failed\n");
         return err;
     }
-    __CPROVER_assert(false, "false"); 
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_vmx_msrs(tdx_global_data_ptr) == TDX_SUCCESS);
+        //__CPROVER_assert(err == TDX_SUCCESS, "yees"); 
+    #endif // MODULAR_PROOF
+
+    
 
     // /*---------------------------------------------------
     //     Sample and Check Key Management Configuration
@@ -1756,7 +1828,7 @@ api_error_type tdh_sys_init(void)
     #ifdef FLOW_PROOF
         err = check_platform_config_and_cpu_enumeration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
                                                          &tsx_ctrl_original, &tsx_ctrl_modified);
-        __CPROVER_assert(err == TDX_SUCCESS, "CPU platform config and enumeration correct");
+        __CPROVER_assert(err == TDX_SUCCESS, "CPU platform config and enumeration incorrect");
         retval = err; 
         goto EXIT; 
     #endif //FLOW_PROOF
