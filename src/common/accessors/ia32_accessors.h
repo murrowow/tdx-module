@@ -536,12 +536,17 @@ _STATIC_INLINE_ bool_t _lock_btr_64b(volatile uint64_t* mem, uint64_t bit)
 
 _STATIC_INLINE_ bool_t bit_scan_forward64(uint64_t mask, uint64_t* lsb_position)
 {
+    #ifdef SOURCE
     _ASM_VOLATILE_ ("bsfq %1, %0 \n"
                         :"=r"(*lsb_position)
                         :"r"(mask)
                         :"cc");
-
+    #else 
+    if (mask == 0) return false; 
+    *lsb_position = __builtin_ctzll(mask);
+    #endif // SOURCE
     return (mask != 0);
+
 }
 
 _STATIC_INLINE_ bool_t bit_scan_reverse32(uint32_t value, uint32_t* msb_position)

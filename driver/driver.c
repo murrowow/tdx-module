@@ -5,7 +5,6 @@
 #ifdef SOURCE
 #else 
 void driver_main() {
-
     __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
     __CPROVER_assume((global_data.private_hkid_min == 0x00000000));  //&& (global_data.private_hkid_min < (0xFFFFFFFF - (HKID_SIZE)))); 
     __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE))); //&& (global_data.private_hkid_max < 0xFFFFFFFF)); 
@@ -13,7 +12,9 @@ void driver_main() {
     __CPROVER_assume(global_data.hkid_mask == HKID_MASK);
     __CPROVER_havoc_object(&tables); 
     __CPROVER_havoc_object(&vmcs);
-    
+
+    __CPROVER_havoc_object(&sysinfo); 
+    __CPROVER_assume(sysinfo.num_handoff_pages >= TDX_MIN_HANDOFF_PAGES); 
     uint16_t index = 0; 
     #ifdef SETUP
         __CPROVER_havoc_object(&tables);
@@ -114,7 +115,7 @@ void driver_main() {
         __CPROVER_assume(found);
     #endif // INIT_SETUP
 
-    //TDX_bootup(); 
-    TD_setup(index); 
+    TDX_bootup(); 
+    //TD_setup(index); 
 }
 #endif // not SOURCE

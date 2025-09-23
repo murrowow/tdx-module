@@ -229,25 +229,46 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
 {
     uint8_t num_of_smrrs = 1;
 
+    #ifdef SOURCE
     tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw = ia32_rdmsr(MTRR_CAP_MSR_ADDR);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr == 0)
     {
         TDX_ERROR("SMRR not enabled\n");
         return TDX_SMRR_NOT_SUPPORTED;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr != 0);
+    #endif //MODULAR_PROOF
+
+    #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock == 0)
     {
             TDX_ERROR("SMRR Lock not enabled\n");
             return TDX_SMRR_LOCK_NOT_SUPPORTED;
     }
+    #endif //SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock != 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw = ia32_rdmsr(SMRR_MASK_MSR_ADDR);
     tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw = ia32_rdmsr(SMRR_BASE_MSR_ADDR);
 
     sysinfo_table_t * sysinfo_table_ptr = get_sysinfo_table();
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        sysinfo_table_t * sysinfo_table_ptr = &sysinfo;
+    #endif //MODULAR_PROOF
+
+    #ifdef SOURCE
     // Determine whether SMRR2 is supported
     if (sysinfo_table_ptr->mcheck_fields.smrr2_not_supported == 0 && tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr2 != 0)
     {
@@ -255,7 +276,9 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
         tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw = ia32_rdmsr(SMRR2_BASE_MSR_ADDR);
         num_of_smrrs = 2U;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     //SMRR and SMRR2 must be locked
     for (uint8_t smrr_idx = 0; smrr_idx < num_of_smrrs; smrr_idx++)
     {
@@ -265,7 +288,14 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
             return api_error_with_operand_id(TDX_SMRR_NOT_LOCKED, (uint64_t)smrr_idx);
         }
     }
+    #endif //SOURCE
 
+    #ifdef MODULAR_PROOF
+        for (uint8_t smrr_idx = 0; smrr_idx < num_of_smrrs; smrr_idx++)
+        {
+            __CPROVER_assume(tdx_global_data_ptr->plt_common_config.smrr[smrr_idx].smrr_mask.lock != 0);
+        }
+    #endif // MODULAR_PROOF
     //SMRR and SMRR2 must not overlap with any CMR
 
     for (uint8_t smrr_idx = 0; smrr_idx < num_of_smrrs; smrr_idx++)
@@ -279,21 +309,29 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
         smrr_mask_t smrr_mask = { .raw = 0 };
         smrr_mask.mask = tdx_global_data_ptr->plt_common_config.smrr[smrr_idx].smrr_mask.mask;
 
+        #ifdef SOURCE
         if (!is_smrr_mask_valid_for_tdx(smrr_base, smrr_mask))
         {
             TDX_ERROR("SMRR %d mask is corrupt 0x%llx (base 0x%llx)\n",
                     smrr_idx+1, smrr_mask.raw, smrr_base.raw);
             return api_error_with_operand_id(TDX_INVALID_SMRR_CONFIGURATION, (uint64_t)smrr_idx);
         }
+        #endif //SOURCE
 
+        #ifdef MODULAR_PROOF
+            __CPROVER_assume(is_smrr_mask_valid_for_tdx(smrr_base, smrr_mask)); 
+        #endif // MODULAR_PROOF
         uint64_t smrr_size = mask_to_size(smrr_mask.raw);
 
+        #ifdef SOURCE
         tdx_debug_assert(is_valid_integer_range(smrr_base.raw, smrr_size));
+        #endif // SOURCE
 
         // Check SMRRs don't overlap with CMRs - at this point CMR ranges should be checked
         // for integer overflow
         for (uint8_t cmr_i = 0; cmr_i < MAX_CMR; cmr_i++)
         {
+            #ifdef SOURCE
             if (sysinfo_table_ptr->cmr_data[cmr_i].cmr_size != 0 &&
                     is_overlap(smrr_base.raw, smrr_size, sysinfo_table_ptr->cmr_data[cmr_i].cmr_base,
                     sysinfo_table_ptr->cmr_data[cmr_i].cmr_size))
@@ -301,6 +339,13 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
                 TDX_ERROR("SMRR %d overlap with CMR %d \n", smrr_idx+1, cmr_i);
                 return api_error_with_multiple_info(TDX_SMRR_OVERLAPS_CMR, smrr_idx, cmr_i, 0, 0);
             }
+            #endif // SOURCE
+
+            #ifdef MODULAR_PROOF
+                __CPROVER_assume(!(sysinfo_table_ptr->cmr_data[cmr_i].cmr_size != 0 &&
+                    is_overlap(smrr_base.raw, smrr_size, sysinfo_table_ptr->cmr_data[cmr_i].cmr_base,
+                    sysinfo_table_ptr->cmr_data[cmr_i].cmr_size)));
+            #endif // MODULAR_PROOF
         };
     }
     return TDX_SUCCESS;
@@ -308,16 +353,36 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
 
 _STATIC_INLINE_ api_error_type check_key_management_config(tdx_module_global_t* tdx_global_data_ptr)
 {
+    #ifdef SOURCE
     tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw = ia32_rdmsr(IA32_TME_CAPABILITY_MSR_ADDR);
     tdx_global_data_ptr->plt_common_config.ia32_tme_activate.raw = ia32_rdmsr(IA32_TME_ACTIVATE_MSR_ADDR);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     uint32_t msr_addr = check_mem_enc_alg(tdx_global_data_ptr->plt_common_config.ia32_tme_capability,
                                           tdx_global_data_ptr->plt_common_config.ia32_tme_activate);
     if (msr_addr != 0)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, msr_addr);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+       ia32_tme_activate_t tme_activate = tdx_global_data_ptr->plt_common_config.ia32_tme_activate;
+       ia32_tme_capability_t tme_capability = tdx_global_data_ptr->plt_common_config.ia32_tme_capability;
+        __CPROVER_assume(tme_activate.lock == 0); 
+        if (sysinfo.mcheck_fields.tdx_without_integrity) {
+            __CPROVER_assume(!((tme_capability.aes_xts_256 == 0) && (tme_capability.aes_xts_128 == 0)));
+            __CPROVER_assume(!(((tme_activate.algs_aes_xts_256 == 0) &&
+                                (tme_activate.algs_aes_xts_128 == 0))));
+        } else {
+            __CPROVER_assume(!((tme_capability.aes_xts_256_with_integrity == 0) &&
+                               (tme_capability.aes_xts_128_with_integrity == 0)));
+            __CPROVER_assume(!((tme_activate.algs_aes_xts_256_with_integrity == 0) &&
+                              (tme_activate.algs_aes_xts_128_with_integrity == 0)));
+        }
+    #endif //MODULAR_PROOF
+    
     tdx_global_data_ptr->hkid_start_bit = (uint32_t)(MAX_PA -
             (uint64_t)tdx_global_data_ptr->plt_common_config.ia32_tme_activate.mk_tme_keyid_bits);
 
@@ -334,11 +399,19 @@ _STATIC_INLINE_ api_error_type check_key_management_config(tdx_module_global_t* 
             tdx_global_data_ptr->plt_common_config.ia32_tme_keyid_partitioning.num_mktme_kids +
             tdx_global_data_ptr->plt_common_config.ia32_tme_keyid_partitioning.num_tdx_priv_kids;
 
+
+    #ifdef SOURCE
     if (tdx_global_data_ptr->private_hkid_max >= MAX_HKIDS)
     {
         return api_error_with_operand_id(TDX_NUM_ACTIVATED_HKIDS_NOT_SUPPORTED, MAX_HKIDS);
     }
+    #endif //SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->private_hkid_max < MAX_HKIDS);
+    #endif //MODULAR_PROOF
+
+    #ifdef SOURCE
     /* Get the number of cache sub-blocks for TDWBINVD
     */
     // INIT number of cached blocks for WBINVD cycle
@@ -349,7 +422,7 @@ _STATIC_INLINE_ api_error_type check_key_management_config(tdx_module_global_t* 
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_WBNOINVDP_MSR_ADDR);
     }
-
+    #endif //SOURCE
     return TDX_SUCCESS;
 }
 
@@ -850,12 +923,18 @@ _STATIC_INLINE_ bool_t check_cmrs()
     /*----------------------------------------------------------------
       Defense-in-depth sanity check on the CMR list provided by MCHECK
       ----------------------------------------------------------------*/
+    #ifdef SOURCE
     sysinfo_table_t* sysinfo_table = get_sysinfo_table();
     tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        sysinfo_table_t* sysinfo_table = &sysinfo;
+        tdx_module_global_t* tdx_global_data_ptr = &global_data;
+    #endif // MODULAR_PROOF
 
     uint64_t prev_cmr_area_start = 0;
     uint64_t prev_cmr_area_end = 0;
-
 
     for (uint32_t i = 0; i < MAX_CMR; i++)
     {
@@ -1434,38 +1513,57 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(check_vmx_msrs(tdx_global_data_ptr) == TDX_SUCCESS);
-        //__CPROVER_assert(err == TDX_SUCCESS, "yees"); 
     #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(check_vmx_msrs(tdx_global_data_ptr) == TDX_SUCCESS);
+    #endif //FLOW_PROOF
     
 
-    // /*---------------------------------------------------
-    //     Sample and Check Key Management Configuration
-    // ---------------------------------------------------*/
-    // if ((err = check_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("Check of key management configuration failed\n");
-    //     return err;
-    // }
+    /*---------------------------------------------------
+        Sample and Check Key Management Configuration
+    ---------------------------------------------------*/
+    #ifdef SOURCE
+    if ((err = check_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
+    {
+        TDX_ERROR("Check of key management configuration failed\n");
+        return err;
+    }
+    #endif // SOURCE
 
-    // /*---------------------------------------------------
-    //     Sanity check on CMR info provided by MCHECK
-    // ---------------------------------------------------*/
-    // if (!check_cmrs())
-    // {
-    //     err = TDX_CMR_LIST_INVALID;
-    //     return err;
-    // }
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_key_management_config(tdx_global_data_ptr) == TDX_SUCCESS);
+    #endif //MODULAR_PROOF
 
-    // /*---------------------------------------------------
-    //     Check SMRRs and store in global data
-    // ---------------------------------------------------*/
-    // if ((err = check_and_store_smrr_smrr2(tdx_global_data_ptr)) != TDX_SUCCESS)
-    // {
-    //     TDX_ERROR("check_and_store_smrr_smrr2 failure\n");
-    //     return err;
-    // }
+    /*---------------------------------------------------
+        Sanity check on CMR info provided by MCHECK
+    ---------------------------------------------------*/
+    #ifdef SOURCE
+    if (!check_cmrs())
+    {
+        err = TDX_CMR_LIST_INVALID;
+        return err;
+    }
+    #endif //SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_cmrs());
+    #endif // MODULAR_PROOF
+
+    /*---------------------------------------------------
+        Check SMRRs and store in global data
+    ---------------------------------------------------*/
+    #ifdef SOURCE
+    if ((err = check_and_store_smrr_smrr2(tdx_global_data_ptr)) != TDX_SUCCESS)
+    {
+        TDX_ERROR("check_and_store_smrr_smrr2 failure\n");
+        return err;
+    }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_and_store_smrr_smrr2(tdx_global_data_ptr) == TDX_SUCCESS);
+    #endif // MODULAR_PROOF
     return TDX_SUCCESS;
 }
 
@@ -1512,16 +1610,16 @@ _STATIC_INLINE_ void tdx_init_global_data(tdx_module_global_t* tdx_global_data_p
         tdx_global_data_ptr->seamrr_size = mask_to_size(seamrr_mask);
     #endif // SOURCE 
 
-    #ifdef MODULAR_SOURCE
+    #ifdef MODULAR_PROOF
         uint64_t seamrr_base;
-        __CPROVER_havoc(&seamrr_base);
+        __CPROVER_havoc_object(&seamrr_base);
         tdx_global_data_ptr->seamrr_base = seamrr_base & IA32_SEAMRR_BASE_AND_MASK_MASK;
         uint64_t seamrr_mask;
-        __CPROVER_havoc(&seamrr_mask);
+        __CPROVER_havoc_object(&seamrr_mask);
         seamrr_mask &= IA32_SEAMRR_BASE_AND_MASK_MASK;
-        __CPROVER_assume(seamrr_mask != 0)
-        tdx_global_data_ptr->seamrr_size = BIT(__builtin_ctzll(seamrr_mask));
-    #endif
+        __CPROVER_assume(seamrr_mask != 0);
+        tdx_global_data_ptr->seamrr_size = mask_to_size(seamrr_mask);
+    #endif //MODULAR_PROOF
 
     tdx_global_data_ptr->num_of_init_lps = 0;
 
@@ -1619,6 +1717,8 @@ _STATIC_INLINE_ api_error_type tdx_init_stack_canary(void)
     #else
         // sysinfo_table_t* last_page_ptr = &tdx_mem[(sizeof(tdx_mem) / sizeof(tdx_mem[0])) - 1];
         // right now only an array of 1 so will need to expand to multiple later on
+        sysinfo_table_t * last_page_ptr = &memory_pages[HKID_SIZE - 1];
+        last_page_ptr->stack_canary.canary = canary; 
         vmcs.FS.value = 1; // only one right now need to change into an array of some 
     #endif // SOURCE 
 
@@ -1692,11 +1792,11 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
         //     (global_data.min_update_hv >= TDX_MIN_UPDATE_HV) &&
         //     ((global_data.no_downgrade != 0) || (TDX_NO_DOWNGRADE != 1)) &&
         //     ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES));
-
         __CPROVER_assume((global_data.module_hv == 0) &&
             (global_data.min_update_hv >= 0) &&
-            ((global_data.no_downgrade != 0) || (0 != 1)) &&
-            ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES));
+            (global_data.no_downgrade == 0) && // (0 != 1)
+            ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES)
+        );
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF    
@@ -1708,7 +1808,7 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
         // AHMAD: REPLACE MAKEFILE VARS WITH 0 FOR NOW IN REALITY SET AT COMPILE TIME
         __CPROVER_assert((global_data.module_hv == 0) &&
             (global_data.min_update_hv >= 0) &&
-            ((global_data.no_downgrade != 0) || (0 != 1)) &&
+            ((global_data.no_downgrade != 0)) && // (0 != 1)
             ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES), "Failed build time checks");
 
     #endif // FLOW_PROOF
@@ -1860,7 +1960,6 @@ api_error_type tdh_sys_init(void)
         goto EXIT;
     }
     #endif // SOURCE 
-
     #ifdef MODULAR_PROOF
         __CPROVER_assume((err = check_module_build_time_defs(tdx_global_data_ptr)) == TDX_SUCCESS);
     #endif // MODULAR_PROOF
@@ -1949,7 +2048,7 @@ api_error_type tdh_sys_init(void)
         __CPROVER_assert(tdx_global_data_ptr->seamverifyreport_available == ((tdx_global_data_ptr->seam_capabilities.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0), "seamverifyreport_available set according to caps");
         __CPROVER_assert((tdx_global_data_ptr->max_pa <= 48) ? (tdx_global_data_ptr->config_flags_fixed1.gpaw == 0) : true, "gpaw bit must be cleared if max_pa <= 48");
     #endif
-
+        __CPROVER_assert(false, "false"); 
     return TDX_SUCCESS;
 }
 

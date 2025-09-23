@@ -121,6 +121,9 @@ struct hardware_states tables[HKID_SIZE];
 //sysinfo table
 sysinfo_table_t sysinfo; 
 
+// memory pages
+sysinfo_table_t memory_pages[HKID_SIZE]; 
+
 //vmcs 
 vmcs_host_values_t vmcs;
 
