@@ -554,9 +554,11 @@ static api_error_type handle_l2_entry(tdr_t* tdr_ptr, tdcs_t* tdcs_ptr, tdvps_t*
 
 api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
 {
-    // Local data for return values and global data
-    tdx_module_local_t  * local_data_ptr = get_local_data();
-    tdx_module_global_t * global_data_ptr = get_global_data();
+    #ifdef SOURCE
+        // Local data for return values and global data
+        tdx_module_local_t  * local_data_ptr = get_local_data();
+        tdx_module_global_t * global_data_ptr = get_global_data();
+    #endif // SOURCE
 
     // TDVPR related variables
     pa_t                  tdvpr_pa;                    // TDVPR physical address
