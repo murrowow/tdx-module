@@ -54,7 +54,7 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
                                               uint32_t variable_mask,
                                               uint32_t unknown_mask)
 {
-    #ifdef SOURCE
+    #ifdef SOURCE 
     // Sanity check on the MSR values returned by the CPU:
     // Any bit can't be both fixed-1 (bits that are 1 in NOT_ALLOWED0) and fixed-0 (bits that are 0 in ALLOWED1)
     tdx_sanity_check((src.not_allowed0 & ~src.allowed1) == 0, SCEC_SEAMCALL_SOURCE(TDH_SYS_INIT_LEAF), 0);
@@ -83,7 +83,8 @@ _STATIC_INLINE_ bool_t check_allowed_vmx_ctls(uint32_t* dest,
     #ifdef FLOW_PROOF
         if ((src.not_allowed0 & ~(init | unknown_mask)) != 0)
         {
-            __CPROVER_assert((src.not_allowed0 & ~(init | unknown_mask)) == 0, )
+            __CPROVER_printf("SOPHIA: %d",(src.not_allowed0 & ~(init | unknown_mask)));
+            __CPROVER_assert((src.not_allowed0 & ~(init | unknown_mask)) == 0, "bits not allowed");
             return false;
         }
     #endif // FLOW_PROOF
@@ -492,12 +493,7 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
     global_data_ptr->cpuid_last_extended_leaf = last_extended_leaf;
     #endif // SOURCE
 
-    #ifdef SOURCE
     for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++)
-    #endif // SOURCE
-    #ifdef MODULAR_PROOF
-    for (uint32_t i = 0; i < 1; i++)
-    #endif // MODULAR_PROOF
     {
         if (!cpuid_lookup[i].valid_entry)
         {
@@ -926,9 +922,7 @@ _STATIC_INLINE_ bool_t check_cmrs()
     #ifdef SOURCE
     sysinfo_table_t* sysinfo_table = get_sysinfo_table();
     tdx_module_global_t* tdx_global_data_ptr = get_global_data();
-    #endif // SOURCE
-
-    #ifdef MODULAR_PROOF
+    #else
         sysinfo_table_t* sysinfo_table = &sysinfo;
         tdx_module_global_t* tdx_global_data_ptr = &global_data;
     #endif // MODULAR_PROOF
@@ -1239,6 +1233,18 @@ _STATIC_INLINE_ api_error_type check_vmx_msrs(tdx_module_global_t* tdx_global_da
                          (msr_values_ptr->ia32_vmx_basic.ia32_vmx_true_available == 1)); 
     #endif // MODULAR_PROOF
     
+    #ifdef FLOW_PROOF
+    if ((msr_values_ptr->ia32_vmx_basic.vmcs_region_size > TD_VMCS_SIZE) ||
+        (msr_values_ptr->ia32_vmx_basic.vmexit_info_on_ios != 1) ||
+        (msr_values_ptr->ia32_vmx_basic.ia32_vmx_true_available != 1))
+    {
+            __CPROVER_assert((msr_values_ptr->ia32_vmx_basic.vmcs_region_size <= TD_VMCS_SIZE) &&
+                             (msr_values_ptr->ia32_vmx_basic.vmexit_info_on_ios == 1) &&
+                             (msr_values_ptr->ia32_vmx_basic.ia32_vmx_true_available == 1), "valid vmcs region");
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_VMX_BASIC_MSR_ADDR);
+    }
+    #endif // FLOW_PROOF
+
     #ifdef SOURCE
     msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw = ia32_rdmsr(IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     if (!check_allowed_vmx_ctls(&td_vmcs_values_ptr->pinbased_ctls, msr_values_ptr->ia32_vmx_true_pinbased_ctls,
@@ -1483,6 +1489,7 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
     ---------------------------------------------------*/
     if ((err = check_msrs(tdx_global_data_ptr, tsx_ctrl_modified_flag, tsx_ctrl_original, tsx_ctrl_modified)) != TDX_SUCCESS)
     {
+        __CPROVER_assert(err == TDX_SUCCESS, "msr check failed");
         TDX_ERROR("Check of MSR's failed\n");
         return err;
     }
@@ -1516,7 +1523,12 @@ _STATIC_INLINE_ api_error_type check_platform_config_and_cpu_enumeration(tdx_mod
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(check_vmx_msrs(tdx_global_data_ptr) == TDX_SUCCESS);
+        if ((err = check_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
+        {   
+            __CPROVER_assert(check_vmx_msrs(tdx_global_data_ptr) == TDX_SUCCESS, "correct vmx msrs");
+            TDX_ERROR("Check of IA32 VMX MSRs failed\n");
+            return err;
+        }
     #endif //FLOW_PROOF
     
 
@@ -1859,8 +1871,9 @@ api_error_type tdh_sys_init(void)
     #endif //MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (tdx_global_data.kot.lock.raw != SHAREX_FREE) {
-            return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
+        if (tdx_global_data_ptr->kot.lock.raw != SHAREX_FREE) {
+            __CPROVER_assert(tdx_global_data_ptr->kot.lock.raw == SHAREX_FREE, "kot is free");
+            retval = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
             goto EXIT;
         } 
     #endif // FLOW_PROOF
@@ -1927,10 +1940,12 @@ api_error_type tdh_sys_init(void)
 
     #ifdef FLOW_PROOF
         err = check_platform_config_and_cpu_enumeration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
-                                                         &tsx_ctrl_original, &tsx_ctrl_modified);
-        __CPROVER_assert(err == TDX_SUCCESS, "CPU platform config and enumeration incorrect");
-        retval = err; 
-        goto EXIT; 
+                                                         &tsx_ctrl_original, &tsx_ctrl_modified);\
+        if (err != TDX_SUCCESS) {
+            __CPROVER_assert(err == TDX_SUCCESS, "CPU platform config and enumeration incorrect");
+            retval = err; 
+            goto EXIT; 
+        }
     #endif //FLOW_PROOF
 
     #ifdef SOURCE
@@ -1979,7 +1994,9 @@ api_error_type tdh_sys_init(void)
         __CPROVER_havoc_slice(&(tdx_global_data_ptr->seamdb_nonce), sizeof(uint256_t)); 
         __CPROVER_havoc_slice(&seamdb_size, sizeof(uint64_t)); 
     #endif // SOURCE 
-
+    
+    #ifdef FLOW_PROOF
+    #else 
     tdx_global_data_ptr->seamverifyreport_available = ((caps.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
     /*
      * Calculate allowed ATTRIBUTES bits.
@@ -2005,6 +2022,7 @@ api_error_type tdh_sys_init(void)
 
     tdx_global_data_ptr->config_flags_fixed0.raw = config_flags_fixed0.raw;
     tdx_global_data_ptr->config_flags_fixed1.raw = config_flags_fixed1.raw;
+    #endif // FLOW_PRROF
 
     #ifdef SOURCE
         if (tdx_init_stack_canary() != TDX_SUCCESS)
@@ -2048,7 +2066,14 @@ api_error_type tdh_sys_init(void)
         __CPROVER_assert(tdx_global_data_ptr->seamverifyreport_available == ((tdx_global_data_ptr->seam_capabilities.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0), "seamverifyreport_available set according to caps");
         __CPROVER_assert((tdx_global_data_ptr->max_pa <= 48) ? (tdx_global_data_ptr->config_flags_fixed1.gpaw == 0) : true, "gpaw bit must be cleared if max_pa <= 48");
     #endif
-        __CPROVER_assert(false, "false"); 
-    return TDX_SUCCESS;
+    
+    #ifdef FLOW_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE);
+        __CPROVER_assume(tdx_global_data_ptr->seam_capabilities.raw & TD_PRESERVING_CAPABILITIES);
+        __CPROVER_assume(tdx_global_data_ptr->seamverifyreport_available == ((tdx_global_data_ptr->seam_capabilities.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0));
+        __CPROVER_assume((tdx_global_data_ptr->max_pa <= 48) ? (tdx_global_data_ptr->config_flags_fixed1.gpaw == 0) : true);
+    #endif // FLOW_PROOF
+
+    return retval;
 }
 
