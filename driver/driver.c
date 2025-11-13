@@ -4,7 +4,7 @@
 
 #ifdef SOURCE
 #else 
-void driver_main() {
+void setup() {
     __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
     __CPROVER_assume((global_data.private_hkid_min == 0x00000000));  //&& (global_data.private_hkid_min < (0xFFFFFFFF - (HKID_SIZE)))); 
     __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE))); //&& (global_data.private_hkid_max < 0xFFFFFFFF)); 
@@ -13,106 +13,145 @@ void driver_main() {
     __CPROVER_havoc_object(&tables); 
     __CPROVER_havoc_object(&vmcs);
 
-    __CPROVER_havoc_object(&sysinfo); 
-    __CPROVER_assume(sysinfo.num_handoff_pages >= TDX_MIN_HANDOFF_PAGES); 
-    uint16_t index = 0; 
-    #ifdef SETUP
-        __CPROVER_havoc_object(&tables);
-        __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE);
-        //init the kot table
-        for (int i = 0; i < HKID_SIZE; i++) {
-            __CPROVER_assume(global_data.kot.entries[i].state == KOT_STATE_HKID_FREE);
-            __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
-            __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
-            __CPROVER_assume(tables[i].tdr_table.key_management_fields.pkg_config_bitmap == 0); 
-            __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx == 0); 
-            __CPROVER_assume(tables[i].tdcx_pamt_entry.pt == PT_NDA);
+    __CPROVER_havoc_object(&tables);
+    __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE);
+    //init the kot table
+    for (int i = 0; i < HKID_SIZE; i++) {
+       __CPROVER_assume(global_data.kot.entries[i].state == KOT_STATE_HKID_FREE);
+       __CPROVER_assume(tables[i].tdr_table.management_fields.fatal == false); 
+       __CPROVER_assume(tables[i].pamt_entry.pt == PT_NDA); 
+       __CPROVER_assume(tables[i].tdr_table.key_management_fields.pkg_config_bitmap == 0); 
+       __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx == 0); 
+       __CPROVER_assume(tables[i].tdcx_pamt_entry.pt == PT_NDA);
+       // SOPHIA: highkey have no idea what this does for add_cx
+       __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state == 0); // TDH_MNG_ADDCX_LEAF == 1, [1][0] == 1
+    }
+}
 
-            // SOPHIA: highkey have no idea what this does for add_cx
-            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state == 0); // TDH_MNG_ADDCX_LEAF == 1, [1][0] == 1
-        }
+void key_config_setup(uint16_t index) {
+    __CPROVER_havoc_object(&local_data.lp_info.pkg);
+    __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < HKID_SIZE);
+    __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
+    __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
 
-    #endif // SETUP
     
-    #ifdef KEY_CONFIG_SETUP
-        __CPROVER_havoc_object(&local_data.lp_info.pkg);
-        __CPROVER_assume(local_data.lp_info.pkg >= 0 && local_data.lp_info.pkg < HKID_SIZE);
-        __CPROVER_havoc_object(&global_data.pkg_config_bitmap);
-        __CPROVER_assume(global_data.pkg_config_bitmap & BIT(local_data.lp_info.pkg) != 0);
-
-        
-        // Ensure at least one element has pamt_entry.pt set to PT_TDR
-        bool_t found = false;
-        for (int i = 0; i < HKID_SIZE; i++) {
-            if ((tables[i].pamt_entry.pt == PT_TDR) &&
-                !tables[i].tdr_table.management_fields.fatal &&
-                (tables[i].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED) &&
-                !(tables[i].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)))) {
-                found = true;
-                index = i;
-                break;
-            }
+    // Ensure at least one element has pamt_entry.pt set to PT_TDR
+    bool_t found = false;
+    for (int i = 0; i < HKID_SIZE; i++) {
+        if ((tables[i].pamt_entry.pt == PT_TDR) &&
+            !tables[i].tdr_table.management_fields.fatal &&
+            (tables[i].tdr_table.management_fields.lifecycle_state == TD_HKID_ASSIGNED) &&
+            !(tables[i].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg)))) {
+            found = true;
+            index = i;
+            break;
         }
-        __CPROVER_assume(found);
+    }
+    __CPROVER_assume(found);
+}
 
-    #endif // KEY_CONFIG_SETUP
+void add_cx_setup(uint16_t index) {
+    for (int i = 0; i < HKID_SIZE; i++) {
+        __CPROVER_havoc_object(&tables[i].pamt_entry);
+        __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
+        __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
+    }
 
-    #ifdef ADD_CX_SETUP
-        for (int i = 0; i < HKID_SIZE; i++) {
-            __CPROVER_havoc_object(&tables[i].pamt_entry);
-            __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
-            __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
+    for(int i = 0; i < HKID_SIZE; i++)
+        __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
+    
+    // Ensure at least one element is as we need it
+    bool_t found = false;
+    for (int i = 0; i < HKID_SIZE; i++) {
+        if (tables[i].pamt_entry.pt == PT_TDR && 
+            tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED && 
+            tables[i].tdcx_table.management_fields.op_state == OP_STATE_UNINITIALIZED && 
+            !tables[i].tdr_table.management_fields.fatal &&
+            tables[i].tdr_table.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES && 
+            tables[i].tdcx_pamt_entry.pt == PT_NDA && 
+            seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[i].tdcx_table.management_fields.op_state]) {
+            found = true;
+            index = i; 
+            break;
         }
+    }
+    __CPROVER_assume(found);
 
-        for(int i = 0; i < HKID_SIZE; i++)
-            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
-        
-        // Ensure at least one element is as we need it
-        bool_t found = false;
-        for (int i = 0; i < HKID_SIZE; i++) {
-            if (tables[i].pamt_entry.pt == PT_TDR && 
-                tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED && 
-                tables[i].tdcx_table.management_fields.op_state == OP_STATE_UNINITIALIZED && 
-                !tables[i].tdr_table.management_fields.fatal &&
-                tables[i].tdr_table.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES && 
-                tables[i].tdcx_pamt_entry.pt == PT_NDA && 
-                seamcall_state_lookup[TDH_MNG_ADDCX_LEAF][tables[i].tdcx_table.management_fields.op_state]) {
+}
+
+void init_setup(uint16_t index) {
+    for (int i = 0; i < HKID_SIZE; i++) {
+        __CPROVER_havoc_object(&tables[i].pamt_entry);
+        __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
+        __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
+    }
+
+    for(int i = 0; i < HKID_SIZE; i++)
+        __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
+
+    // Ensure at least one element is as we need it
+    bool_t found = false;
+    for (int i = 0; i < HKID_SIZE; i++) {
+        if (tables[i].pamt_entry.pt == PT_TDR && 
+            tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED &&
+            tables[i].tdr_table.management_fields.fatal == false && 
+            tables[i].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES && 
+            tables[i].td_params_table.ia32_arch_capabilities_config == 0 
+        )
+            {
                 found = true;
                 index = i; 
                 break;
-            }
         }
-        __CPROVER_assume(found);
+    }
 
+    __CPROVER_assume(found);
+}
+
+void driver_main() {
+
+    __CPROVER_havoc_object(&sysinfo); 
+    __CPROVER_havoc_object(&global_data); 
+    __CPROVER_assume(sysinfo.num_handoff_pages >= TDX_MIN_HANDOFF_PAGES); 
+
+    __CPROVER_havoc_object(&global_data); 
+    __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_PENDING); 
+    __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE); 
+
+    __CPROVER_assume((sysinfo.module_hv == 0)); 
+    __CPROVER_assume((sysinfo.no_downgrade == 0)); 
+    __CPROVER_assume((sysinfo.min_update_hv == 0)); 
+    __CPROVER_assume((sysinfo.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES);
+
+    // MSR Stuff
+    platform_common_config_t msr_values_ptr = global_data.plt_common_config;
+    __CPROVER_assume(msr_values_ptr.ia32_vmx_basic.vmcs_region_size <= TD_VMCS_SIZE);
+    __CPROVER_assume(msr_values_ptr.ia32_vmx_basic.ia32_vmx_true_available == 1U);
+    __CPROVER_assume(msr_values_ptr.ia32_vmx_basic.vmexit_info_on_ios == 1U);
+
+
+    __CPROVER_assume((msr_values_ptr.ia32_vmx_true_procbased_ctls.not_allowed0 & ~(PROCBASED_CTLS_INIT | PROCBASED_CTLS_UNKNOWN)) == 0);
+    __CPROVER_assume(((~msr_values_ptr.ia32_vmx_true_procbased_ctls.allowed1) & PROCBASED_CTLS_INIT) == 0); 
+    __CPROVER_assume(((msr_values_ptr.ia32_vmx_true_procbased_ctls.not_allowed0 | ~msr_values_ptr.ia32_vmx_true_procbased_ctls.allowed1) & PROCBASED_CTLS_VARIABLE) == 0);
+    __CPROVER_assume((msr_values_ptr.ia32_vmx_true_pinbased_ctls.not_allowed0 & ~(PINBASED_CTLS_INIT | PINBASED_CTLS_UNKNOWN)) == 0);
+    __CPROVER_assume(((~msr_values_ptr.ia32_vmx_true_pinbased_ctls.allowed1) & PINBASED_CTLS_INIT) == 0); 
+    __CPROVER_assume(((msr_values_ptr.ia32_vmx_true_pinbased_ctls.not_allowed0 | ~msr_values_ptr.ia32_vmx_true_pinbased_ctls.allowed1) & PINBASED_CTLS_VARIABLE) == 0);
+
+    uint16_t index = 0; 
+    #ifdef SETUP
+        setup(); 
+    #endif // SETUP
+    
+    #ifdef KEY_CONFIG_SETUP
+        key_config_setup(index); 
+    #endif //KEY_CONFIG_SETUP
+
+    #ifdef ADD_CX_SETUP
+        add_cx_setup(index);
     #endif // ADD_CX_SETUP
 
     #ifdef INIT_SETUP
-        for (int i = 0; i < HKID_SIZE; i++) {
-            __CPROVER_havoc_object(&tables[i].pamt_entry);
-            __CPROVER_havoc_object(&tables[i].tdr_table.management_fields.lifecycle_state);
-            __CPROVER_havoc_object(&tables[i].tdcx_table.management_fields.op_state);
-        }
-
-        for(int i = 0; i < HKID_SIZE; i++)
-            __CPROVER_assume(tables[i].tdcx_table.management_fields.op_state >= 0 && tables[i].tdcx_table.management_fields.op_state <= 10);
-
-        // Ensure at least one element is as we need it
-        bool_t found = false;
-        for (int i = 0; i < HKID_SIZE; i++) {
-            if (tables[i].pamt_entry.pt == PT_TDR && 
-                tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED &&
-                tables[i].tdr_table.management_fields.fatal == false && 
-                tables[i].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES && 
-                tables[i].td_params_table.ia32_arch_capabilities_config == 0 
-            )
-                {
-                    found = true;
-                    index = i; 
-                    break;
-            }
-        }
-
-        __CPROVER_assume(found);
+        init_setup(index); 
     #endif // INIT_SETUP
 
     TDX_bootup(); 

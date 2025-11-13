@@ -1800,10 +1800,6 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
         global_data.num_handoff_pages = sysinfo.num_handoff_pages;
 
         // AHMAD: REPLACE MAKEFILE VARS WITH 0 FOR NOW IN REALITY SET AT COMPILE TIME
-        // __CPROVER_assume((global_data.module_hv == TDX_MODULE_HV) &&
-        //     (global_data.min_update_hv >= TDX_MIN_UPDATE_HV) &&
-        //     ((global_data.no_downgrade != 0) || (TDX_NO_DOWNGRADE != 1)) &&
-        //     ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES));
         __CPROVER_assume((global_data.module_hv == 0) &&
             (global_data.min_update_hv >= 0) &&
             (global_data.no_downgrade == 0) && // (0 != 1)
@@ -1817,12 +1813,17 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
         global_data.no_downgrade      = sysinfo.no_downgrade;
         global_data.num_handoff_pages = sysinfo.num_handoff_pages;
 
-        // AHMAD: REPLACE MAKEFILE VARS WITH 0 FOR NOW IN REALITY SET AT COMPILE TIME
-        __CPROVER_assert((global_data.module_hv == 0) &&
-            (global_data.min_update_hv >= 0) &&
-            ((global_data.no_downgrade != 0)) && // (0 != 1)
-            ((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES), "Failed build time checks");
+        if ((tdx_global_data_ptr->module_hv != 0) ||
+            (tdx_global_data_ptr->min_update_hv < 0) ||
+            ((tdx_global_data_ptr->no_downgrade != 0)) ||
+            ((tdx_global_data_ptr->num_handoff_pages + 1) < TDX_MIN_HANDOFF_PAGES)) {
 
+            __CPROVER_assert((global_data.module_hv == 0), "Failed build time checks1");
+            __CPROVER_assert((global_data.min_update_hv >= 0), "Failed build time checks2");
+            __CPROVER_assert((global_data.no_downgrade == 0), "Failed build time checks3");
+            __CPROVER_assert((global_data.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES, "Failed build time checks4");
+            return TDX_SYS_INCOMPATIBLE_SIGSTRUCT;
+        }
     #endif // FLOW_PROOF
 
     return TDX_SUCCESS;
@@ -2073,7 +2074,7 @@ api_error_type tdh_sys_init(void)
         __CPROVER_assume(tdx_global_data_ptr->seamverifyreport_available == ((tdx_global_data_ptr->seam_capabilities.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0));
         __CPROVER_assume((tdx_global_data_ptr->max_pa <= 48) ? (tdx_global_data_ptr->config_flags_fixed1.gpaw == 0) : true);
     #endif // FLOW_PROOF
-
+    
     return retval;
 }
 
