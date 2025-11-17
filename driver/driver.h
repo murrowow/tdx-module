@@ -132,6 +132,8 @@ char kot_lock;
 //PAMT TABLE
 
 void driver_main(); 
+//important registers 
+uint64_t invt_global_ept; 
 
 _STATIC_INLINE_ pa_t set_hkid_to_pa_local(pa_t pa, uint16_t hkid)
 {

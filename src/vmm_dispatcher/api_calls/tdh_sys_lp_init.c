@@ -485,6 +485,7 @@ api_error_type tdh_sys_lp_init(void)
         }
         tmp_global_lock_acquired = true;
     #endif // SOURCE 
+
     #ifdef MODULAR_PROOF
         __CPROVER_assume(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER);
     #endif // MODULAR_PROOF
@@ -514,10 +515,10 @@ api_error_type tdh_sys_lp_init(void)
             goto EXIT;
         }
     #endif // SOURCE
-    
+
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE);
-        __CPROVER_assume(tdx_local_data_ptr->lp_is_init);
+    __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
+    __CPROVER_assume(!local_data.lp_is_init); 
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
@@ -538,9 +539,9 @@ api_error_type tdh_sys_lp_init(void)
         }
     #endif // FLOW_PROOF
 
-    // Explicit LP-scope state initialization
     tdx_local_data_ptr->vp_ctx.last_tdvpr_pa.raw = NULL_PA;
     uint32_t lfsr_value = LFSR_INIT_VALUE;
+    // Explicit LP-scope state initialization
     if (!lfsr_init_seed (&lfsr_value))
     {
         TDX_ERROR("LFSR initialization failed\n");
