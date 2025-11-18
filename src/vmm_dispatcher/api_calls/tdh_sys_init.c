@@ -985,6 +985,9 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
     #ifdef SOURCE
         msr_values_ptr->ia32_core_capabilities.raw = ia32_rdmsr(IA32_CORE_CAPABILITIES);
         msr_values_ptr->ia32_arch_capabilities.raw = ia32_rdmsr(IA32_ARCH_CAPABILITIES_MSR_ADDR);
+    #else 
+        msr_values_ptr->ia32_core_capabilities.raw = msr_values_ptr_model.ia32_core_capabilities.raw;
+        msr_values_ptr->ia32_arch_capabilities.raw = msr_values_ptr_model.ia32_arch_capabilities.raw; 
     #endif // SOURCE
 
     #ifdef SOURCE
@@ -998,6 +1001,14 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
         __CPROVER_assume(check_native_ia32_arch_capabilities(msr_values_ptr->ia32_arch_capabilities));
     #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        if (!check_native_ia32_arch_capabilities(msr_values_ptr->ia32_arch_capabilities))
+        {
+            __CPROVER_assert(check_native_ia32_arch_capabilities(msr_values_ptr->ia32_arch_capabilities), "ia32 arch capabilities are correct"); 
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_ARCH_CAPABILITIES_MSR_ADDR);
+        }
+    #endif //FLOW_PROOF
+    
     #ifdef SOURCE
     if (msr_values_ptr->ia32_arch_capabilities.tsx_ctrl)
     {
@@ -1042,6 +1053,15 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
     __CPROVER_assume(msr_values_ptr->ia32_misc_package_ctls.energy_filtering_enable);
     #endif //MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        msr_values_ptr->ia32_misc_package_ctls.raw = msr_values_ptr_model.ia32_misc_package_ctls.raw;
+        if (!msr_values_ptr->ia32_misc_package_ctls.energy_filtering_enable)
+        {
+            __CPROVER_assert(msr_values_ptr->ia32_misc_package_ctls.energy_filtering_enable, "energy filtering is enabled"); 
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_MISC_PACKAGE_CTLS_MSR_ADDR);
+        }
+    #endif //FLOW_PROOF
+
     #ifdef SOURCE
     // Check Performance Monitoring - Support of IA32_A_PMC MSRs
     msr_values_ptr->ia32_perf_capabilities.raw = ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR);
@@ -1057,6 +1077,18 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
         __CPROVER_assume((msr_values_ptr->ia32_perf_capabilities.freeze_while_smm_supported == 1) &&
                          (msr_values_ptr->ia32_perf_capabilities.full_write == 1));
     #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        msr_values_ptr->ia32_perf_capabilities.raw = msr_values_ptr_model.ia32_perf_capabilities.raw;
+        if ((msr_values_ptr->ia32_perf_capabilities.freeze_while_smm_supported != 1) ||
+            (msr_values_ptr->ia32_perf_capabilities.full_write != 1))
+        {
+            __CPROVER_assert((msr_values_ptr->ia32_perf_capabilities.freeze_while_smm_supported == 1) &&
+                            (msr_values_ptr->ia32_perf_capabilities.full_write == 1), "freeze while smm support and full write not set")
+            TDX_ERROR("Check of IA32 PERF MSRs failed\n");
+            return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_PERF_CAPABILITIES_MSR_ADDR);
+        }
+    #endif //FLOW_PROOF
     /*--------------------------------------------
                   Time Stamp Counter
     --------------------------------------------*/
@@ -1065,8 +1097,9 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
     // TDX-SEAM operation on TDHVPENTER and other flows that rely on rdtsc.
     #ifdef SOURCE
     msr_values_ptr->ia32_tsc_adjust = ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR);
+    #else 
+    msr_values_ptr->ia32_tsc_adjust = msr_values_ptr_model.ia32_tsc_adjust;
     #endif // SOURCE
-
     return TDX_SUCCESS;
 }
 

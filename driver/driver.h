@@ -134,6 +134,10 @@ char kot_lock;
 void driver_main(); 
 //important registers 
 uint64_t invt_global_ept; 
+seam_ops_capabilities_t seamop_cap_model; 
+
+//MSRs
+platform_common_config_t msr_values_ptr_model;
 
 _STATIC_INLINE_ pa_t set_hkid_to_pa_local(pa_t pa, uint16_t hkid)
 {

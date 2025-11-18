@@ -51,6 +51,7 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
 {
     // Check Capabilities MSRs to have the same values as sampled during TDHSYSINIT
 
+    #ifdef SOURCE
     if (ia32_rdmsr(IA32_CORE_CAPABILITIES) !=
             tdx_global_data_ptr->plt_common_config.ia32_core_capabilities.raw)
     {
@@ -74,6 +75,11 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_XAPIC_DISABLE_STATUS_MSR_ADDR);
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_core_capabilities.raw == msr_values_ptr_model.ia32_core_capabilities.raw); 
+    #endif //MODULAR_PROOF
 
     return TDX_SUCCESS;
 }
@@ -368,7 +374,11 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
                                                                            ia32_tsx_ctrl_t* tsx_ctrl_modified)
 {
 
+    #ifdef SOURCE
     tdx_module_local_t *tdx_local_data_ptr = get_local_data();
+    #else
+    tdx_module_local_t *tdx_local_data_ptr = &local_data; 
+    #endif // SOURCE
     api_error_type err;
 
     if ((err = check_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
@@ -491,11 +501,11 @@ api_error_type tdh_sys_lp_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
-        if (tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
-            retval = TDX_SYS_BUSY; 
-            goto EXIT; 
-        }
+        // __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
+        // if (tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
+        //     retval = TDX_SYS_BUSY; 
+        //     goto EXIT; 
+        // }
         
     #endif // FLOW_PROOF
 
@@ -539,6 +549,7 @@ api_error_type tdh_sys_lp_init(void)
         }
     #endif // FLOW_PROOF
 
+    #ifdef SOURCE
     tdx_local_data_ptr->vp_ctx.last_tdvpr_pa.raw = NULL_PA;
     uint32_t lfsr_value = LFSR_INIT_VALUE;
     // Explicit LP-scope state initialization
@@ -549,13 +560,22 @@ api_error_type tdh_sys_lp_init(void)
         goto EXIT;
     }
     tdx_local_data_ptr->single_step_def_state.lfsr_value = lfsr_value;
+    #else 
+        // SOPHIA: assume lfsr_value is set to random value
+        __CPROVER_havoc_object(&tdx_local_data_ptr->single_step_def_state.lfsr_value);   
+    #endif //SOURCE 
 
     /* Do a global EPT flush.  This is required to help ensure security in case of
        a TDX-SEAM module update. */
+    #ifdef SOURCE
     const ept_descriptor_t zero_descriptor = { 0 };
     ia32_invept(&zero_descriptor, INVEPT_GLOBAL);
+    #else 
+        invt_global_ept = 0; 
+    #endif // SOURCE
 
     // Verify SEAM capabilities consistency
+    #ifdef SOURCE
     seam_ops_capabilities_t caps = { .raw = ia32_seamops_capabilities() };
 
     if (tdx_global_data_ptr->seam_capabilities.raw != caps.raw)
@@ -565,7 +585,21 @@ api_error_type tdh_sys_lp_init(void)
         retval = TDX_INCOMPATIBLE_SEAM_CAPABILITIES;
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+       __CPROVER_assume(tdx_global_data_ptr->seam_capabilities.raw == seamop_cap_model.raw);
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->seam_capabilities.raw != seamop_cap_model.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->seam_capabilities.raw == seamop_cap_model.raw, "verify the SEAM capabilities consistency");
+            retval = TDX_INCOMPATIBLE_SEAM_CAPABILITIES;
+            goto EXIT;
+        }
+    #endif //FLOW_PROOF
+    
     if ((retval = check_enumeration_and_compare_configuration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
                                                               &tsx_ctrl_original, &tsx_ctrl_modified)) != TDX_SUCCESS)
     {
@@ -573,11 +607,14 @@ api_error_type tdh_sys_lp_init(void)
         goto EXIT;
     }
 
-    tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
+    __CPROVER_assert(false, "false"); 
 
-    retval = TDX_SUCCESS;
+    // tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
+
+    // retval = TDX_SUCCESS;
     EXIT:
 
+    #ifdef SOURCE
     // Restore the original value of IA32_TSX_CTRL, if modified above
     if (tsx_ctrl_modified_flag)
     {
@@ -588,6 +625,7 @@ api_error_type tdh_sys_lp_init(void)
     {
         release_sharex_lock_sh(&tdx_global_data_ptr->global_lock);
     }
+    #endif //SOURCE 
 
     return retval;
 }

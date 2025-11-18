@@ -2,6 +2,8 @@
 #include "driver/flows/flows.h"
 #include "stdlib.h"
 
+#include "../src/common/helpers/virt_msr_helpers.h"
+
 #ifdef SOURCE
 #else 
 void setup() {
@@ -113,6 +115,11 @@ void driver_main() {
     #ifdef BOOTUP_SETUP
     __CPROVER_havoc_object(&sysinfo); 
     __CPROVER_havoc_object(&global_data); 
+    __CPROVER_havoc_object(&msr_values_ptr_model); 
+    __CPROVER_assume(check_native_ia32_arch_capabilities(msr_values_ptr_model.ia32_arch_capabilities));
+    __CPROVER_assume(msr_values_ptr_model.ia32_misc_package_ctls.energy_filtering_enable);
+    __CPROVER_assume((msr_values_ptr_model.ia32_perf_capabilities.freeze_while_smm_supported == 1) &&
+                     (msr_values_ptr_model.ia32_perf_capabilities.full_write == 1));
     __CPROVER_assume(sysinfo.num_handoff_pages >= TDX_MIN_HANDOFF_PAGES); 
 
     //__CPROVER_havoc_object(&global_data); 
@@ -144,6 +151,8 @@ void driver_main() {
     __CPROVER_havoc_object(&local_data.lp_is_init); 
     __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
     __CPROVER_assume(!local_data.lp_is_init); 
+
+    __CPROVER_havoc_object(&seamop_cap_model); 
     #endif //SYS_LP_INIT_SETUP
 
 
