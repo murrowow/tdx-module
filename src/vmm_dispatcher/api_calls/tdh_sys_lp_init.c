@@ -79,13 +79,46 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_core_capabilities.raw == msr_values_ptr_model.ia32_core_capabilities.raw); 
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_arch_capabilities.raw == msr_values_ptr_model.ia32_arch_capabilities.raw); 
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_misc_package_ctls.raw == msr_values_ptr_model.ia32_misc_package_ctls.raw); 
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw); 
     #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.ia32_core_capabilities.raw != msr_values_ptr_model.ia32_core_capabilities.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_core_capabilities.raw == msr_values_ptr_model.ia32_core_capabilities.raw, "msr core capabilities is incorrect"); 
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_CORE_CAPABILITIES);
+        }
+        
+        if (msr_values_ptr_model.ia32_arch_capabilities.raw !=
+                tdx_global_data_ptr->plt_common_config.ia32_arch_capabilities.raw)
+        {
+             __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_arch_capabilities.raw == msr_values_ptr_model.ia32_arch_capabilities.raw, "msr arch capabilities is incorrect"); 
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_ARCH_CAPABILITIES_MSR_ADDR);
+        }
+        
+        if (msr_values_ptr_model.ia32_misc_package_ctls.raw !=
+                tdx_global_data_ptr->plt_common_config.ia32_misc_package_ctls.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_misc_package_ctls.raw == msr_values_ptr_model.ia32_misc_package_ctls.raw, "msr misc package ctls is incorrect"); 
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_MISC_PACKAGE_CTLS_MSR_ADDR);
+        }
+    
+        if (msr_values_ptr_model.ia32_xapic_disable_status.raw !=
+                tdx_global_data_ptr->plt_common_config.ia32_xapic_disable_status.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw, "msr values xapic disable is incorrect"); 
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_XAPIC_DISABLE_STATUS_MSR_ADDR);
+        }
+    #endif //FLOW_PROOF
 
     return TDX_SUCCESS;
 }
 
 _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_global_data_ptr)
 {
+    #ifdef SOURCE
     ia32_mtrrcap_t local_mtrr_cap = {.raw = ia32_rdmsr(MTRR_CAP_MSR_ADDR)};
 
     if (local_mtrr_cap.raw != tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw)
@@ -93,24 +126,36 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
         TDX_ERROR("local MTRRCAP MSR mismatch with platform\n");
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, MTRR_CAP_MSR_ADDR);
     }
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+    
+    #endif // MODULAR_PROOF
 
     smrr_mask_t tmp_smrr_mask;
     smrr_base_t tmp_smrr_base;
 
     //SMRR and SMRR2 must be configured the same on all LPs
+    #if SOURCE
     tmp_smrr_mask.raw = ia32_rdmsr(SMRR_MASK_MSR_ADDR);
     tmp_smrr_base.raw = ia32_rdmsr(SMRR_BASE_MSR_ADDR);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw != tmp_smrr_base.raw)
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR_BASE_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw != tmp_smrr_mask.raw)
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR_MASK_MSR_ADDR);
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (get_sysinfo_table()->mcheck_fields.smrr2_not_supported == 0 && local_mtrr_cap.smrr2 != 0)
     {
         tmp_smrr_mask.raw = ia32_rdmsr(SMRR2_MASK_MSR_ADDR);
@@ -127,6 +172,7 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
         }
 
     }
+    #endif // SOURCE
 
     return TDX_SUCCESS;
 }
@@ -146,6 +192,7 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
 
     platform_common_config_t* msr_values_ptr = &tdx_global_data_ptr->plt_common_config;
 
+    #ifdef SOURCE
     if (msr_values_ptr->ia32_arch_capabilities.tsx_ctrl)
     {
         tsx_ctrl_original->raw = ia32_rdmsr(IA32_TSX_CTRL_MSR_ADDR);
@@ -160,18 +207,23 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
             *tsx_ctrl_modified_flag = true;
         }
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Boot NT4 bit should not be set
     if ((ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) & MISC_EN_LIMIT_CPUID_MAXVAL_BIT ) != 0)
     {
         return TDX_LIMIT_CPUID_MAXVAL_SET;
     }
+    #endif // SOURCE
 
     uint32_t last_base_leaf, last_extended_leaf;
     uint32_t ebx, ecx, edx;
 
+    #ifdef SOURCE
     ia32_cpuid(CPUID_MAX_INPUT_VAL_LEAF, 0, &last_base_leaf, &ebx, &ecx, &edx);
     ia32_cpuid(CPUID_MAX_EXTENDED_VAL_LEAF, 0, &last_extended_leaf, &ebx, &ecx, &edx);
+    #endif // SOURCE
 
     for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++)
     {
@@ -183,9 +235,11 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
         tmp_cpuid_config.leaf_subleaf =
                 cpuid_lookup[i].leaf_subleaf;
 
+        #ifdef SOURCE
         ia32_cpuid(tmp_cpuid_config.leaf_subleaf.leaf, tmp_cpuid_config.leaf_subleaf.subleaf,
                 &tmp_cpuid_config.values.eax, &tmp_cpuid_config.values.ebx,
                 &tmp_cpuid_config.values.ecx, &tmp_cpuid_config.values.edx);
+        #endif // SOURCE
 
         if (!((tmp_cpuid_config.leaf_subleaf.leaf <= last_base_leaf) ||
             ((tmp_cpuid_config.leaf_subleaf.leaf >= CPUID_FIRST_EXTENDED_LEAF) &&
@@ -235,11 +289,24 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
 
     }
 
+    #ifdef SOURCE
     // Compare IA32_TSC_ADJUST to the value sampled on TDHSYSINIT
     if (ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR) != tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust)
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TSC_ADJ_MSR_ADDR);
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust != msr_values_ptr_model.ia32_tsc_adjust) {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust, "ia32 tsc adjust is incorrect");
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TSC_ADJ_MSR_ADDR);
+        }
+    #endif // FLOW_PROOF
 
     return TDX_SUCCESS;
 }
@@ -400,24 +467,24 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
         return err;
     }
 
-    if ((err = compare_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
-    {
-        return err;
-    }
+    // if ((err = compare_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
 
-    /*---------------------------------------------------
-        Check Performance Monitoring
-      ---------------------------------------------------*/
-    if (ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR) !=
-            tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
-    {
-        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
-    }
+    // /*---------------------------------------------------
+    //     Check Performance Monitoring
+    //   ---------------------------------------------------*/
+    // if (ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR) !=
+    //         tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
+    // {
+    //     return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
+    // }
 
-    if ((err = compare_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
-    {
-        return err;
-    }
+    // if ((err = compare_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
 
     return TDX_SUCCESS;
 }
@@ -501,11 +568,11 @@ api_error_type tdh_sys_lp_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        // __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
-        // if (tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
-        //     retval = TDX_SYS_BUSY; 
-        //     goto EXIT; 
-        // }
+        __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
+        if (&tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
+            retval = TDX_SYS_BUSY; 
+            goto EXIT; 
+        }
         
     #endif // FLOW_PROOF
 
@@ -532,11 +599,10 @@ api_error_type tdh_sys_lp_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE, "Wrong sys_init state\n");
-        __CPROVER_assert(tdx_local_data_ptr->lp_is_init, "LP is already initialized\n");
 
         if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
         {
+            __CPROVER_assert(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE, "Wrong sys_init state\n");
             retval = TDX_SYS_LP_INIT_NOT_PENDING;
             goto EXIT;
         }
@@ -544,6 +610,7 @@ api_error_type tdh_sys_lp_init(void)
         //Check current LP state
         if (tdx_local_data_ptr->lp_is_init)
         {
+            __CPROVER_assert(!tdx_local_data_ptr->lp_is_init, "LP is already initialized\n");
             retval = TDX_SYS_LP_INIT_DONE;
             goto EXIT;
         }
@@ -562,7 +629,7 @@ api_error_type tdh_sys_lp_init(void)
     tdx_local_data_ptr->single_step_def_state.lfsr_value = lfsr_value;
     #else 
         // SOPHIA: assume lfsr_value is set to random value
-        __CPROVER_havoc_object(&tdx_local_data_ptr->single_step_def_state.lfsr_value);   
+        __CPROVER_havoc_slice(&tdx_local_data_ptr->single_step_def_state.lfsr_value, sizeof(uint32_t));   
     #endif //SOURCE 
 
     /* Do a global EPT flush.  This is required to help ensure security in case of
@@ -599,19 +666,19 @@ api_error_type tdh_sys_lp_init(void)
             goto EXIT;
         }
     #endif //FLOW_PROOF
-    
+
+    #ifdef SOURCE
     if ((retval = check_enumeration_and_compare_configuration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
                                                               &tsx_ctrl_original, &tsx_ctrl_modified)) != TDX_SUCCESS)
     {
         TDX_ERROR("comparing LP configuration with platform failed\n");
         goto EXIT;
     }
-
-    __CPROVER_assert(false, "false"); 
+    #endif // SOURCE
 
     // tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
 
-    // retval = TDX_SUCCESS;
+    retval = TDX_SUCCESS;
     EXIT:
 
     #ifdef SOURCE

@@ -232,6 +232,8 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
 
     #ifdef SOURCE
     tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw = ia32_rdmsr(MTRR_CAP_MSR_ADDR);
+    #else 
+    tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw = msr_values_ptr_model.ia32_mtrrcap.raw;
     #endif // SOURCE
 
     #ifdef SOURCE
@@ -246,6 +248,15 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
         __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr != 0);
     #endif //MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr == 0)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr != 0, "ia32_mtrrcap is incorrect");
+            TDX_ERROR("SMRR not enabled\n");
+            return TDX_SMRR_NOT_SUPPORTED;
+        }
+    #endif //FLOW_PROOF
+
     #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock == 0)
     {
@@ -258,6 +269,14 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
         __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock != 0);
     #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock == 0)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.smrr_lock != 0, "mtrrcap.smhr_lock not enabled");
+            TDX_ERROR("SMRR Lock not enabled\n");
+            return TDX_SMRR_LOCK_NOT_SUPPORTED;
+        }
+    #endif // FLOW_PROOF
     #ifdef SOURCE
     tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw = ia32_rdmsr(SMRR_MASK_MSR_ADDR);
     tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw = ia32_rdmsr(SMRR_BASE_MSR_ADDR);
@@ -502,6 +521,7 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
 
         cpuid_config.leaf_subleaf = cpuid_lookup[i].leaf_subleaf;
 
+        #ifdef SOURCE
         if ((cpuid_config.leaf_subleaf.leaf <= last_base_leaf) ||
             ((cpuid_config.leaf_subleaf.leaf >= CPUID_FIRST_EXTENDED_LEAF) &&
              (cpuid_config.leaf_subleaf.leaf <= last_extended_leaf)))
@@ -516,6 +536,7 @@ _STATIC_INLINE_ api_error_type check_cpuid_configurations(tdx_module_global_t* g
             cpuid_config.values.low = 0;
             cpuid_config.values.high = 0;
         }
+        #endif // SOURCE
 
         if (!(((cpuid_config.values.low & cpuid_lookup[i].verify_mask.low)
                 == cpuid_lookup[i].verify_value.low)
@@ -1025,21 +1046,6 @@ _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_p
         }
     }
     #endif // SOURCE
-
-    #ifdef MODULAR_PROOF
-    if (msr_values_ptr->ia32_arch_capabilities.tsx_ctrl)
-    {
-        if (tsx_ctrl_original->tsx_cpuid_clear)
-        {
-            // TSX_CPUID_CLEAR forces CPUID(7,0).EBX bits 4 and 11 to 0.
-            // In order to get their real values, clear this bit.
-            // It will be restored later, after we sample CPUID.
-            tsx_ctrl_modified->raw = tsx_ctrl_original->raw;
-            tsx_ctrl_modified->tsx_cpuid_clear = 0;
-            *tsx_ctrl_modified_flag = true;
-        }
-    }
-    #endif // MODULAR_PROOF
 
     #ifdef SOURCE
     msr_values_ptr->ia32_misc_package_ctls.raw = ia32_rdmsr(IA32_MISC_PACKAGE_CTLS_MSR_ADDR);

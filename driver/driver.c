@@ -115,14 +115,17 @@ void driver_main() {
     #ifdef BOOTUP_SETUP
     __CPROVER_havoc_object(&sysinfo); 
     __CPROVER_havoc_object(&global_data); 
+    __CPROVER_havoc_object(&local_data); 
     __CPROVER_havoc_object(&msr_values_ptr_model); 
     __CPROVER_assume(check_native_ia32_arch_capabilities(msr_values_ptr_model.ia32_arch_capabilities));
     __CPROVER_assume(msr_values_ptr_model.ia32_misc_package_ctls.energy_filtering_enable);
     __CPROVER_assume((msr_values_ptr_model.ia32_perf_capabilities.freeze_while_smm_supported == 1) &&
                      (msr_values_ptr_model.ia32_perf_capabilities.full_write == 1));
+    __CPROVER_assume(msr_values_ptr_model.ia32_mtrrcap.smrr != 0);
+    __CPROVER_assume(msr_values_ptr_model.ia32_mtrrcap.smrr_lock != 0);
+
     __CPROVER_assume(sysinfo.num_handoff_pages >= TDX_MIN_HANDOFF_PAGES); 
 
-    //__CPROVER_havoc_object(&global_data); 
     __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_PENDING); 
     __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE); 
 
@@ -131,6 +134,7 @@ void driver_main() {
     __CPROVER_assume((sysinfo.min_update_hv == 0)); 
     __CPROVER_assume((sysinfo.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES);
 
+    __CPROVER_assume(!local_data.lp_is_init);
     // MSR Stuff
     platform_common_config_t msr_values_ptr = global_data.plt_common_config;
     __CPROVER_assume(msr_values_ptr.ia32_vmx_basic.vmcs_region_size <= TD_VMCS_SIZE);
@@ -147,14 +151,28 @@ void driver_main() {
     #endif //BOOTUP_SETUP
 
     #ifdef SYS_LP_INIT_SETUP
-    __CPROVER_havoc_object(&global_data.global_state.sys_state); 
-    __CPROVER_havoc_object(&local_data.lp_is_init); 
-    __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
-    __CPROVER_assume(!local_data.lp_is_init); 
-
+    __CPROVER_havoc_object(&sysinfo); 
+    __CPROVER_havoc_object(&global_data); 
+    __CPROVER_havoc_object(&local_data); 
+    __CPROVER_havoc_object(&msr_values_ptr_model); 
     __CPROVER_havoc_object(&seamop_cap_model); 
-    #endif //SYS_LP_INIT_SETUP
 
+    // correct initiliazation state
+    __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
+    __CPROVER_assume(!local_data.lp_is_init);
+
+    // make sure that we do not ruin through shifting
+    __CPROVER_assume(global_data.x2apic_core_id_shift_count < 32);
+    __CPROVER_assume(global_data.x2apic_pkg_id_shift_count< 32);
+
+    // MSRs are correct 
+    __CPROVER_assume(global_data.plt_common_config.ia32_core_capabilities.raw == msr_values_ptr_model.ia32_core_capabilities.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_arch_capabilities.raw == msr_values_ptr_model.ia32_arch_capabilities.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_misc_package_ctls.raw == msr_values_ptr_model.ia32_misc_package_ctls.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust);
+    __CPROVER_assume(global_data.seam_capabilities.raw == seamop_cap_model.raw); 
+    #endif //SYS_LP_INIT_SETUP
 
     uint16_t index = 0; 
     #ifdef SETUP
