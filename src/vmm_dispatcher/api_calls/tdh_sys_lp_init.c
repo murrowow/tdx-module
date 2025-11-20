@@ -120,7 +120,11 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
 {
     #ifdef SOURCE
     ia32_mtrrcap_t local_mtrr_cap = {.raw = ia32_rdmsr(MTRR_CAP_MSR_ADDR)};
+    #else 
+    ia32_mtrrcap_t local_mtrr_cap = msr_values_ptr_model.ia32_mtrrcap;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (local_mtrr_cap.raw != tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw)
     {
         TDX_ERROR("local MTRRCAP MSR mismatch with platform\n");
@@ -129,9 +133,19 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
     #endif //SOURCE
 
     #ifdef MODULAR_PROOF
-    
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw == msr_values_ptr_model.ia32_mtrrcap.raw); 
     #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+
+    if (local_mtrr_cap.raw != tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw)
+    {
+        __CPROVER_assert(msr_values_ptr_model.ia32_mtrrcap.raw == tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw);
+        TDX_ERROR("local MTRRCAP MSR mismatch with platform\n");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, MTRR_CAP_MSR_ADDR);
+    }
+
+    #endif // FLOW_PROOF
     smrr_mask_t tmp_smrr_mask;
     smrr_base_t tmp_smrr_base;
 
@@ -139,6 +153,9 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
     #if SOURCE
     tmp_smrr_mask.raw = ia32_rdmsr(SMRR_MASK_MSR_ADDR);
     tmp_smrr_base.raw = ia32_rdmsr(SMRR_BASE_MSR_ADDR);
+    #else 
+    tmp_smrr_mask.raw = msr_values_ptr_model.smrr[0].smrr_mask.raw;
+    tmp_smrr_base.raw = msr_values_ptr_model.smrr[0].smrr_base.raw;
     #endif // SOURCE
 
     #ifdef SOURCE
@@ -148,12 +165,36 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
     }
     #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw == tmp_smrr_base.raw);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw != tmp_smrr_base.raw)
+        {   
+             __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw == tmp_smrr_base.raw, "smrr_base does not match SMRR_BASE_MSR");
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR_BASE_MSR_ADDR);
+        }
+    #endif // FLOW_PROOF
+
     #ifdef SOURCE
     if (tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw != tmp_smrr_mask.raw)
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR_MASK_MSR_ADDR);
     }
     #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw == tmp_smrr_mask.raw);
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw != tmp_smrr_mask.raw)
+        {
+             __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw == tmp_smrr_mask.raw, "smrr_mask does not match SMRR_MASK_MSR");
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR_MASK_MSR_ADDR);
+        }
+    #endif //FLOW_PROOF
 
     #ifdef SOURCE
     if (get_sysinfo_table()->mcheck_fields.smrr2_not_supported == 0 && local_mtrr_cap.smrr2 != 0)
@@ -173,6 +214,31 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
 
     }
     #endif // SOURCE
+
+    #if MODULAR_PROOF
+        __CPROVER_assume(sysinfo.mcheck_fields.smrr2_not_supported != 0 || local_mtrr_cap.smrr2 == 0); 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if (sysinfo.mcheck_fields.smrr2_not_supported == 0 && local_mtrr_cap.smrr2 != 0)
+    {
+        tmp_smrr_mask.raw = msr_values_ptr_model.smrr[0].smrr_mask.raw;
+        tmp_smrr_base.raw = msr_values_ptr_model.smrr[0].smrr_base.raw;
+
+
+        if (tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw != tmp_smrr_base.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw == tmp_smrr_base.raw, "smrr[1].smrr_base.raw wrong")
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR2_BASE_MSR_ADDR);
+        }
+        if (tdx_global_data_ptr->plt_common_config.smrr[1].smrr_mask.raw != tmp_smrr_mask.raw)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_mask.raw == tmp_smrr_mask.raw, "smrr[1].smrr_mask.raw wrong")
+            return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR2_MASK_MSR_ADDR);
+        }
+
+    }
+    #endif // FLOW_PROOF
 
     return TDX_SUCCESS;
 }
@@ -467,11 +533,11 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
         return err;
     }
 
-    // if ((err = compare_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
-
+    if ((err = compare_vmx_msrs(tdx_global_data_ptr)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    __CPROVER_assert(false, "false");
     // /*---------------------------------------------------
     //     Check Performance Monitoring
     //   ---------------------------------------------------*/
@@ -667,14 +733,12 @@ api_error_type tdh_sys_lp_init(void)
         }
     #endif //FLOW_PROOF
 
-    #ifdef SOURCE
     if ((retval = check_enumeration_and_compare_configuration(tdx_global_data_ptr, &tsx_ctrl_modified_flag,
                                                               &tsx_ctrl_original, &tsx_ctrl_modified)) != TDX_SUCCESS)
     {
         TDX_ERROR("comparing LP configuration with platform failed\n");
         goto EXIT;
     }
-    #endif // SOURCE
 
     // tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
 

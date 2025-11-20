@@ -282,11 +282,12 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
     tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw = ia32_rdmsr(SMRR_BASE_MSR_ADDR);
 
     sysinfo_table_t * sysinfo_table_ptr = get_sysinfo_table();
-    #endif // SOURCE
-
-    #ifdef MODULAR_PROOF
+    #else 
+        tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw = msr_values_ptr_model.smrr[0].smrr_mask.raw;
+        tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw = msr_values_ptr_model.smrr[0].smrr_base.raw;
+        
         sysinfo_table_t * sysinfo_table_ptr = &sysinfo;
-    #endif //MODULAR_PROOF
+    #endif // SOURCE
 
     #ifdef SOURCE
     // Determine whether SMRR2 is supported
