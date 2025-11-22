@@ -322,6 +322,7 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
         pl_verify_same_mask.values.high = (tdx_global_data_ptr->cpuid_values[i].values.high &
                 cpuid_lookup[i].verify_same.high);
 
+        #ifdef SOURCE
         if (tmp_verify_same_mask.values.low != pl_verify_same_mask.values.low ||
             tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high)
         {
@@ -331,6 +332,24 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
 
             return TDX_INCONSISTENT_CPUID_FIELD;
         }
+        #endif //SOURCE
+
+        #ifdef MODULAR_PROOF
+        __CPROVER_assume((tmp_verify_same_mask.values.low == pl_verify_same_mask.values.low) &&
+                         (tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high));
+        #endif //MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if (tmp_verify_same_mask.values.low != pl_verify_same_mask.values.low ||
+                tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high)
+            {
+            tdx_local_data_ptr->vmm_regs.rcx = tmp_cpuid_config.leaf_subleaf.raw;
+            tdx_local_data_ptr->vmm_regs.rdx = cpuid_lookup[i].verify_same.low;
+            tdx_local_data_ptr->vmm_regs.r8 = cpuid_lookup[i].verify_same.high;
+
+            return TDX_INCONSISTENT_CPUID_FIELD;
+            }
+        #endif // FLOW_PROOF
 
         /*------------------------------------------------------
            Special Handling of Selected CPUID Leaves/Sub-Leaves
@@ -346,11 +365,25 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
             tdx_local_data_ptr->lp_info.pkg  =
                     (tmp_cpuid_config.values.edx >> tdx_global_data_ptr->x2apic_pkg_id_shift_count);
 
+            #ifdef SOURCE
             // Sanity check
             if (tdx_local_data_ptr->lp_info.pkg >= MAX_PKGS)
             {
                 return api_error_with_operand_id(TDX_INVALID_PKG_ID, tdx_local_data_ptr->lp_info.pkg);
             }
+            #endif // SOURCE
+
+            #ifdef MODULAR_PROOF
+                __CPROVER_assume(tdx_local_data_ptr->lp_info.pkg < MAX_PKGS); 
+            #endif // MODULAR_PROOF
+
+            #ifdef FLOW_PROOF
+                if (tdx_local_data_ptr->lp_info.pkg >= MAX_PKGS)
+                {
+                    __CPROVER_assert(tdx_local_data_ptr->lp_info.pkg < MAX_PKGS, "too many packages in lp_info"); 
+                    return api_error_with_operand_id(TDX_INVALID_PKG_ID, tdx_local_data_ptr->lp_info.pkg);
+                }
+            #endif // FLOW_PROOF
         }
 
     }
@@ -382,6 +415,7 @@ _STATIC_INLINE_ api_error_type compare_vmx_msrs(tdx_module_global_t* tdx_global_
     platform_common_config_t* pl_msr_values_ptr = &tdx_global_data_ptr->plt_common_config;
     uint64_t tmp_msr;
 
+    #ifdef SOURCE
     tmp_msr = ia32_rdmsr(IA32_VMX_BASIC_MSR_ADDR);
     if (pl_msr_values_ptr->ia32_vmx_basic.raw != tmp_msr)
     {
@@ -456,6 +490,113 @@ _STATIC_INLINE_ api_error_type compare_vmx_msrs(tdx_module_global_t* tdx_global_
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR4_FIXED1_MSR_ADDR);
     }
+    #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_basic.raw == msr_values_ptr_model.ia32_vmx_basic.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_pinbased_ctls.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_true_procbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_procbased_ctls2.raw== msr_values_ptr_model.ia32_vmx_procbased_ctls2.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_procbased_ctls3.raw == msr_values_ptr_model.ia32_vmx_procbased_ctls3.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_true_exit_ctls.raw== msr_values_ptr_model.ia32_vmx_true_exit_ctls.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_true_entry_ctls.raw == msr_values_ptr_model.ia32_vmx_true_entry_ctls.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_misc.raw == msr_values_ptr_model.ia32_vmx_misc.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_ept_vpid_cap == msr_values_ptr_model.ia32_vmx_ept_vpid_cap); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_cr0_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed0.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_cr4_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw); 
+    __CPROVER_assume(pl_msr_values_ptr->ia32_vmx_cr4_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed1.raw); 
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    tmp_msr = msr_values_ptr_model.ia32_vmx_basic.raw;
+    if (pl_msr_values_ptr->ia32_vmx_basic.raw != tmp_msr)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_basic.raw == msr_values_ptr_model.ia32_vmx_basic.raw, "ia32_vmx_basic is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_BASIC_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_true_pinbased_ctls.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_pinbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_pinbased_ctls.raw, "ia32_vmx_true_pinbased_ctls is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
+    }
+
+    tmp_msr = imsr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_procbased_ctls.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_procbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw, "ia32_vmx_true_procbased_ctls is wrong");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_PROCBASED_CTLS_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_procbased_ctls2.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_procbased_ctls2.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_procbased_ctls2.raw== msr_values_ptr_model.ia32_vmx_procbased_ctls2.raw, "ia32_vmx_procbased_ctls2 is wrong");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_PROCBASED_CTLS2_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_procbased_ctls3.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_procbased_ctls3.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_procbased_ctls3.raw == msr_values_ptr_model.ia32_vmx_procbased_ctls3.raw, "ia32_vmx_procbased_ctls3 is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_PROCBASED_CTLS3_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_true_exit_ctls.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_exit_ctls.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_exit_ctls.raw == msr_values_ptr_model.ia32_vmx_true_exit_ctls.raw, "ia32_vmx_true_exit_ctls is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_EXIT_CTLS_MSR_ADDR);
+    }
+
+    tmp_msr = imsr_values_ptr_model.ia32_vmx_true_entry_ctls.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_entry_ctls.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_entry_ctls.raw == msr_values_ptr_model.ia32_vmx_true_entry_ctls.raw, "ia32_vmx_true_entry_ctls is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_ENTRY_CTLS_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_misc.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_misc.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_misc.raw == msr_values_ptr_model.ia32_vmx_misc.raw, "ia32_vmx_misc is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_MISC_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_ept_vpid_cap;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_ept_vpid_cap)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_ept_vpid_cap == msr_values_ptr_model.ia32_vmx_ept_vpid_cap, "ia32_vmx_ept_vpid_cap is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_EPT_VPID_CAP_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_vmx_cr0_fixed0.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_cr0_fixed0.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr0_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed0.raw, "ia32_vmx_cr0_fixed0 is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR0_FIXED0_MSR_ADDR);
+    }
+    tmp_msr = msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw), "ia32_vmx_cr0_fixed1 is wrong"; 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR0_FIXED1_MSR_ADDR);
+    }
+    tmp_msr = msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_cr4_fixed0.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr4_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw, "ia32_vmx_cr4_fixed0 is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR4_FIXED0_MSR_ADDR);
+    }
+    tmp_msr = msr_values_ptr_model.ia32_vmx_cr4_fixed1.raw;
+    if (tmp_msr != pl_msr_values_ptr->ia32_vmx_cr4_fixed1.raw)
+    {
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr4_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed1.raw, "ia32_vmx_cr4_fixed1 is wrong"); 
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR4_FIXED1_MSR_ADDR);
+    }
+    #endif //FLOW_PROOF
 
     return TDX_SUCCESS;
 }
@@ -465,6 +606,7 @@ _STATIC_INLINE_ api_error_type compare_key_management_config(tdx_module_global_t
 
     uint64_t tmp_msr;
 
+    #ifdef SOURCE
     tmp_msr = ia32_rdmsr(IA32_TME_CAPABILITY_MSR_ADDR);
     if (tmp_msr != tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw)
     {
@@ -497,6 +639,54 @@ _STATIC_INLINE_ api_error_type compare_key_management_config(tdx_module_global_t
     {
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_WBNOINVDP_MSR_ADDR);
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(msr_values_ptr_model.ia32_tme_capability.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw);
+    __CPROVER_assume(msr_values_ptr_model.ia32_tme_activate.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_activate.raw);
+    __CPROVER_assume(msr_values_ptr_model.ia32_tme_keyid_partitioning.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_keyid_partitioning.raw);
+
+    /* Check consistency of number of cache sub-blocks for TDWBINVD.
+       Implementation may choose to do these checks once per package.
+    */
+    // SOPHIA: we abstract together IA32_WBINVDP_MSR_ADDR and IA32_WBNOINVDP_MSR_ADDR
+    __CPROVER_assume(num_cached_sub_blocks_model == tdx_global_data_ptr->num_of_cached_sub_blocks);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    tmp_msr = msr_values_ptr_model.ia32_tme_capability_t.raw;
+    if (tmp_msr != tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw)
+    {
+        __CPROVER_assert(msr_values_ptr_model.ia32_tme_capability_t.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw, "ia32_tme_capability.raw doesn't match");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TME_CAPABILITY_MSR_ADDR);
+    };
+
+    tmp_msr = msr_values_ptr_model.ia32_tme_activate.raw;
+    if (tmp_msr != tdx_global_data_ptr->plt_common_config.ia32_tme_activate.raw)
+    {
+        __CPROVER_assert(msr_values_ptr_model.ia32_tme_activate.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_activate.raw, "ia32_tme_activate.raw doesn't match");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TME_ACTIVATE_MSR_ADDR);
+    }
+
+    tmp_msr = msr_values_ptr_model.ia32_tme_keyid_partitioning.raw;
+    if (tmp_msr != tdx_global_data_ptr->plt_common_config.ia32_tme_keyid_partitioning.raw)
+    {
+        __CPROVER_assert(msr_values_ptr_model.ia32_tme_keyid_partitioning.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_keyid_partitioning.raw, "ia32_tme_keyid_partitioning.raw doesn't match");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_MKTME_KEYID_PARTITIONING_MSR_ADDR);
+    }
+
+    /* Check consistency of number of cache sub-blocks for TDWBINVD.
+       Implementation may choose to do these checks once per package.
+    */
+    // SOPHIA: join these into one
+    tmp_msr = num_cached_sub_blocks_model;
+    if (tmp_msr != tdx_global_data_ptr->num_of_cached_sub_blocks)
+    {
+        __CPROVER_assert(num_cached_sub_blocks_model == tdx_global_data_ptr->num_of_cached_sub_blocks, "num cached sub blocks doesn't match");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_WBINVDP_MSR_ADDR);
+    }
+
+    #endif // FLOW_PROOF
 
     return TDX_SUCCESS;
 }
@@ -537,21 +727,39 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
     {
         return err;
     }
-    __CPROVER_assert(false, "false");
-    // /*---------------------------------------------------
-    //     Check Performance Monitoring
-    //   ---------------------------------------------------*/
-    // if (ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR) !=
-    //         tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
-    // {
-    //     return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
-    // }
 
-    // if ((err = compare_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
+    /*---------------------------------------------------
+        Check Performance Monitoring
+      ---------------------------------------------------*/
+    #ifdef SOURCE
+    if (ia32_rdmsr(IA32_PERF_CAPABILITIES_MSR_ADDR) !=
+            tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
+    {
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
+    }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(msr_values_ptr_model.ia32_perf_capabilities.raw != 
+                         tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if (msr_values_ptr_model.ia32_perf_capabilities.raw !=
+            tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
+    {
+        __CPROVER_assert(msr_values_ptr_model.ia32_perf_capabilities.raw != 
+                         tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw, "ia32_perf_capabilities is wrong");
+        return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
+    }
+    #endif //FLOW_PROOF
+
+    #ifdef SOURCE
+    if ((err = compare_key_management_config(tdx_global_data_ptr)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    #endif // SOURCE
     return TDX_SUCCESS;
 }
 
@@ -564,7 +772,11 @@ _STATIC_INLINE_ void tdx_local_init(tdx_module_local_t* tdx_local_data_ptr,
         tdx_module_global_t* tdx_global_data_ptr)
 {
 
+    #ifdef SOURCE
     sysinfo_table_t* sysinfo_table = get_sysinfo_table();
+    #else 
+    sysinfo_table_t* sysinfo_table = &sysinfo;
+    #endif // SOURCE
 
     //Set local defs
     init_keyhole_state();
@@ -740,7 +952,7 @@ api_error_type tdh_sys_lp_init(void)
         goto EXIT;
     }
 
-    // tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
+    //tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
 
     retval = TDX_SUCCESS;
     EXIT:

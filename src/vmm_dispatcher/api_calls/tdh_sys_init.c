@@ -285,7 +285,7 @@ _STATIC_INLINE_ api_error_type check_and_store_smrr_smrr2(tdx_module_global_t* t
     #else 
         tdx_global_data_ptr->plt_common_config.smrr[0].smrr_mask.raw = msr_values_ptr_model.smrr[0].smrr_mask.raw;
         tdx_global_data_ptr->plt_common_config.smrr[0].smrr_base.raw = msr_values_ptr_model.smrr[0].smrr_base.raw;
-        
+
         sysinfo_table_t * sysinfo_table_ptr = &sysinfo;
     #endif // SOURCE
 
@@ -437,13 +437,28 @@ _STATIC_INLINE_ api_error_type check_key_management_config(tdx_module_global_t* 
     */
     // INIT number of cached blocks for WBINVD cycle
     tdx_global_data_ptr->num_of_cached_sub_blocks = ia32_rdmsr(IA32_WBINVDP_MSR_ADDR);
+    #else 
+    tdx_global_data_ptr->num_of_cached_sub_blocks = num_cached_sub_blocks_model; 
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // WBNOINVDP should return the same value
     if (ia32_rdmsr(IA32_WBNOINVDP_MSR_ADDR) != tdx_global_data_ptr->num_of_cached_sub_blocks)
     {
         return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_WBNOINVDP_MSR_ADDR);
     }
     #endif //SOURCE
+
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(tdx_global_data_ptr->num_of_cached_sub_blocks == num_cached_sub_blocks_model);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if (num_cached_sub_blocks_model != tdx_global_data_ptr->num_of_cached_sub_blocks)
+    {
+        return api_error_with_operand_id(TDX_INCORRECT_MSR_VALUE, IA32_WBNOINVDP_MSR_ADDR);
+    }
+    #endif // FLOW_PROOF
     return TDX_SUCCESS;
 }
 

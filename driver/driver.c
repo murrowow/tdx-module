@@ -3,6 +3,7 @@
 #include "stdlib.h"
 
 #include "../src/common/helpers/virt_msr_helpers.h"
+#include "../include/auto_gen/cpuid_configurations.h"
 
 #ifdef SOURCE
 #else 
@@ -172,6 +173,43 @@ void driver_main() {
     __CPROVER_assume(global_data.plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw); 
     __CPROVER_assume(global_data.plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust);
     __CPROVER_assume(global_data.seam_capabilities.raw == seamop_cap_model.raw); 
+
+    // SOPHIA TODO: FIX THIS 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_basic.raw == msr_values_ptr_model.ia32_vmx_basic.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_pinbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_pinbased_ctls.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_procbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_procbased_ctls2.raw== msr_values_ptr_model.ia32_vmx_procbased_ctls2.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_procbased_ctls3.raw == msr_values_ptr_model.ia32_vmx_procbased_ctls3.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_exit_ctls.raw== msr_values_ptr_model.ia32_vmx_true_exit_ctls.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_entry_ctls.raw == msr_values_ptr_model.ia32_vmx_true_entry_ctls.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_misc.raw == msr_values_ptr_model.ia32_vmx_misc.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_ept_vpid_cap == msr_values_ptr_model.ia32_vmx_ept_vpid_cap); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr0_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed0.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr4_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr4_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed1.raw); 
+
+    __CPROVER_havoc_object(&num_cached_sub_blocks_model); 
+
+    cpuid_config_t tmp_cpuid_config;
+    cpuid_config_t tmp_verify_same_mask;
+    cpuid_config_t pl_verify_same_mask;
+    for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++) {
+    tmp_cpuid_config.leaf_subleaf = cpuid_lookup[i].leaf_subleaf;
+
+    tmp_verify_same_mask.values.low = (tmp_cpuid_config.values.low & cpuid_lookup[i].verify_same.low);
+    tmp_verify_same_mask.values.high = (tmp_cpuid_config.values.high & cpuid_lookup[i].verify_same.high);
+
+    pl_verify_same_mask.values.low = (global_data.cpuid_values[i].values.low &
+                cpuid_lookup[i].verify_same.low);
+    pl_verify_same_mask.values.high = (global_data.cpuid_values[i].values.high &
+                cpuid_lookup[i].verify_same.high);
+
+    __CPROVER_assume(global_data.cpuid_values[i].values.low & cpuid_lookup[i].verify_same.low 
+                     == tmp_cpuid_config.values.low & cpuid_lookup[i].verify_same.low);
+    __CPROVER_assume(global_data.cpuid_values[i].values.high & cpuid_lookup[i].verify_same.high
+                     == tmp_cpuid_config.values.high & cpuid_lookup[i].verify_same.high);
+    }
     #endif //SYS_LP_INIT_SETUP
 
     uint16_t index = 0; 
