@@ -787,10 +787,14 @@ _STATIC_INLINE_ void tdx_local_init(tdx_module_local_t* tdx_local_data_ptr,
     tdx_local_data_ptr->lp_info.lp_id = (uint32_t)get_current_thread_num(sysinfo_table, tdx_local_data_ptr);
 
     uint64_t last_page_addr = sysinfo_table->data_rgn_base + sysinfo_table->data_rgn_size - _4KB;
+    #ifdef SOURCE
     ia32_vmwrite(VMX_HOST_FS_BASE_ENCODE, last_page_addr);
+    #endif // SOURCE
 
     tdx_local_data_ptr->vp_ctx.active_vmcs = ACTIVE_VMCS_NONE;
 
+    // SOPHIA: these registers don't seem to be needed at the moment
+    #ifdef SOURCE
     // Read the LP-dependant host state from the VMCS and store it locally
     uint64_t val;
     ia32_vmread(VMX_HOST_RSP_ENCODE, &val);
@@ -801,11 +805,23 @@ _STATIC_INLINE_ void tdx_local_init(tdx_module_local_t* tdx_local_data_ptr,
 
     ia32_vmread(VMX_HOST_GS_BASE_ENCODE, &val);
     tdx_local_data_ptr->host_gs_base = val;
+    #endif // SOURCE
 
     tdx_local_data_ptr->lp_is_init = true;
 
+    #ifdef SOURCE
     // Mark the current LP as initialized
     increment_num_of_lps(tdx_global_data_ptr);
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+    tdx_global_data_ptr->num_of_init_lps += 1;
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    __CPROVER_assume(tdx_global_data_ptr->num_of_init_lps == tdx_global_data_ptr->num_of_init_lps + 1); 
+    #endif // FLOW_PROOF
+
 }
 
 api_error_type tdh_sys_lp_init(void)
@@ -846,8 +862,8 @@ api_error_type tdh_sys_lp_init(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
         if (&tdx_global_data_ptr->global_lock == SHAREX_FULL_COUNTER_NO_WRITER) {
+            __CPROVER_assert(&tdx_global_data_ptr->global_lock != SHAREX_FULL_COUNTER_NO_WRITER, "global lock is not busy");
             retval = TDX_SYS_BUSY; 
             goto EXIT; 
         }
@@ -952,7 +968,7 @@ api_error_type tdh_sys_lp_init(void)
         goto EXIT;
     }
 
-    //tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
+    tdx_local_init(tdx_local_data_ptr, tdx_global_data_ptr);
 
     retval = TDX_SUCCESS;
     EXIT:
@@ -970,6 +986,54 @@ api_error_type tdh_sys_lp_init(void)
     }
     #endif //SOURCE 
 
+    // SOPHIA: ensure that all keyholes have been initialized correctly
+    #ifdef MODULAR_PROOF
+        for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
+        {
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE, "keyhole state is correct"); 
+            if (i != 0) {
+                __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].lru_prev == i - 1, "keyhole lru prev is correct");
+            }
+            if (i != MAX_CACHEABLE_KEYHOLES-1) {
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].lru_next == i + 1, "keyhole lru next is correct");
+            }
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX, "keyhole hashlist next is correct");
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].mapped_pa == 0, "keyhole mapped pa is correct");
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].is_writable == 0, "keyhole is writeable set to 0");
+            __CPROVER_assert(local_data.keyhole_state.keyhole_array[i].ref_count == 0, "keyhole ref count set correctly");
+            __CPROVER_assert(local_data.keyhole_state.hash_table[i] == (uint16_t)UNDEFINED_IDX, "keyhole hash table zeroed out");
+        }
+
+        __CPROVER_assert(local_data.keyhole_state.keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX, "keyhole[0] lru prev correct");
+        __CPROVER_assert(local_data.keyhole_state.keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX, "keyhole[last] lru next correct");
+        __CPROVER_assert(local_data.keyhole_state.lru_head == MAX_CACHEABLE_KEYHOLES - 1, "lru head max cacheanle keyholes is correct");
+        __CPROVER_assert(local_data.keyhole_state.lru_tail == 0, "keyhole lru tail is 0");
+        __CPROVER_assert(local_data.keyhole_state.total_ref_count == 0, "keyhole total ref count is 0");
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
+        {
+            __CPROVER_assume(keyhole_state->keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE); 
+            if (i != 0) {
+            __CPROVER_assume(keyhole_state->keyhole_array[i].lru_prev == i - 1);
+            }
+            if (i != MAX_CACHEABLE_KEYHOLES-1) {
+            __CPROVER_assume(keyhole_state->keyhole_array[i].lru_next == i + 1);
+            }
+            __CPROVER_assume(keyhole_state->keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX);
+            __CPROVER_assume(keyhole_state->keyhole_array[i].mapped_pa == 0);
+            __CPROVER_assume(keyhole_state->keyhole_array[i].is_writable == 0);
+            __CPROVER_assume(keyhole_state->keyhole_array[i].ref_count == 0);
+            __CPROVER_assume(keyhole_state->hash_table[i] = (uint16_t)UNDEFINED_IDX);
+        }
+
+        __CPROVER_assume(keyhole_state->keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX);
+        __CPROVER_assume(keyhole_state->keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX);
+        __CPROVER_assume(keyhole_state->lru_head == MAX_CACHEABLE_KEYHOLES - 1);
+        __CPROVER_assume(keyhole_state->lru_tail == 0);
+        __CPROVER_assume(keyhole_state->total_ref_count == 0);
+    #endif //FLOW_PROOF
     return retval;
 }
 

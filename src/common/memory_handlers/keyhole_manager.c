@@ -32,6 +32,8 @@
 #include "src/common/accessors/ia32_accessors.h"
 #include "src/common/accessors/data_accessors.h"
 
+#include "driver/driver.h"
+
 _STATIC_INLINE_ uint64_t la_from_keyhole_idx(uint16_t keyhole_idx)
 {
     // The keyhole mechanism allows LP with LPID = i to map at most M = 128 physical pages.
@@ -231,11 +233,17 @@ static void lru_cache_add_head_entry(uint16_t keyhole_idx)
 
 void init_keyhole_state(void)
 {
+    #ifdef SOURCE
     keyhole_state_t* keyhole_state = &get_local_data()->keyhole_state;
+    #else 
+    keyhole_state_t* keyhole_state = &(local_data.keyhole_state);
+    #endif // SOURCE
     // At init state - free keyhole entries will be linked in the LRU list
     // So that as long as there are any free entries left, they will be used before
     // cached entries will be reused.
 
+    #ifdef FLOW_PROOF
+    #else 
     for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
     {
         keyhole_state->keyhole_array[i].state = (uint8_t)KH_ENTRY_FREE;
@@ -248,7 +256,10 @@ void init_keyhole_state(void)
 
         keyhole_state->hash_table[i] = (uint16_t)UNDEFINED_IDX;
     }
+    #endif // FLOW_PROOF
 
+    #ifdef FLOW_PROOF
+    #else 
     keyhole_state->keyhole_array[0].lru_prev = (uint16_t)UNDEFINED_IDX;
     keyhole_state->keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next = (uint16_t)UNDEFINED_IDX;
 
@@ -256,6 +267,7 @@ void init_keyhole_state(void)
     keyhole_state->lru_tail = 0;
 
     keyhole_state->total_ref_count = 0;
+    #endif // FLOW_PROOF
 }
 
 static void* map_pa_with_memtype(void* pa, mapping_type_t mapping_type, bool_t is_wb_memtype)
