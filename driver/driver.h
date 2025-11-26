@@ -100,6 +100,7 @@ struct hardware_states
    uint8_t tdcx_mem;
    bool_t tdcx_lock;
 
+   tdmr_entry_t tdmr_table; 
    td_params_t td_params_table;
 
 //    pamt_entry_t tdvpr_pamt_entry;

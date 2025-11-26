@@ -244,6 +244,14 @@ void driver_main() {
         __CPROVER_havoc_object(&local_data); 
         __CPROVER_assume(local_data.lp_is_init);
     #endif // SYS_RD_SETUP
+
+    #ifdef SYS_CONFIG_SETUP
+        __CPROVER_havoc_object(&global_data);
+        
+        __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
+        __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
+    #endif // SYS_CONFIG_SETUP
+
     uint16_t index = 0; 
     #ifdef SETUP
         setup(); 

@@ -73,19 +73,22 @@ void TDX_bootup() {
                          (field_id.reserved_2 == 0) && (field_id.reserved_3 == 0) &&
                          (field_id.last_element_in_field == 0) && (field_id.last_field_in_sequence == 0));
     __CPROVER_havoc_object(&tdmr_info_array_pa);
+    __CPROVER_assume(is_addr_aligned_pwr_of_2(tdmr_info_array_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT));
     __CPROVER_havoc_object(&num_of_tdmr_entries);
+    __CPROVER_assume(num_of_tdmr_entries == 1); 
     __CPROVER_havoc_object(&global_private_hkid);
+    __CPROVER_assume((global_private_hkid.hkid >= global_data.private_hkid_min) && 
+                     (global_private_hkid.hkid <= global_data.private_hkid_max));
 
     api_error_type error = UNINITIALIZE_ERROR;
-    error = tdh_sys_init(); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    error = tdh_sys_lp_init(); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_sys_rd(field_id); 
-    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
-    __CPROVER_assert(false, "false"); 
-    // error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    // error = tdh_sys_init(); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_sys_lp_init(); 
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_sys_rd(field_id); 
+    // __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // error = tdh_sys_key_config();
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // error code coverage, find a sequence that goes through every one 

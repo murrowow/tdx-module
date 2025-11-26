@@ -25,19 +25,20 @@
  * @brief TDHSYSCONFIG API handler
  */
 
-#include "tdx_api_defs.h"
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
-#include "tdx_vmm_api_handlers.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "data_structures/tdx_global_data.h"
-#include "memory_handlers/pamt_manager.h"
-#include "data_structures/loader_data.h"
-#include "accessors/data_accessors.h"
-#include "helpers/helpers.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "auto_gen/cpuid_configurations.h"
+#include "include/tdx_api_defs.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/data_structures/loader_data.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "include/auto_gen/cpuid_configurations.h"
 
+#include "driver/driver.h"
 typedef struct pamt_data_s
 {
     uint64_t pamt_1g_base; /**< Base address of the PAMT_1G range associated with the above TDMR (HKID bits must be 0). 4K aligned. */
@@ -675,57 +676,72 @@ static api_error_type check_and_set_tdmrs(tdmr_info_entry_t tdmr_info_copy[MAX_T
     uint64_t prev_tdmr_base, prev_tdmr_size;
 
     // Check for integer overflow
+    #ifdef SOURCE
     if (!is_valid_integer_range(tdmr_info_copy[i].tdmr_base, tdmr_info_copy[i].tdmr_size))
     {
         TDX_ERROR("TDMR[%d]: base+size cues integer overflow\n", i);
         return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
     }
+    #endif // SOURCE
 
-    if (i > 0)
-    {
-        prev_tdmr_base = tdmr_info_copy[i-1].tdmr_base;
-        prev_tdmr_size = tdmr_info_copy[i-1].tdmr_size;
-    }
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(is_valid_integer_range(tdmr_info_copy[i].tdmr_base, tdmr_info_copy[i].tdmr_size)); 
+    #endif // MODULAR_PROOF
 
-    // TDMRs must be sorted in an ascending base address order.
-    if ((i > 0) && tdmr_base < prev_tdmr_base)
+    #ifdef FLOW_PROOF
+    if (!is_valid_integer_range(tdmr_info_copy[i].tdmr_base, tdmr_info_copy[i].tdmr_size))
     {
-        TDX_ERROR("TDMR_BASE[%d]=0x%llx is smaller than TDMR_BASE[%d]=0x%llx\n",
-                i, tdmr_info_copy[i].tdmr_base, i-1, tdmr_info_copy[i-1].tdmr_base);
-        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+        __CPROVER_assert(is_valid_integer_range(tdmr_info_copy[i].tdmr_base, tdmr_info_copy[i].tdmr_size), "TMDR base+size cues integer overflow"); 
+        TDX_ERROR("TDMR[%d]: base+size cues integer overflow\n", i);
+        return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
     }
+    #endif // FLOW_PROOF
 
-    // TDMRs must not overlap with other TDMRs.
-    // Check will be correct due to previous (ascension) check correctness.
-    if ((i > 0) && (tdmr_base < prev_tdmr_base + prev_tdmr_size))
-    {
-        TDX_ERROR("TDMR[%d]: (from 0x%llx to 0x%llx) overlaps TDMR[%d] at 0x%llx\n",
-                i-1, prev_tdmr_base, prev_tdmr_base + prev_tdmr_size, i, tdmr_base);
-        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
-    }
+    // if (i > 0)
+    // {
+    //     prev_tdmr_base = tdmr_info_copy[i-1].tdmr_base;
+    //     prev_tdmr_size = tdmr_info_copy[i-1].tdmr_size;
+    // }
 
-    api_error_type err;
-    if ((err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    {
-        return err;
-    }
+    // // TDMRs must be sorted in an ascending base address order.
+    // if ((i > 0) && tdmr_base < prev_tdmr_base)
+    // {
+    //     TDX_ERROR("TDMR_BASE[%d]=0x%llx is smaller than TDMR_BASE[%d]=0x%llx\n",
+    //             i, tdmr_info_copy[i].tdmr_base, i-1, tdmr_info_copy[i-1].tdmr_base);
+    //     return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    // }
 
-    if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    {
-        return err;
-    }
-    if ((err = check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array)) != TDX_SUCCESS)
-    {
-        return err;
-    }
+    // // TDMRs must not overlap with other TDMRs.
+    // // Check will be correct due to previous (ascension) check correctness.
+    // if ((i > 0) && (tdmr_base < prev_tdmr_base + prev_tdmr_size))
+    // {
+    //     TDX_ERROR("TDMR[%d]: (from 0x%llx to 0x%llx) overlaps TDMR[%d] at 0x%llx\n",
+    //             i-1, prev_tdmr_base, prev_tdmr_base + prev_tdmr_size, i, tdmr_base);
+    //     return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    // }
 
-    if ((err = check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    {
-        return err;
-    }
+    // api_error_type err;
+    // if ((err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
+
+    // if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
+    // if ((err = check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
+
+    // if ((err = check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    // {
+    //     return err;
+    // }
     // All checks passed for current TDMR, fill it in our module data:
 
-    set_tdmr_info_in_global_data(tdmr_info_copy, (uint32_t)i);
+    //set_tdmr_info_in_global_data(tdmr_info_copy, (uint32_t)i);
 
     return TDX_SUCCESS;
 
@@ -744,20 +760,38 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     uint64_t*            tdmr_pa_array = NULL; // Pointer to an array of physical addresses of the TDMR info structure
     uint16_t             hkid = global_private_hkid.hkid;
     bool_t               global_lock_acquired = false;
+    #ifdef SOURCE
     tdx_module_global_t* tdx_global_data_ptr = get_global_data();
+    #else 
+    tdx_module_global_t* tdx_global_data_ptr = &global_data;
+    #endif // SOURCE
 
     api_error_type       retval = TDX_SYS_BUSY;
 
-
+    #ifdef SOURCE
     if (acquire_sharex_lock_ex(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
     {
         TDX_ERROR("Failed to acquire global lock\n");
         retval = TDX_SYS_BUSY;
         goto EXIT;
     }
+    #endif // SOURCE
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE); 
+    #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        if (&tdx_global_data_ptr->global_lock.raw != SHAREX_FREE)
+        {
+            __CPROVER_assume(&tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "obtain lock for global data pointer"); 
+            TDX_ERROR("Failed to acquire global lock\n");
+            retval = TDX_SYS_BUSY;
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
     global_lock_acquired = true;
 
+    #ifdef SOURCE
     if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
     {
         TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
@@ -802,11 +836,86 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
         retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_R8);
         goto EXIT;
     }
+    #endif // SOURCE 
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
+        __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(tdmr_info_array_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT));
+        __CPROVER_assume(num_of_tdmr_entries <= MAX_TDMRS);
+        __CPROVER_assume(num_of_tdmr_entries >= 1);
+        __CPROVER_assume((global_private_hkid.reserved == 0));
+        __CPROVER_assume((hkid >= global_data.private_hkid_min) && 
+                        (hkid <= global_data.private_hkid_max));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdx_global_data_ptr->global_state.sys_state != SYSINIT_DONE)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->global_state.sys_state == SYSINIT_DONE, "wrong init state"); 
+            TDX_ERROR("Wrong sys_init state: %d\n", tdx_global_data_ptr->global_state.sys_state);
+            retval = TDX_SYS_CONFIG_NOT_PENDING;
+            goto EXIT;
+        }
+
+        if (tdx_global_data_ptr->num_of_init_lps < tdx_global_data_ptr->num_of_lps)
+        {
+            __CPROVER_assert(tdx_global_data_ptr->num_of_init_lps == tdx_global_data_ptr->num_of_lps, "num of initialized lps is smaller than total num of lps");
+            TDX_ERROR("Num of initialized lps %d is smaller than total num of lps %d\n",
+                        tdx_global_data_ptr->num_of_init_lps, tdx_global_data_ptr->num_of_lps);
+
+            retval = TDX_SYS_CONFIG_NOT_PENDING;
+            goto EXIT;
+        }
+
+        retval = shared_hpa_check_with_pwr_2_alignment(tdmr_info_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
+        if (retval != TDX_SUCCESS)
+        {
+            __CPROVER_assert(shared_hpa_check_with_pwr_2_alignment(tdmr_info_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR info array PA is not a valid shared HPA");
+            retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
+            TDX_ERROR("TDMR info array PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_info_pa.raw, retval);
+            goto EXIT;
+        }
+
+        if (num_of_tdmr_entries > MAX_TDMRS)
+        {
+            __CPROVER_assert(num_of_tdmr_entries <= MAX_TDMRS, "Num of TDMR entries bigger than MAX_TDMRS");
+            TDX_ERROR("Num of TDMR entries %llu bigger than MAX_TDMRS (%d)\n", num_of_tdmr_entries, MAX_TDMRS);
+            retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+
+        if (num_of_tdmr_entries < 1)
+        {
+            __CPROVER_assert(num_of_tdmr_entries >= 1, "Num of TDMR entries smaller than 1");
+            TDX_ERROR("Num of TDMR entries %llu smaller than 1 \n", num_of_tdmr_entries);
+            retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+
+        if ((global_private_hkid.reserved != 0) || !is_private_hkid(hkid))
+        {
+            __CPROVER_assert((global_private_hkid.reserved == 0) && is_private_hkid(hkid), "HKID is not private");
+            TDX_ERROR("HKID 0x%x is not private\n", hkid);
+            retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_R8);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+    
+    #ifdef SOURCE
     tdx_global_data_ptr->kot.entries[hkid].state = KOT_STATE_HKID_RESERVED;
+    #else 
+    tdx_global_data_ptr->kot.entries[hkid & HKID_MASK].state = KOT_STATE_HKID_RESERVED;
+    #endif // SOURCE 
+
     tdx_global_data_ptr->hkid = hkid;
-	
+
+    #ifdef SOURCE
     tdmr_pa_array = map_pa(tdmr_info_pa.raw_void, TDX_RANGE_RO);
+    #else 
+    // SOPHIA: index of the tdmr?
+    tdmr_pa_array = hkid & HKID_MASK;
+    #endif // SOURCE
     tdmr_info_p_init = true;
 
     // map only 2 tdmr entries each time
@@ -819,7 +928,13 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     for(uint64_t i = 0; i < num_of_tdmr_entries; i++)
     {
 
+        #ifdef SOURCE
         tdmr_entry.raw = tdmr_pa_array[i];
+        #else 
+        tdmr_entry.raw = &(tables[i].tdmr_table);
+        #endif // SOURCE
+
+        #ifdef SOURCE
         retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
         if (retval != TDX_SUCCESS)
         {
@@ -827,37 +942,82 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
             goto EXIT;
         }
+        #endif // SOURCE
 
+        #ifdef MODULAR_PROOF
+            __CPROVER_assume(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT)); 
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
+            if (retval != TDX_SUCCESS)
+            {
+                __CPROVER_assert(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR entry PA is not a va lid shared HPA");
+                retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
+                TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
+                goto EXIT;
+            }
+        #endif // FLOW_PROOF
+
+        #ifdef SOURCE
         tdmr_info_p = (tdmr_info_entry_t*)map_pa(tdmr_entry.raw_void, TDX_RANGE_RO);
         copy_tdmr_info_entry (tdmr_info_p, &tdmr_info_copy[i]);
         free_la(tdmr_info_p);
+        #endif // SOURCE
+        
+        // SOPHIA: keyhole mapping not fully verified yet
+        #ifdef MODULAR_PROOF
+        tdmr_info_p = (tdmr_info_entry_t*)&(tables[i].tdmr_table); 
+        copy_tdmr_info_entry (tdmr_info_p, &tdmr_info_copy[i]);
+        #endif // MODULAR_PROOF
 
-
+        #ifdef SOURCE
         if ((err = check_and_set_tdmrs(tdmr_info_copy, i, pamt_data_array)) != TDX_SUCCESS)
         {
             TDX_ERROR("Check and set TDMRs failed\n");
             retval = err;
             goto EXIT;
         }
+        #endif // SOURCE
+
+        #ifdef MODULAR_PROOF
+            err = check_and_set_tdmrs(tdmr_info_copy, i, pamt_data_array);
+            __CPROVER_assert(err == TDX_SUCCESS, "check and set failed"); 
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if ((err = check_and_set_tdmrs(tdmr_info_copy, i, pamt_data_array)) != TDX_SUCCESS)
+            {
+                __CPROVER_assert(check_and_set_tdmrs(tdmr_info_copy, i, pamt_data_array) == TDX_SUCCESS, "Check and set TDMRs failed");
+                TDX_ERROR("Check and set TDMRs failed\n");
+                retval = err;
+                goto EXIT;
+            }
+        #endif // FLOW_PROOF
+
+        #ifdef SOURCE
         update_pamt_array(tdmr_info_copy, pamt_data_array, (uint32_t)i); // save tdmr's pamt data
+        #endif // SOURCE
     }
+    __CPROVER_assert(false, "False");
 
-    tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
+    // tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
 
-    // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
+    // // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
-    // Complete CPUID handling
-    complete_cpuid_handling(tdx_global_data_ptr);
+    // // Complete CPUID handling
+    // complete_cpuid_handling(tdx_global_data_ptr);
 
-    // Prepare state variables for TDHSYSKEYCONFIG
-    tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
+    // // Prepare state variables for TDHSYSKEYCONFIG
+    // tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
 
-    // Mark the system initialization as done
-    tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
+    // // Mark the system initialization as done
+    // tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
     retval = TDX_SUCCESS;
 
 EXIT:
 
+    #ifdef SOURCE
     if (global_lock_acquired)
     {
         release_sharex_lock_ex(&tdx_global_data_ptr->global_lock);
@@ -867,6 +1027,7 @@ EXIT:
     {
         free_la(tdmr_pa_array);
     }
+    #endif // SOURCE
 
     return retval;
 }
