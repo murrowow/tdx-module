@@ -222,8 +222,8 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
     #ifdef FLOW_PROOF
     if (sysinfo.mcheck_fields.smrr2_not_supported == 0 && local_mtrr_cap.smrr2 != 0)
     {
-        tmp_smrr_mask.raw = msr_values_ptr_model.smrr[0].smrr_mask.raw;
-        tmp_smrr_base.raw = msr_values_ptr_model.smrr[0].smrr_base.raw;
+        tmp_smrr_mask.raw = msr_values_ptr_model.smrr[1].smrr_mask.raw;
+        tmp_smrr_base.raw = msr_values_ptr_model.smrr[1].smrr_base.raw;
 
 
         if (tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw != tmp_smrr_base.raw)

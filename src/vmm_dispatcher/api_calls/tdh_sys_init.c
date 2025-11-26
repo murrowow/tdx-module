@@ -2013,13 +2013,22 @@ api_error_type tdh_sys_init(void)
             retval = TDX_INCOMPATIBLE_SEAM_CAPABILITIES;
             goto EXIT;
         }
-    #else
-        seam_ops_capabilities_t caps;
-        __CPROVER_havoc_object(&caps);
-        __CPROVER_assume(is_td_preserving_available(caps));
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_td_preserving_available(seamop_cap_model));
     #endif // SOURCE 
 
-    tdx_global_data_ptr->seam_capabilities = caps;
+    #ifdef FLOW_PROOF
+        if (!is_td_preserving_available(seamop_cap_model))
+        {
+            TDX_ERROR("TD-preserving is not supported on the platform\n");
+            retval = TDX_INCOMPATIBLE_SEAM_CAPABILITIES;
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    tdx_global_data_ptr->seam_capabilities = seamop_cap_model;
 
     uint64_t seamdb_size;
 
@@ -2053,7 +2062,7 @@ api_error_type tdh_sys_init(void)
     
     #ifdef FLOW_PROOF
     #else 
-    tdx_global_data_ptr->seamverifyreport_available = ((caps.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
+    tdx_global_data_ptr->seamverifyreport_available = ((seamop_cap_model.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
     /*
      * Calculate allowed ATTRIBUTES bits.
      */
