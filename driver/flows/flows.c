@@ -69,6 +69,9 @@ void TDX_bootup() {
     hkid_api_input_t global_private_hkid;
 
     __CPROVER_havoc_object(&field_id);
+    __CPROVER_assume((field_id.reserved_0 == 0) && (field_id.reserved_1 == 0) &&
+                         (field_id.reserved_2 == 0) && (field_id.reserved_3 == 0) &&
+                         (field_id.last_element_in_field == 0) && (field_id.last_field_in_sequence == 0));
     __CPROVER_havoc_object(&tdmr_info_array_pa);
     __CPROVER_havoc_object(&num_of_tdmr_entries);
     __CPROVER_havoc_object(&global_private_hkid);
@@ -78,8 +81,9 @@ void TDX_bootup() {
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_sys_lp_init(); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    // error = tdh_sys_rd(field_id); 
-    // __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    error = tdh_sys_rd(field_id); 
+    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    __CPROVER_assert(false, "false"); 
     // error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // error = tdh_sys_key_config();

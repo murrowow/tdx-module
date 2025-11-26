@@ -29,11 +29,11 @@
 #define SRC_COMMON_METADATA_HANDLERS_METADATA_SYS_H_
 
 #include "metadata_generic.h"
-#include "auto_gen/global_sys_fields_lookup.h"
-#include "auto_gen/tdr_tdcs_fields_lookup.h"
-#include "auto_gen/td_vmcs_fields_lookup.h"
-#include "auto_gen/tdvps_fields_lookup.h"
-#include "helpers/error_reporting.h"
+#include "include/auto_gen/global_sys_fields_lookup.h"
+#include "include/auto_gen/tdr_tdcs_fields_lookup.h"
+#include "include/auto_gen/td_vmcs_fields_lookup.h"
+#include "include/auto_gen/tdvps_fields_lookup.h"
+#include "src/common/helpers/error_reporting.h"
 
 api_error_code_e md_sys_read_element(md_field_id_t field_id, const md_lookup_t* entry, md_access_t access_type,
         md_access_qualifier_t access_qual, uint64_t* out_rd_value);

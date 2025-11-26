@@ -240,6 +240,10 @@ void driver_main() {
         __CPROVER_havoc_object(&num_cached_sub_blocks_model); 
     #endif //SYS_LP_INIT_SETUP
 
+    #ifdef SYS_RD_SETUP
+        __CPROVER_havoc_object(&local_data); 
+        __CPROVER_assume(local_data.lp_is_init);
+    #endif // SYS_RD_SETUP
     uint16_t index = 0; 
     #ifdef SETUP
         setup(); 

@@ -25,17 +25,17 @@
  */
 
 #include "metadata_generic.h"
-#include "auto_gen/global_sys_fields_lookup.h"
-#include "auto_gen/tdr_tdcs_fields_lookup.h"
-#include "auto_gen/td_vmcs_fields_lookup.h"
-#include "auto_gen/td_l2_vmcs_fields_lookup.h"
-#include "auto_gen/tdvps_fields_lookup.h"
-#include "auto_gen/cpuid_configurations.h"
-#include "helpers/error_reporting.h"
-#include "helpers/helpers.h"
-#include "metadata_sys.h"
-#include "metadata_td.h"
-#include "metadata_vp.h"
+#include "include/auto_gen/global_sys_fields_lookup.h"
+#include "include/auto_gen/tdr_tdcs_fields_lookup.h"
+#include "include/auto_gen/td_vmcs_fields_lookup.h"
+#include "include/auto_gen/td_l2_vmcs_fields_lookup.h"
+#include "include/auto_gen/tdvps_fields_lookup.h"
+#include "include/auto_gen/cpuid_configurations.h"
+#include "src/common/helpers/error_reporting.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/metadata_handlers/metadata_sys.h"
+#include "src/common/metadata_handlers/metadata_td.h"
+#include "src/common/metadata_handlers/metadata_vp.h"
 
 _STATIC_INLINE_ bool_t is_write_access_type(md_access_t access_type)
 {
@@ -671,8 +671,15 @@ api_error_code_e md_read_element(md_context_code_e ctx_code, md_field_id_t field
         md_access_t access_type, md_access_qualifier_t access_qual, md_context_ptrs_t md_ctx, uint64_t* value)
 {
     api_error_code_e retval;
+    #ifdef SOURCE
     const md_lookup_t* entry = md_check_element_and_get_entry(ctx_code, field_id, md_ctx);
+    #else 
+    md_lookup_t* entry;
+    __CPROVER_havoc_object(&entry); 
+    __CPROVER_assume(entry != NULL); 
+    #endif // SOURCE
 
+    #ifdef SOURCE
     IF_RARE (entry == NULL)
     {
         return TDX_METADATA_FIELD_ID_INCORRECT;
@@ -693,6 +700,22 @@ api_error_code_e md_read_element(md_context_code_e ctx_code, md_field_id_t field
             FATAL_ERROR();
             break;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(entry != NULL); 
+        retval = TDX_SUCCESS;
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        IF_RARE (entry == NULL)
+        {
+            __CPROVER_assert(entry != NULL, "entry is null"); 
+            return TDX_METADATA_FIELD_ID_INCORRECT;
+        } else {
+            retval = TDX_SUCCESS;
+        }
+    #endif // FLOW_PROOF
 
     return retval;
 }
