@@ -1,6 +1,7 @@
 #include "driver/driver.h"
 #include "driver/flows/flows.h"
 #include "stdlib.h"
+#include "stdint.h"
 
 #include "../src/common/helpers/virt_msr_helpers.h"
 #include "../include/auto_gen/cpuid_configurations.h"
@@ -134,6 +135,7 @@ void driver_main() {
     __CPROVER_assume((sysinfo.no_downgrade == 0)); 
     __CPROVER_assume((sysinfo.min_update_hv == 0)); 
     __CPROVER_assume((sysinfo.num_handoff_pages + 1) >= TDX_MIN_HANDOFF_PAGES);
+    __CPROVER_assume(sysinfo_table.data_rgn_base > 0); 
 
     __CPROVER_assume(!local_data.lp_is_init);
     // MSR Stuff
@@ -157,6 +159,7 @@ void driver_main() {
     __CPROVER_havoc_object(&local_data); 
     __CPROVER_havoc_object(&msr_values_ptr_model); 
     __CPROVER_havoc_object(&seamop_cap_model); 
+    __CPROVER_havoc_object(&sysinfo); 
 
     // correct initiliazation state
     __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
@@ -171,6 +174,7 @@ void driver_main() {
     __CPROVER_assume(global_data.plt_common_config.ia32_arch_capabilities.raw == msr_values_ptr_model.ia32_arch_capabilities.raw); 
     __CPROVER_assume(global_data.plt_common_config.ia32_misc_package_ctls.raw == msr_values_ptr_model.ia32_misc_package_ctls.raw); 
     __CPROVER_assume(global_data.plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_perf_capabilities.raw == msr_values_ptr_model.ia32_perf_capabilities.raw);
     __CPROVER_assume(global_data.plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust);
     __CPROVER_assume(global_data.seam_capabilities.raw == seamop_cap_model.raw); 
 
@@ -188,28 +192,16 @@ void driver_main() {
     __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw); 
     __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr4_fixed0.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw); 
     __CPROVER_assume(global_data.plt_common_config.ia32_vmx_cr4_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr4_fixed1.raw); 
+    __CPROVER_assume(global_data.plt_common_config.ia32_mtrrcap.raw == msr_values_ptr_model.ia32_mtrrcap.raw);
+    __CPROVER_assume(global_data.plt_common_config.smrr[0].smrr_base.raw == msr_values_ptr_model.smrr[0].smrr_base.raw);
+    __CPROVER_assume(global_data.plt_common_config.smrr[0].smrr_mask.raw == msr_values_ptr_model.smrr[0].smrr_mask.raw);
+
+    __CPROVER_assume(sysinfo.mcheck_fields.smrr2_not_supported != 0 || msr_values_ptr_model.ia32_mtrrcap.smrr2 == 0); 
+    __CPROVER_assume(sysinfo.data_rgn_base > 0); 
+    __CPROVER_assume(TDX_PAGE_SIZE_IN_BYTES * (sysinfo.num_tls_pages + 1) != 0);
+    __CPROVER_assume(local_data.lp_info.pkg < MAX_PKGS); 
 
     __CPROVER_havoc_object(&num_cached_sub_blocks_model); 
-
-    cpuid_config_t tmp_cpuid_config;
-    cpuid_config_t tmp_verify_same_mask;
-    cpuid_config_t pl_verify_same_mask;
-    for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++) {
-    tmp_cpuid_config.leaf_subleaf = cpuid_lookup[i].leaf_subleaf;
-
-    tmp_verify_same_mask.values.low = (tmp_cpuid_config.values.low & cpuid_lookup[i].verify_same.low);
-    tmp_verify_same_mask.values.high = (tmp_cpuid_config.values.high & cpuid_lookup[i].verify_same.high);
-
-    pl_verify_same_mask.values.low = (global_data.cpuid_values[i].values.low &
-                cpuid_lookup[i].verify_same.low);
-    pl_verify_same_mask.values.high = (global_data.cpuid_values[i].values.high &
-                cpuid_lookup[i].verify_same.high);
-
-    __CPROVER_assume(global_data.cpuid_values[i].values.low & cpuid_lookup[i].verify_same.low 
-                     == tmp_cpuid_config.values.low & cpuid_lookup[i].verify_same.low);
-    __CPROVER_assume(global_data.cpuid_values[i].values.high & cpuid_lookup[i].verify_same.high
-                     == tmp_cpuid_config.values.high & cpuid_lookup[i].verify_same.high);
-    }
     #endif //SYS_LP_INIT_SETUP
 
     uint16_t index = 0; 

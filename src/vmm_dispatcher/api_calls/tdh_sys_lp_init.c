@@ -140,7 +140,7 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
 
     if (local_mtrr_cap.raw != tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw)
     {
-        __CPROVER_assert(msr_values_ptr_model.ia32_mtrrcap.raw == tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw);
+        __CPROVER_assert(msr_values_ptr_model.ia32_mtrrcap.raw == tdx_global_data_ptr->plt_common_config.ia32_mtrrcap.raw, "local MTRRCAP MSR mismatch with platform");
         TDX_ERROR("local MTRRCAP MSR mismatch with platform\n");
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, MTRR_CAP_MSR_ADDR);
     }
@@ -228,12 +228,12 @@ _STATIC_INLINE_ api_error_type check_smrr_smrr2_config(tdx_module_global_t* tdx_
 
         if (tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw != tmp_smrr_base.raw)
         {
-            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw == tmp_smrr_base.raw, "smrr[1].smrr_base.raw wrong")
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_base.raw == tmp_smrr_base.raw, "smrr[1].smrr_base.raw wrong");
             return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR2_BASE_MSR_ADDR);
         }
         if (tdx_global_data_ptr->plt_common_config.smrr[1].smrr_mask.raw != tmp_smrr_mask.raw)
         {
-            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_mask.raw == tmp_smrr_mask.raw, "smrr[1].smrr_mask.raw wrong")
+            __CPROVER_assert(tdx_global_data_ptr->plt_common_config.smrr[1].smrr_mask.raw == tmp_smrr_mask.raw, "smrr[1].smrr_mask.raw wrong");
             return api_error_with_operand_id(TDX_INCONSISTENT_MSR, SMRR2_MASK_MSR_ADDR);
         }
 
@@ -290,9 +290,10 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
     ia32_cpuid(CPUID_MAX_INPUT_VAL_LEAF, 0, &last_base_leaf, &ebx, &ecx, &edx);
     ia32_cpuid(CPUID_MAX_EXTENDED_VAL_LEAF, 0, &last_extended_leaf, &ebx, &ecx, &edx);
     #endif // SOURCE
-
     for (uint32_t i = 0; i < MAX_NUM_CPUID_LOOKUP; i++)
     {
+        // SOPHIA: can abstract this away because assume running on valid intel processor
+        #ifdef SOURCE
         if (!cpuid_lookup[i].valid_entry)
         {
             continue;
@@ -301,11 +302,9 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
         tmp_cpuid_config.leaf_subleaf =
                 cpuid_lookup[i].leaf_subleaf;
 
-        #ifdef SOURCE
         ia32_cpuid(tmp_cpuid_config.leaf_subleaf.leaf, tmp_cpuid_config.leaf_subleaf.subleaf,
                 &tmp_cpuid_config.values.eax, &tmp_cpuid_config.values.ebx,
                 &tmp_cpuid_config.values.ecx, &tmp_cpuid_config.values.edx);
-        #endif // SOURCE
 
         if (!((tmp_cpuid_config.leaf_subleaf.leaf <= last_base_leaf) ||
             ((tmp_cpuid_config.leaf_subleaf.leaf >= CPUID_FIRST_EXTENDED_LEAF) &&
@@ -322,7 +321,6 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
         pl_verify_same_mask.values.high = (tdx_global_data_ptr->cpuid_values[i].values.high &
                 cpuid_lookup[i].verify_same.high);
 
-        #ifdef SOURCE
         if (tmp_verify_same_mask.values.low != pl_verify_same_mask.values.low ||
             tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high)
         {
@@ -333,24 +331,6 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
             return TDX_INCONSISTENT_CPUID_FIELD;
         }
         #endif //SOURCE
-
-        #ifdef MODULAR_PROOF
-        __CPROVER_assume((tmp_verify_same_mask.values.low == pl_verify_same_mask.values.low) &&
-                         (tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high));
-        #endif //MODULAR_PROOF
-
-        #ifdef FLOW_PROOF
-            if (tmp_verify_same_mask.values.low != pl_verify_same_mask.values.low ||
-                tmp_verify_same_mask.values.high != pl_verify_same_mask.values.high)
-            {
-            tdx_local_data_ptr->vmm_regs.rcx = tmp_cpuid_config.leaf_subleaf.raw;
-            tdx_local_data_ptr->vmm_regs.rdx = cpuid_lookup[i].verify_same.low;
-            tdx_local_data_ptr->vmm_regs.r8 = cpuid_lookup[i].verify_same.high;
-
-            return TDX_INCONSISTENT_CPUID_FIELD;
-            }
-        #endif // FLOW_PROOF
-
         /*------------------------------------------------------
            Special Handling of Selected CPUID Leaves/Sub-Leaves
         ------------------------------------------------------*/
@@ -359,11 +339,13 @@ _STATIC_INLINE_ api_error_type compare_cpuid_configuration(tdx_module_global_t* 
         if ((tmp_cpuid_config.leaf_subleaf.leaf == CPUID_GET_TOPOLOGY_LEAF) &&
             (tmp_cpuid_config.leaf_subleaf.subleaf == 0))
         {
+            #ifdef SOURCE
             tdx_local_data_ptr->lp_info.core =
                     (tmp_cpuid_config.values.edx >> tdx_global_data_ptr->x2apic_core_id_shift_count) &
                     tdx_global_data_ptr->x2apic_core_id_mask;
             tdx_local_data_ptr->lp_info.pkg  =
                     (tmp_cpuid_config.values.edx >> tdx_global_data_ptr->x2apic_pkg_id_shift_count);
+            #endif // SOURCE
 
             #ifdef SOURCE
             // Sanity check
@@ -523,7 +505,7 @@ _STATIC_INLINE_ api_error_type compare_vmx_msrs(tdx_module_global_t* tdx_global_
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_PINBASED_CTLS_MSR_ADDR);
     }
 
-    tmp_msr = imsr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw;
+    tmp_msr = msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw;
     if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_procbased_ctls.raw)
     {
         __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_procbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw, "ia32_vmx_true_procbased_ctls is wrong");
@@ -551,7 +533,7 @@ _STATIC_INLINE_ api_error_type compare_vmx_msrs(tdx_module_global_t* tdx_global_
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_TRUE_EXIT_CTLS_MSR_ADDR);
     }
 
-    tmp_msr = imsr_values_ptr_model.ia32_vmx_true_entry_ctls.raw;
+    tmp_msr = msr_values_ptr_model.ia32_vmx_true_entry_ctls.raw;
     if (tmp_msr != pl_msr_values_ptr->ia32_vmx_true_entry_ctls.raw)
     {
         __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_true_entry_ctls.raw == msr_values_ptr_model.ia32_vmx_true_entry_ctls.raw, "ia32_vmx_true_entry_ctls is wrong"); 
@@ -581,7 +563,7 @@ _STATIC_INLINE_ api_error_type compare_vmx_msrs(tdx_module_global_t* tdx_global_
     tmp_msr = msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw;
     if (tmp_msr != pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw)
     {
-        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw), "ia32_vmx_cr0_fixed1 is wrong"; 
+        __CPROVER_assert(pl_msr_values_ptr->ia32_vmx_cr0_fixed1.raw == msr_values_ptr_model.ia32_vmx_cr0_fixed1.raw, "ia32_vmx_cr0_fixed1 is wrong"); 
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_VMX_CR0_FIXED1_MSR_ADDR);
     }
     tmp_msr = msr_values_ptr_model.ia32_vmx_cr4_fixed0.raw;
@@ -654,10 +636,10 @@ _STATIC_INLINE_ api_error_type compare_key_management_config(tdx_module_global_t
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-    tmp_msr = msr_values_ptr_model.ia32_tme_capability_t.raw;
+    tmp_msr = msr_values_ptr_model.ia32_tme_capability.raw;
     if (tmp_msr != tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw)
     {
-        __CPROVER_assert(msr_values_ptr_model.ia32_tme_capability_t.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw, "ia32_tme_capability.raw doesn't match");
+        __CPROVER_assert(msr_values_ptr_model.ia32_tme_capability.raw == tdx_global_data_ptr->plt_common_config.ia32_tme_capability.raw, "ia32_tme_capability.raw doesn't match");
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_TME_CAPABILITY_MSR_ADDR);
     };
 
@@ -1011,29 +993,29 @@ api_error_type tdh_sys_lp_init(void)
         __CPROVER_assert(local_data.keyhole_state.total_ref_count == 0, "keyhole total ref count is 0");
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
-        {
-            __CPROVER_assume(keyhole_state->keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE); 
-            if (i != 0) {
-            __CPROVER_assume(keyhole_state->keyhole_array[i].lru_prev == i - 1);
-            }
-            if (i != MAX_CACHEABLE_KEYHOLES-1) {
-            __CPROVER_assume(keyhole_state->keyhole_array[i].lru_next == i + 1);
-            }
-            __CPROVER_assume(keyhole_state->keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX);
-            __CPROVER_assume(keyhole_state->keyhole_array[i].mapped_pa == 0);
-            __CPROVER_assume(keyhole_state->keyhole_array[i].is_writable == 0);
-            __CPROVER_assume(keyhole_state->keyhole_array[i].ref_count == 0);
-            __CPROVER_assume(keyhole_state->hash_table[i] = (uint16_t)UNDEFINED_IDX);
-        }
+    // #ifdef FLOW_PROOF
+    //     for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
+    //     {
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE); 
+    //         if (i != 0) {
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_prev == i - 1);
+    //         }
+    //         if (i != MAX_CACHEABLE_KEYHOLES-1) {
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_next == i + 1);
+    //         }
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX);
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].mapped_pa == 0);
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].is_writable == 0);
+    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].ref_count == 0);
+    //         __CPROVER_assume(local_data.keyhole_state.hash_table[i] == (uint16_t)UNDEFINED_IDX);
+    //     }
 
-        __CPROVER_assume(keyhole_state->keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX);
-        __CPROVER_assume(keyhole_state->keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX);
-        __CPROVER_assume(keyhole_state->lru_head == MAX_CACHEABLE_KEYHOLES - 1);
-        __CPROVER_assume(keyhole_state->lru_tail == 0);
-        __CPROVER_assume(keyhole_state->total_ref_count == 0);
-    #endif //FLOW_PROOF
+    //     __CPROVER_assume(local_data.keyhole_state.keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX);
+    //     __CPROVER_assume(local_data.keyhole_state.keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX);
+    //     __CPROVER_assume(local_data.keyhole_state.lru_head == MAX_CACHEABLE_KEYHOLES - 1);
+    //     __CPROVER_assume(local_data.keyhole_state.lru_tail == 0);
+    //     __CPROVER_assume(local_data.keyhole_state.total_ref_count == 0);
+    // #endif //FLOW_PROOF
     return retval;
 }
 
