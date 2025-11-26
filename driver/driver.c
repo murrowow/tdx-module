@@ -166,7 +166,7 @@ void driver_main() {
         __CPROVER_assume(global_data.plt_common_config.ia32_xapic_disable_status.raw == msr_values_ptr_model.ia32_xapic_disable_status.raw); 
         __CPROVER_assume(global_data.plt_common_config.ia32_perf_capabilities.raw == msr_values_ptr_model.ia32_perf_capabilities.raw);
         __CPROVER_assume(global_data.plt_common_config.ia32_tsc_adjust == msr_values_ptr_model.ia32_tsc_adjust);
-        
+
         __CPROVER_assume(global_data.plt_common_config.ia32_vmx_basic.raw == msr_values_ptr_model.ia32_vmx_basic.raw); 
         __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_pinbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_pinbased_ctls.raw); 
         __CPROVER_assume(global_data.plt_common_config.ia32_vmx_true_procbased_ctls.raw == msr_values_ptr_model.ia32_vmx_true_procbased_ctls.raw); 

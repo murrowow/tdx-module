@@ -47,6 +47,8 @@
 
 #include "driver/driver.h"
 
+uint32_t old_num_of_init_lps;
+
 _STATIC_INLINE_ api_error_type check_msrs(tdx_module_global_t* tdx_global_data_ptr)
 {
     // Check Capabilities MSRs to have the same values as sampled during TDHSYSINIT
@@ -722,7 +724,7 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
     #endif // SOURCE
 
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(msr_values_ptr_model.ia32_perf_capabilities.raw != 
+        __CPROVER_assume(msr_values_ptr_model.ia32_perf_capabilities.raw == 
                          tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw);
     #endif // MODULAR_PROOF
 
@@ -730,7 +732,7 @@ _STATIC_INLINE_ api_error_type check_enumeration_and_compare_configuration(tdx_m
     if (msr_values_ptr_model.ia32_perf_capabilities.raw !=
             tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw)
     {
-        __CPROVER_assert(msr_values_ptr_model.ia32_perf_capabilities.raw != 
+        __CPROVER_assert(msr_values_ptr_model.ia32_perf_capabilities.raw == 
                          tdx_global_data_ptr->plt_common_config.ia32_perf_capabilities.raw, "ia32_perf_capabilities is wrong");
         return api_error_with_operand_id(TDX_INCONSISTENT_MSR, IA32_PERF_CAPABILITIES_MSR_ADDR);
     }
@@ -762,7 +764,7 @@ _STATIC_INLINE_ void tdx_local_init(tdx_module_local_t* tdx_local_data_ptr,
 
     //Set local defs
     init_keyhole_state();
-
+    
     /**
      * Calc LPID from local_data_ptr
      */
@@ -800,10 +802,6 @@ _STATIC_INLINE_ void tdx_local_init(tdx_module_local_t* tdx_local_data_ptr,
     tdx_global_data_ptr->num_of_init_lps += 1;
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-    __CPROVER_assume(tdx_global_data_ptr->num_of_init_lps == tdx_global_data_ptr->num_of_init_lps + 1); 
-    #endif // FLOW_PROOF
-
 }
 
 api_error_type tdh_sys_lp_init(void)
@@ -819,6 +817,10 @@ api_error_type tdh_sys_lp_init(void)
         tdx_module_local_t* tdx_local_data_ptr = &local_data;
     #endif // SOURCE
 
+    #ifdef SOURCE
+    #else
+    old_num_of_init_lps = tdx_global_data_ptr->num_of_init_lps;
+    #endif // SOURCE
     api_error_type retval = TDX_SYS_BUSY;
 
     ia32_tsx_ctrl_t tsx_ctrl_original = { .raw = 0 };
@@ -991,31 +993,37 @@ api_error_type tdh_sys_lp_init(void)
         __CPROVER_assert(local_data.keyhole_state.lru_head == MAX_CACHEABLE_KEYHOLES - 1, "lru head max cacheanle keyholes is correct");
         __CPROVER_assert(local_data.keyhole_state.lru_tail == 0, "keyhole lru tail is 0");
         __CPROVER_assert(local_data.keyhole_state.total_ref_count == 0, "keyhole total ref count is 0");
+
+        __CPROVER_assert(tdx_global_data_ptr->num_of_init_lps == old_num_of_init_lps + 1, "sys lp count incremented");
     #endif // MODULAR_PROOF
 
-    // #ifdef FLOW_PROOF
-    //     for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
-    //     {
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE); 
-    //         if (i != 0) {
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_prev == i - 1);
-    //         }
-    //         if (i != MAX_CACHEABLE_KEYHOLES-1) {
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_next == i + 1);
-    //         }
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX);
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].mapped_pa == 0);
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].is_writable == 0);
-    //         __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].ref_count == 0);
-    //         __CPROVER_assume(local_data.keyhole_state.hash_table[i] == (uint16_t)UNDEFINED_IDX);
-    //     }
+    #ifdef FLOW_PROOF
+        for (uint16_t i = 0; i < MAX_KEYHOLE_PER_LP; i++)
+        {
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].state == (uint8_t)KH_ENTRY_FREE); 
+            if (i != 0) {
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_prev == i - 1);
+            }
+            if (i != MAX_CACHEABLE_KEYHOLES-1) {
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].lru_next == i + 1);
+            }
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].hash_list_next == (uint16_t)UNDEFINED_IDX);
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].mapped_pa == 0);
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].is_writable == 0);
+            __CPROVER_assume(local_data.keyhole_state.keyhole_array[i].ref_count == 0);
+            __CPROVER_assume(local_data.keyhole_state.hash_table[i] == (uint16_t)UNDEFINED_IDX);
+        }
 
-    //     __CPROVER_assume(local_data.keyhole_state.keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX);
-    //     __CPROVER_assume(local_data.keyhole_state.keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX);
-    //     __CPROVER_assume(local_data.keyhole_state.lru_head == MAX_CACHEABLE_KEYHOLES - 1);
-    //     __CPROVER_assume(local_data.keyhole_state.lru_tail == 0);
-    //     __CPROVER_assume(local_data.keyhole_state.total_ref_count == 0);
-    // #endif //FLOW_PROOF
+        __CPROVER_assume(local_data.keyhole_state.keyhole_array[0].lru_prev == (uint16_t)UNDEFINED_IDX);
+        __CPROVER_assume(local_data.keyhole_state.keyhole_array[MAX_CACHEABLE_KEYHOLES - 1].lru_next == (uint16_t)UNDEFINED_IDX);
+        __CPROVER_assume(local_data.keyhole_state.lru_head == MAX_CACHEABLE_KEYHOLES - 1);
+        __CPROVER_assume(local_data.keyhole_state.lru_tail == 0);
+        __CPROVER_assume(local_data.keyhole_state.total_ref_count == 0);
+    
+        // Increment number of lps
+    __CPROVER_havoc_slice(&(tdx_global_data_ptr->num_of_init_lps), sizeof(uint32_t));
+    __CPROVER_assume(tdx_global_data_ptr->num_of_init_lps == old_num_of_init_lps + 1); 
+    #endif //FLOW_PROOF
     return retval;
 }
 

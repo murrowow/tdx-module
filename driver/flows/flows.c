@@ -74,8 +74,8 @@ void TDX_bootup() {
     __CPROVER_havoc_object(&global_private_hkid);
 
     api_error_type error = UNINITIALIZE_ERROR;
-    // error = tdh_sys_init(); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_sys_init(); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_sys_lp_init(); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // error = tdh_sys_rd(field_id); 
