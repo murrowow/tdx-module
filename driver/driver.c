@@ -125,6 +125,7 @@ void driver_main() {
 
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_PENDING); 
         __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE); 
+        __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
 
         // SYSINFO assumptions
         __CPROVER_assume((sysinfo.module_hv == 0)); 
@@ -247,9 +248,13 @@ void driver_main() {
 
     #ifdef SYS_CONFIG_SETUP
         __CPROVER_havoc_object(&global_data);
-        
+        __CPROVER_havoc_object(&tables); 
+
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
         __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
+        __CPROVER_assume(global_data.hkid_mask == HKID_MASK); 
+        __CPROVER_assume(global_data.hkid_start_bit == (64 - n - 1));
+        __CPROVER_assume((tables[0].tdmr_info_table.tdmr_base + tables[0].tdmr_info_table.tdmr_size - 1) < MAX_PA );
     #endif // SYS_CONFIG_SETUP
 
     uint16_t index = 0; 

@@ -51,12 +51,14 @@ typedef struct pamt_data_s
 
 _STATIC_INLINE_ void update_pamt_array (tdmr_info_entry_t*   tdmr_info_copy, pamt_data_t pamt_data_array[], uint32_t i)
 {
+    #ifdef SOURCE
     pamt_data_array[i].pamt_1g_base = tdmr_info_copy[i].pamt_1g_base;
     pamt_data_array[i].pamt_1g_size = tdmr_info_copy[i].pamt_1g_size;
     pamt_data_array[i].pamt_2m_base = tdmr_info_copy[i].pamt_2m_base;
     pamt_data_array[i].pamt_2m_size = tdmr_info_copy[i].pamt_2m_size;
     pamt_data_array[i].pamt_4k_base = tdmr_info_copy[i].pamt_4k_base;
     pamt_data_array[i].pamt_4k_size = tdmr_info_copy[i].pamt_4k_size;
+    #endif // SOURCE
 }
 
 _STATIC_INLINE_ void copy_tdmr_info_entry (tdmr_info_entry_t* tdmr_info_src, tdmr_info_entry_t* tdmr_info_target)
@@ -118,6 +120,7 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
 {
     // TDMR base address must be aligned on 1GB.
     //TDMR size must be greater than 0 and a whole multiple of 1GB.
+    #ifdef SOURCE
     if (!is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_base, _1GB) ||
         !is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_size, _1GB) ||
         tdmr_info_copy[i].tdmr_size <= 0)
@@ -126,7 +129,29 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
                 i, tdmr_info_copy[i].tdmr_base, i, tdmr_info_copy[i].tdmr_size);
         return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_base, _1GB) &&
+                         is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_size, _1GB) &&
+                         (tdmr_info_copy[i].tdmr_size >= 0));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if (!is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_base, _1GB) ||
+        !is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_size, _1GB) ||
+        tdmr_info_copy[i].tdmr_size <= 0)
+    {
+        __CPROVER_assert(is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_base, _1GB) &&
+                         is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_size, _1GB) &&
+                         (tdmr_info_copy[i].tdmr_size >= 0), "TDMR address must be 1GB aligned and size greater than 0");
+        TDX_ERROR("TDMR_BASE[%d]=0x%llx or TDMR_SIZE[%d]=0x%llx are not 1GB aligned\n",
+                i, tdmr_info_copy[i].tdmr_base, i, tdmr_info_copy[i].tdmr_size);
+        return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
+    }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // TDMR base address must comply with the platform’s maximum PA and their HKID bits must be 0.
     if (!is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base) ||
          get_hkid_from_pa((pa_t)tdmr_info_copy[i].tdmr_base) != 0)
@@ -136,7 +161,18 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
                 get_hkid_from_pa((pa_t)tdmr_info_copy[i].tdmr_base));
         return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base)); 
+    __CPROVER_assume(((tdmr_info_copy[i].tdmr_base & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base), "tdmr base pa is not smaller than max pa"); 
+        __CPROVER_assert(((tdmr_info_copy[i].tdmr_base & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0, "tdmr hkid shifted all the way is not 0");
+    #endif // FLOW_PROOF
+    #ifdef SOURCE
     // TDMR end address must comply with the platform’s maximum PA and their HKID bits must be 0.
     uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size - 1;
     if (!is_pa_smaller_than_max_pa(tdmr_end) || get_hkid_from_pa((pa_t)tdmr_end) != 0)
@@ -145,7 +181,17 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
                 i, tdmr_end, BIT(get_global_data()->max_pa), get_hkid_from_pa((pa_t)tdmr_end));
         return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        uint64_t tdmr_end = tables[i].tdmr_info_table.tdmr_base + tables[i].tdmr_info_table.tdmr_size - 1;
+        __CPROVER_assume(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        uint64_t tdmr_end = tables[i].tdmr_info_table.tdmr_base + tables[i].tdmr_info_table.tdmr_size - 1;
+        __CPROVER_assert(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0, "tdmr end exceeds the maximum possible size");
+    #endif // FLOW_PROOF
     return TDX_SUCCESS;
 }
 
@@ -697,34 +743,84 @@ static api_error_type check_and_set_tdmrs(tdmr_info_entry_t tdmr_info_copy[MAX_T
     }
     #endif // FLOW_PROOF
 
-    // if (i > 0)
-    // {
-    //     prev_tdmr_base = tdmr_info_copy[i-1].tdmr_base;
-    //     prev_tdmr_size = tdmr_info_copy[i-1].tdmr_size;
-    // }
+    #ifdef FLOW_PROOF
+    #else 
+    if (i > 0)
+    {
+        prev_tdmr_base = tdmr_info_copy[i-1].tdmr_base;
+        prev_tdmr_size = tdmr_info_copy[i-1].tdmr_size;
+    }
+    #endif // FLOW_PROOF
 
-    // // TDMRs must be sorted in an ascending base address order.
-    // if ((i > 0) && tdmr_base < prev_tdmr_base)
-    // {
-    //     TDX_ERROR("TDMR_BASE[%d]=0x%llx is smaller than TDMR_BASE[%d]=0x%llx\n",
-    //             i, tdmr_info_copy[i].tdmr_base, i-1, tdmr_info_copy[i-1].tdmr_base);
-    //     return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
-    // }
+    #ifdef SOURCE
+    // TDMRs must be sorted in an ascending base address order.
+    if ((i > 0) && tdmr_base < prev_tdmr_base)
+    {
+        TDX_ERROR("TDMR_BASE[%d]=0x%llx is smaller than TDMR_BASE[%d]=0x%llx\n",
+                i, tdmr_info_copy[i].tdmr_base, i-1, tdmr_info_copy[i-1].tdmr_base);
+        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    }
+    #endif // SOURCE
 
-    // // TDMRs must not overlap with other TDMRs.
-    // // Check will be correct due to previous (ascension) check correctness.
-    // if ((i > 0) && (tdmr_base < prev_tdmr_base + prev_tdmr_size))
-    // {
-    //     TDX_ERROR("TDMR[%d]: (from 0x%llx to 0x%llx) overlaps TDMR[%d] at 0x%llx\n",
-    //             i-1, prev_tdmr_base, prev_tdmr_base + prev_tdmr_size, i, tdmr_base);
-    //     return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
-    // }
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume(tdmr_base >= prev_tdmr_base);
+    #endif // MODDULAR_PROOF
 
-    // api_error_type err;
-    // if ((err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
+    #ifdef FLOW_PROOF
+        if ((i > 0) && tdmr_base < prev_tdmr_base)
+    {
+        __CPROVER_assert((i > 0) && (tdmr_base >= prev_tdmr_base), "TDMRs must be sorted in an ascending base address order");
+        TDX_ERROR("TDMR_BASE[%d]=0x%llx is smaller than TDMR_BASE[%d]=0x%llx\n",
+                i, tdmr_info_copy[i].tdmr_base, i-1, tdmr_info_copy[i-1].tdmr_base);
+        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    }
+    #endif // FLOW_PROOF
+
+    // TDMRs must not overlap with other TDMRs.
+    // Check will be correct due to previous (ascension) check correctness.
+    #ifdef SOURCE
+    if ((i > 0) && (tdmr_base < prev_tdmr_base + prev_tdmr_size))
+    {
+        TDX_ERROR("TDMR[%d]: (from 0x%llx to 0x%llx) overlaps TDMR[%d] at 0x%llx\n",
+                i-1, prev_tdmr_base, prev_tdmr_base + prev_tdmr_size, i, tdmr_base);
+        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+    __CPROVER_assume((tdmr_base >= prev_tdmr_base + prev_tdmr_size));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if ((i > 0) && (tdmr_base < prev_tdmr_base + prev_tdmr_size))
+    {
+        __CPROVER_assert((tdmr_base >= prev_tdmr_base + prev_tdmr_size), "TDMRs must not overlap with other TDMRs");
+        TDX_ERROR("TDMR[%d]: (from 0x%llx to 0x%llx) overlaps TDMR[%d] at 0x%llx\n",
+                i-1, prev_tdmr_base, prev_tdmr_base + prev_tdmr_size, i, tdmr_base);
+        return api_error_with_multiple_info(TDX_NON_ORDERED_TDMR, (uint8_t)i, 0, 0, 0);
+    }
+    #endif // FLOW_PROOF
+    
+    #ifdef SOURCE
+    api_error_type err;
+    if ((err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        api_error_type err;
+        err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i);
+    #endif //MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        api_error_type err;
+        if ((err = check_tdmr_area_addresses_and_size(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+        {
+            return err;
+        }
+    #endif // FLOW_PROOF
 
     // if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
     // {
@@ -777,13 +873,14 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     }
     #endif // SOURCE
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE); 
+        __CPROVER_assume(tdx_global_data_ptr->global_lock == SHAREX_FREE); 
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (&tdx_global_data_ptr->global_lock.raw != SHAREX_FREE)
+        if (&tdx_global_data_ptr->global_lock != SHAREX_FREE)
         {
-            __CPROVER_assume(&tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "obtain lock for global data pointer"); 
+            __CPROVER_printf("SOPHIA: global_lock:%d SHAREX_FREE: %d", tdx_global_data_ptr->global_lock.raw, SHAREX_FREE);
+            __CPROVER_assert(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "obtain lock for global data pointer"); 
             TDX_ERROR("Failed to acquire global lock\n");
             retval = TDX_SYS_BUSY;
             goto EXIT;
@@ -995,28 +1092,39 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             }
         #endif // FLOW_PROOF
 
-        #ifdef SOURCE
+        #ifdef FLOW_PROOF
+        #else 
         update_pamt_array(tdmr_info_copy, pamt_data_array, (uint32_t)i); // save tdmr's pamt data
         #endif // SOURCE
     }
-    __CPROVER_assert(false, "False");
 
-    // tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
+    #ifdef SOURCE
+    tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
+    #else 
+    global_data.num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries; 
+    #endif // SOURCE
 
-    // // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
+    // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
-    // // Complete CPUID handling
-    // complete_cpuid_handling(tdx_global_data_ptr);
+    // Complete CPUID handling
+    #ifdef FLOW_PROOF
+    #else 
+    complete_cpuid_handling(tdx_global_data_ptr);
+    #endif // SOURCE
 
-    // // Prepare state variables for TDHSYSKEYCONFIG
-    // tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
+    // Prepare state variables for TDHSYSKEYCONFIG
+    #ifdef FLOW_PROOF
+    #else 
+    tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
+    #endif // FLOW_PROOF
 
     // // Mark the system initialization as done
     // tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
     retval = TDX_SUCCESS;
-
+    
 EXIT:
 
+    // SOPHIA: never officially lock or have real memory so can abstract away
     #ifdef SOURCE
     if (global_lock_acquired)
     {
