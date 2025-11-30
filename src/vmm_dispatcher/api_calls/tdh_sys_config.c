@@ -861,8 +861,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     tdx_module_global_t* tdx_global_data_ptr = &global_data;
     #endif // SOURCE
 
-    //api_error_type       retval = TDX_SYS_BUSY;
-    api_error_type         retval = TDX_SUCCESS; 
+    api_error_type       retval = TDX_SYS_BUSY;
     #ifdef SOURCE
     if (acquire_sharex_lock_ex(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
     {
@@ -1016,7 +1015,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     // map only 2 tdmr entries each time
     pa_t tdmr_entry;
     pamt_data_t pamt_data_array[MAX_TDMRS];
-    api_error_type err = TDX_SUCCESS; 
+    api_error_type err; 
     tdmr_info_copy = tdx_global_data_ptr->tdmr_info_copy;
     
     for(uint64_t i = 0; i < num_of_tdmr_entries; i++)
@@ -1031,7 +1030,6 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
         retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
         if (retval != TDX_SUCCESS)
         {
-            __CPROVER_printf("SOPHIA: %d", tdmr_entry.raw);
             retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
             TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
             goto EXIT;
