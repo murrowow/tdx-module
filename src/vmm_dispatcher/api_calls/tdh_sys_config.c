@@ -848,7 +848,6 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
                              hkid_api_input_t global_private_hkid)
 {
     // Temporary Variables
-
     tdmr_info_entry_t*   tdmr_info_p;   // Pointer to TDMR info
     tdmr_info_entry_t*   tdmr_info_copy;// Pointer to TDMR info array
     bool_t               tdmr_info_p_init = false;
@@ -862,8 +861,8 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     tdx_module_global_t* tdx_global_data_ptr = &global_data;
     #endif // SOURCE
 
-    api_error_type       retval = TDX_SYS_BUSY;
-
+    //api_error_type       retval = TDX_SYS_BUSY;
+    api_error_type         retval = TDX_SUCCESS; 
     #ifdef SOURCE
     if (acquire_sharex_lock_ex(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
     {
@@ -873,13 +872,12 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     }
     #endif // SOURCE
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(tdx_global_data_ptr->global_lock == SHAREX_FREE); 
+        __CPROVER_assume(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE); 
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
         if (&tdx_global_data_ptr->global_lock != SHAREX_FREE)
         {
-            __CPROVER_printf("SOPHIA: global_lock:%d SHAREX_FREE: %d", tdx_global_data_ptr->global_lock.raw, SHAREX_FREE);
             __CPROVER_assert(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "obtain lock for global data pointer"); 
             TDX_ERROR("Failed to acquire global lock\n");
             retval = TDX_SYS_BUSY;
@@ -1018,13 +1016,11 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     // map only 2 tdmr entries each time
     pa_t tdmr_entry;
     pamt_data_t pamt_data_array[MAX_TDMRS];
-    api_error_type err;
-
+    api_error_type err = TDX_SUCCESS; 
     tdmr_info_copy = tdx_global_data_ptr->tdmr_info_copy;
-
+    
     for(uint64_t i = 0; i < num_of_tdmr_entries; i++)
     {
-
         #ifdef SOURCE
         tdmr_entry.raw = tdmr_pa_array[i];
         #else 
@@ -1035,6 +1031,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
         retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
         if (retval != TDX_SUCCESS)
         {
+            __CPROVER_printf("SOPHIA: %d", tdmr_entry.raw);
             retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
             TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
             goto EXIT;
@@ -1097,7 +1094,6 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
         update_pamt_array(tdmr_info_copy, pamt_data_array, (uint32_t)i); // save tdmr's pamt data
         #endif // SOURCE
     }
-
     #ifdef SOURCE
     tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
     #else 
@@ -1119,9 +1115,8 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     #endif // FLOW_PROOF
 
     // // Mark the system initialization as done
-    // tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
-    retval = TDX_SUCCESS;
-    
+    tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
+
 EXIT:
 
     // SOPHIA: never officially lock or have real memory so can abstract away
@@ -1136,7 +1131,6 @@ EXIT:
         free_la(tdmr_pa_array);
     }
     #endif // SOURCE
-
     return retval;
 }
 

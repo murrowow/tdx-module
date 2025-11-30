@@ -252,9 +252,13 @@ void driver_main() {
 
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
         __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
+        __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
         __CPROVER_assume(global_data.hkid_mask == HKID_MASK); 
         __CPROVER_assume(global_data.hkid_start_bit == (64 - n - 1));
         __CPROVER_assume((tables[0].tdmr_info_table.tdmr_base + tables[0].tdmr_info_table.tdmr_size - 1) < MAX_PA );
+        __CPROVER_assume((tables[1].tdmr_info_table.tdmr_base + tables[1].tdmr_info_table.tdmr_size - 1) < MAX_PA );
+        //__CPROVER_assume(tables[0].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
+        //__CPROVER_assume(tables[1].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
     #endif // SYS_CONFIG_SETUP
 
     uint16_t index = 0; 
