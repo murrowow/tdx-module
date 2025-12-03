@@ -81,16 +81,17 @@ void TDX_bootup() {
                      (global_private_hkid.hkid <= global_data.private_hkid_max));
 
     api_error_type error = UNINITIALIZE_ERROR;
-    error = tdh_sys_init(); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    error = tdh_sys_lp_init(); 
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_sys_rd(field_id); 
-    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
-    error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
-    __CPROVER_assert(error != TDX_SUCCESS, "seamcall success"); 
-    // error = tdh_sys_key_config();
+    // error = tdh_sys_init(); 
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_sys_lp_init(); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_sys_rd(field_id); 
+    // __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    // error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    // __CPROVER_assert(error != TDX_SUCCESS, "seamcall success"); 
+    error = tdh_sys_key_config();
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    __CPROVER_assert(false, "false"); 
     // error code coverage, find a sequence that goes through every one 
 
 }

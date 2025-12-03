@@ -261,6 +261,12 @@ void driver_main() {
         //__CPROVER_assume(tables[1].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
     #endif // SYS_CONFIG_SETUP
 
+    #ifdef SYS_KEY_CONFIG_SETUP
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables); 
+
+        __CPROVER_assume(global_data.global_state.sys_state == SYSCONFIG_DONE);
+    #endif // SYS_KEY_CONFIG_SETUP
     uint16_t index = 0; 
     #ifdef SETUP
         setup(); 
