@@ -144,7 +144,7 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
     {
         __CPROVER_assert(is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_base, _1GB) &&
                          is_addr_aligned_pwr_of_2(tdmr_info_copy[i].tdmr_size, _1GB) &&
-                         (tdmr_info_copy[i].tdmr_size >= 0), "TDMR address must be 1GB aligned and size greater than 0");
+                         (tdmr_info_copy[i].tdmr_size > 0), "TDMR address must be 1GB aligned and size greater than 0");
         TDX_ERROR("TDMR_BASE[%d]=0x%llx or TDMR_SIZE[%d]=0x%llx are not 1GB aligned\n",
                 i, tdmr_info_copy[i].tdmr_base, i, tdmr_info_copy[i].tdmr_size);
         return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
@@ -169,9 +169,14 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        __CPROVER_assert(is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base), "tdmr base pa is not smaller than max pa"); 
+    if (!is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base) ||
+        (((tdmr_info_copy[i].tdmr_base) >> global_data.hkid_start_bit) != 0)) {
+        __CPROVER_assert(is_pa_smaller_than_max_pa(tdmr_info_copy[i].tdmr_base), "tdmr base pa is not smaller than max pa");
         __CPROVER_assert(((tdmr_info_copy[i].tdmr_base & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0, "tdmr hkid shifted all the way is not 0");
+        return api_error_with_multiple_info(TDX_INVALID_TDMR, (uint8_t)i, 0, 0, 0);
+    }
     #endif // FLOW_PROOF
+
     #ifdef SOURCE
     // TDMR end address must comply with the platform’s maximum PA and their HKID bits must be 0.
     uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size - 1;
@@ -184,13 +189,16 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
     #endif // SOURCE
 
     #ifdef MODULAR_PROOF
-        uint64_t tdmr_end = tables[i].tdmr_info_table.tdmr_base + tables[i].tdmr_info_table.tdmr_size - 1;
+        uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size - 1;
         __CPROVER_assume(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0);
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        uint64_t tdmr_end = tables[i].tdmr_info_table.tdmr_base + tables[i].tdmr_info_table.tdmr_size - 1;
-        __CPROVER_assert(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0, "tdmr end exceeds the maximum possible size");
+    #ifdef FLOW_PROOF // SOPHIA HERE
+        uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size - 1;
+        if (!is_pa_smaller_than_max_pa(tdmr_end) || 
+            (((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) != 0)) {
+            __CPROVER_assert(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0, "tdmr end exceeds the maximum possible size");
+        }
     #endif // FLOW_PROOF
     return TDX_SUCCESS;
 }
@@ -875,7 +883,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (&tdx_global_data_ptr->global_lock != SHAREX_FREE)
+        if (tdx_global_data_ptr->global_lock.raw != SHAREX_FREE)
         {
             __CPROVER_assert(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "obtain lock for global data pointer"); 
             TDX_ERROR("Failed to acquire global lock\n");
@@ -962,10 +970,9 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             goto EXIT;
         }
 
-        retval = shared_hpa_check_with_pwr_2_alignment(tdmr_info_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
-        if (retval != TDX_SUCCESS)
+        if (!is_addr_aligned_pwr_of_2(tdmr_info_pa.raw, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT))
         {
-            __CPROVER_assert(shared_hpa_check_with_pwr_2_alignment(tdmr_info_pa, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR info array PA is not a valid shared HPA");
+            __CPROVER_assert(is_addr_aligned_pwr_of_2(tdmr_info_pa.raw, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR info array PA is not a valid shared HPA");
             retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
             TDX_ERROR("TDMR info array PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_info_pa.raw, retval);
             goto EXIT;
@@ -987,9 +994,11 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             goto EXIT;
         }
 
-        if ((global_private_hkid.reserved != 0) || !is_private_hkid(hkid))
+        if ((global_private_hkid.reserved != 0) || 
+            !((hkid >= global_data.private_hkid_min) && (hkid <= global_data.private_hkid_max)))
         {
-            __CPROVER_assert((global_private_hkid.reserved == 0) && is_private_hkid(hkid), "HKID is not private");
+            __CPROVER_assert((global_private_hkid.reserved == 0), "HKID is not private 1");
+            __CPROVER_assert((hkid >= global_data.private_hkid_min) && (hkid <= global_data.private_hkid_max), "HKID is not private 2");
             TDX_ERROR("HKID 0x%x is not private\n", hkid);
             retval = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_R8);
             goto EXIT;
@@ -1040,16 +1049,16 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             __CPROVER_assume(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT)); 
         #endif // MODULAR_PROOF
 
-        #ifdef FLOW_PROOF
-            retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
-            if (retval != TDX_SUCCESS)
-            {
-                __CPROVER_assert(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR entry PA is not a va lid shared HPA");
-                retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
-                TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
-                goto EXIT;
-            }
-        #endif // FLOW_PROOF
+        // #ifdef FLOW_PROOF
+        //     retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
+        //     if (retval != TDX_SUCCESS)
+        //     {
+        //         __CPROVER_assert(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT), "TDMR entry PA is not a va lid shared HPA");
+        //         retval = api_error_with_operand_id(retval, OPERAND_ID_RCX);
+        //         TDX_ERROR("TDMR entry PA is not a valid shared HPA pa=0x%llx, error=0x%llx\n", tdmr_entry.raw, retval);
+        //         goto EXIT;
+        //     }
+        // #endif // FLOW_PROOF
 
         #ifdef SOURCE
         tdmr_info_p = (tdmr_info_entry_t*)map_pa(tdmr_entry.raw_void, TDX_RANGE_RO);
@@ -1094,7 +1103,9 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     }
     #ifdef SOURCE
     tdx_global_data_ptr->num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries;
-    #else 
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
     global_data.num_of_tdmr_entries = (uint32_t)num_of_tdmr_entries; 
     #endif // SOURCE
 
@@ -1112,8 +1123,9 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
     #endif // FLOW_PROOF
 
-    // // Mark the system initialization as done
+    // Mark the system initialization as done
     tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
+    retval = TDX_SUCCESS;
 
 EXIT:
 

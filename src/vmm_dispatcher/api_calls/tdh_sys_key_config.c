@@ -61,9 +61,9 @@ api_error_type tdh_sys_key_config(void)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-    if (acquire_sharex_lock_ex(&tdx_global_data_ptr->global_lock) != LOCK_RET_SUCCESS)
+    if (tdx_global_data_ptr->global_lock.raw != SHAREX_FREE)
     {
-        __CPROVER_assert(tdx_global_data->global_lock.raw == SHAREX_FREE, "global lock haas not been obtained"); 
+        __CPROVER_assert(tdx_global_data_ptr->global_lock.raw == SHAREX_FREE, "global lock haas not been obtained"); 
         TDX_ERROR("Failed to acquire global lock for LP\n");
         retval = TDX_SYS_BUSY;
         goto EXIT;

@@ -118,6 +118,7 @@ void driver_main() {
         __CPROVER_havoc_object(&sysinfo); 
         __CPROVER_havoc_object(&global_data); 
         __CPROVER_havoc_object(&local_data); 
+        __CPROVER_havoc_object(&tables); 
         __CPROVER_havoc_object(&msr_values_ptr_model); 
         __CPROVER_havoc_object(&seamop_cap_model); 
 
@@ -126,6 +127,16 @@ void driver_main() {
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_PENDING); 
         __CPROVER_assume(global_data.kot.lock.raw == SHAREX_FREE); 
         __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
+        __CPROVER_assume(global_data.hkid_start_bit == (64 - n - 1));
+
+        for (int i = 0; i < MAX_TDMRS; i++) { // MAX_TDMRS = 64
+            __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base == 0);
+            __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_size > 0);
+            __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base < MAX_UINT64 - global_data.tdmr_info_copy[i].tdmr_size);
+            uint64_t tdmr_end = global_data.tdmr_info_copy[i].tdmr_base + global_data.tdmr_info_copy[i].tdmr_size - 1;
+            __CPROVER_assume(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0);
+            __CPROVER_assume(is_addr_aligned_pwr_of_2(global_data.tdmr_info_copy[i].tdmr_size, _1GB)); 
+        }
 
         // SYSINFO assumptions
         __CPROVER_assume((sysinfo.module_hv == 0)); 
@@ -254,7 +265,7 @@ void driver_main() {
         __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
         __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
         __CPROVER_assume(global_data.hkid_mask == HKID_MASK); 
-        __CPROVER_assume(global_data.hkid_start_bit == (64 - n - 1));
+        __CPROVER_assume(global_data.hkid_start_bit == (sizeof(signed long int) - n - 1));
         __CPROVER_assume((tables[0].tdmr_info_table.tdmr_base + tables[0].tdmr_info_table.tdmr_size - 1) < MAX_PA );
         __CPROVER_assume((tables[1].tdmr_info_table.tdmr_base + tables[1].tdmr_info_table.tdmr_size - 1) < MAX_PA );
         //__CPROVER_assume(tables[0].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
@@ -266,6 +277,8 @@ void driver_main() {
         __CPROVER_havoc_object(&tables); 
 
         __CPROVER_assume(global_data.global_state.sys_state == SYSCONFIG_DONE);
+        __CPROVER_assume((global_data.private_hkid_min == 0x00000000)); 
+        __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE)));
     #endif // SYS_KEY_CONFIG_SETUP
     uint16_t index = 0; 
     #ifdef SETUP

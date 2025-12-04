@@ -71,7 +71,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
     #endif //SOURCE
 
     #ifdef FLOW_PROOF
-        if (!(td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)) {
+        if (!((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max))) {
             return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
             goto EXIT; 
         }
