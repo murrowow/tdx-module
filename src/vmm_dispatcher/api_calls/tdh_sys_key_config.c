@@ -112,14 +112,15 @@ api_error_type tdh_sys_key_config(void)
     
     #ifdef MODULAR_PROOF
         uint32_t mask = 1u << tdx_local_data_ptr->lp_info.pkg;
-        __CPROVER_assume((tdx_global_data_ptr->pkg_config_bitmap & mask) != 0);
+        __CPROVER_assume((tdx_global_data_ptr->pkg_config_bitmap & mask) == 0);
         tdx_global_data_ptr->pkg_config_bitmap &= ~mask;
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
         uint32_t mask = 1u << tdx_local_data_ptr->lp_info.pkg;
         tdx_global_data_ptr->pkg_config_bitmap &= ~mask;
-        __CPROVER_assert((tdx_global_data_ptr->pkg_config_bitmap & mask) != 0, "Package has already configured its key");
+        __CPROVER_printf("SOPHIA: %d", tdx_global_data_ptr->pkg_config_bitmap);
+        __CPROVER_assert((tdx_global_data_ptr->pkg_config_bitmap & mask) == 0, "Package has already configured its key");
     #endif // FLOW_PROOF
 
     // SOPHIA: for now assume that mktme configuring a key always succeeds since it generates a key for the package

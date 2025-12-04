@@ -1118,10 +1118,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
     #endif // SOURCE
 
     // Prepare state variables for TDHSYSKEYCONFIG
-    #ifdef FLOW_PROOF
-    #else 
     tdx_global_data_ptr->pkg_config_bitmap = 0ULL;
-    #endif // FLOW_PROOF
 
     // Mark the system initialization as done
     tdx_global_data_ptr->global_state.sys_state = SYSCONFIG_DONE;
@@ -1141,6 +1138,7 @@ EXIT:
         free_la(tdmr_pa_array);
     }
     #endif // SOURCE
+
     return retval;
 }
 
