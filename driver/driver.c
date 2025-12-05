@@ -132,10 +132,38 @@ void driver_main() {
         for (int i = 0; i < MAX_TDMRS; i++) { // MAX_TDMRS = 64
             __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base == 0);
             __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_size > 0);
-            __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base < MAX_UINT64 - global_data.tdmr_info_copy[i].tdmr_size);
+            __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base <= (MAX_UINT64 - global_data.tdmr_info_copy[i].tdmr_size));
             uint64_t tdmr_end = global_data.tdmr_info_copy[i].tdmr_base + global_data.tdmr_info_copy[i].tdmr_size - 1;
             __CPROVER_assume(((tdmr_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0);
             __CPROVER_assume(is_addr_aligned_pwr_of_2(global_data.tdmr_info_copy[i].tdmr_size, _1GB)); 
+            for (uint32_t j = 0; j < MAX_RESERVED_AREAS; j++) {
+                uint64_t area_offset = global_data.tdmr_info_copy[i].rsvd_areas[j].offset;
+                uint64_t area_size = global_data.tdmr_info_copy[i].rsvd_areas[j].size;
+                __CPROVER_assume(area_offset <= (MAX_UINT64 - area_size)); 
+                uint64_t prev_area_offset, prev_area_size;
+                if (j < MAX_RESERVED_AREAS-1 ) {
+                    __CPROVER_assume(global_data.tdmr_info_copy[i].rsvd_areas[j+1].size == 0); 
+                    __CPROVER_assume(global_data.tdmr_info_copy[i].rsvd_areas[j+1].size == 0); 
+                }
+
+                if (j > 0) {
+                    prev_area_offset = global_data.tdmr_info_copy[i].rsvd_areas[j-1].offset;
+                    prev_area_size = global_data.tdmr_info_copy[i].rsvd_areas[j-1].size;
+
+                    __CPROVER_assume(area_offset >= prev_area_offset);
+                    __CPROVER_assume((area_offset >= prev_area_offset + prev_area_size));
+                }
+                 __CPROVER_assume(is_addr_aligned_pwr_of_2(area_offset, _4KB) &&
+                                  is_addr_aligned_pwr_of_2(area_size, _4KB)); 
+
+                uint64_t tdmr_start =  global_data.tdmr_info_copy[i].tdmr_base;
+                uint64_t tdmr_end = global_data.tdmr_info_copy[i].tdmr_base + global_data.tdmr_info_copy[i].tdmr_size;
+                uint64_t rsvd_start = tdmr_start + area_offset;
+                __CPROVER_assume(is_valid_integer_range(rsvd_start, area_size));
+            
+                uint64_t rsvd_end = rsvd_start + area_size;
+                __CPROVER_assume((rsvd_start >= tdmr_start) && (rsvd_end <= tdmr_end));
+            }
         }
 
         // SYSINFO assumptions

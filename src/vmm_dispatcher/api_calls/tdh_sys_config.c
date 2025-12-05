@@ -538,14 +538,30 @@ static api_error_type check_tdmr_reserved_areas(tdmr_info_entry_t tdmr_info_copy
         // A NULL reserved area (indicated by a size of 0) may only be followed by other NULL reserved areas.
         if (area_size == 0)
         {
+            #ifdef SOURCE
             if (j < MAX_RESERVED_AREAS-1 && tdmr_info_copy[i].rsvd_areas[j+1].size != 0)
             {
                 return api_error_with_multiple_info(TDX_NON_ORDERED_RESERVED_IN_TDMR,
                         (uint8_t)i, (uint8_t)j, 0, 0);
             }
+            #endif // SOURCE
+
+            #ifdef MODULAR_PROOF
+                __CPROVER_assume(global_data.tdmr_info_copy[i].rsvd_areas[j+1].size == 0); 
+            #endif // MODULAR_PROOF
+
+            #ifdef FLOW_PROOF
+            if (j < MAX_RESERVED_AREAS-1 && tdmr_info_copy[i].rsvd_areas[j+1].size != 0)
+            {
+                __CPROVER_assert(tdmr_info_copy[i].rsvd_areas[j+1].size == 0, "tdmr info rsvd areas has issue");
+                return api_error_with_multiple_info(TDX_NON_ORDERED_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+            #endif //FLOW_PROOF
         }
         else
         {
+            #ifdef SOURCE
             // Check for integer overflow
             if (!is_valid_integer_range(area_offset, area_size))
             {
@@ -617,6 +633,122 @@ static api_error_type check_tdmr_reserved_areas(tdmr_info_entry_t tdmr_info_copy
                 return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
                         (uint8_t)i, (uint8_t)j, 0, 0);
             }
+            #endif // SOURCE
+
+            #ifdef MODULAR_PROOF
+            // Check for integer overflow
+                __CPROVER_assume(is_valid_integer_range(area_offset, area_size));
+
+                if (j > 0)
+                {
+                    prev_area_offset = tdmr_info_copy[i].rsvd_areas[j-1].offset;
+                    prev_area_size = tdmr_info_copy[i].rsvd_areas[j-1].size;
+                }
+
+                // Reserved areas within TDMR must be sorted in an ascending offset order.
+
+                if (j > 0) 
+                {
+                    __CPROVER_assume(area_offset >= prev_area_offset);
+                    __CPROVER_assume((area_offset >= prev_area_offset + prev_area_size));
+                }
+
+                __CPROVER_assume(is_addr_aligned_pwr_of_2(area_offset, _4KB) &&
+                                is_addr_aligned_pwr_of_2(area_size, _4KB));
+
+                // Reserved areas must be fully contained within their TDMR.
+                uint64_t tdmr_start =  tdmr_info_copy[i].tdmr_base;
+                uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size;
+                __CPROVER_assume(is_valid_integer_range(tdmr_start, area_offset));
+
+                uint64_t rsvd_start = tdmr_start + area_offset;
+                __CPROVER_assume(is_valid_integer_range(rsvd_start, area_size));
+            
+                uint64_t rsvd_end = rsvd_start + area_size;
+                __CPROVER_assume((rsvd_start >= tdmr_start) && (rsvd_end <= tdmr_end));
+            #endif // MODULAR_PROOF
+
+            #ifdef FLOW_PROOF
+            // Check for integer overflow
+            if (!is_valid_integer_range(area_offset, area_size))
+            {
+                __CPROVER_assert(is_valid_integer_range(area_offset, area_size), "area offset and size is valid");
+                TDX_ERROR("TDMR[%d]: integer overflow on reserved area %d\n", i, j);
+                return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+
+            if (j > 0)
+            {
+                prev_area_offset = tdmr_info_copy[i].rsvd_areas[j-1].offset;
+                prev_area_size = tdmr_info_copy[i].rsvd_areas[j-1].size;
+            }
+
+            // Reserved areas within TDMR must be sorted in an ascending offset order.
+
+            if ((j > 0) && (area_offset < prev_area_offset))
+            {
+                __CPROVER_assert(area_offset >= prev_area_offset, "researved areas must be ascending order");
+                TDX_ERROR("TDMR[%d]: RSVD_AREA[%d]=0x%llx is smaller than RSVD_AREA[%d]=0x%llx\n",
+                        i, j, area_offset, j-1, prev_area_offset);
+                return api_error_with_multiple_info(TDX_NON_ORDERED_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+
+
+            // Reserved areas must not overlap.
+            // Check will be correct due to previous (ascencion) check correctness.
+            if ((j > 0) && (area_offset < prev_area_offset + prev_area_size))
+            {
+                __CPROVER_assert((area_offset >= prev_area_offset + prev_area_size), "Reserved areas must not overlap");
+                TDX_ERROR("TDMR[%d]: RSVD_AREA[%d] (from 0x%llx to 0x%llx) overlaps RSVD_AREA[%d] at 0x%llx\n",
+                        i, j-1, prev_area_offset, prev_area_offset + prev_area_size, j, area_offset);
+
+                return api_error_with_multiple_info(TDX_NON_ORDERED_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+
+            // Offset and size must comply with the alignment and granularity requirements.
+            // TDMR base address and size must comply with the alignment and granularity requirements.
+            if (!is_addr_aligned_pwr_of_2(area_offset, _4KB) ||
+                !is_addr_aligned_pwr_of_2(area_size, _4KB))
+            {
+                __CPROVER_assert(is_addr_aligned_pwr_of_2(area_offset, _4KB) &&
+                                 is_addr_aligned_pwr_of_2(area_size, _4KB), "offset and size are not aligned"); 
+                TDX_ERROR("TDMR[%d]: RSVD_AREA[%d] offset 0x%llx or size 0x%llx are not 4KB aligned\n",
+                        i, j, area_offset, area_size);
+                return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+
+            // Reserved areas must be fully contained within their TDMR.
+            uint64_t tdmr_start =  tdmr_info_copy[i].tdmr_base;
+            uint64_t tdmr_end = tdmr_info_copy[i].tdmr_base + tdmr_info_copy[i].tdmr_size;
+            if (!is_valid_integer_range(tdmr_start, area_offset))
+            {
+                __CPROVER_assert(is_valid_integer_range(tdmr_start, area_offset), "tdnr range must be valide");
+                TDX_ERROR("TDMR[%d]: integer overflow on reserved area %d\n", i, j);
+                return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+            uint64_t rsvd_start = tdmr_start + area_offset;
+            if (!is_valid_integer_range(rsvd_start, area_size))
+            {
+                __CPROVER_assert(is_valid_integer_range(rsvd_start, area_size), "tdmr start and area offset must be valid");
+                TDX_ERROR("TDMR[%d]: integer overflow on reserved area %d\n", i, j);
+                return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+            uint64_t rsvd_end = rsvd_start + area_size;
+            if (rsvd_start < tdmr_start || rsvd_end > tdmr_end)
+            {
+                __CPROVER_assert((rsvd_start >= tdmr_start) && (rsvd_end <= tdmr_end), "tdmr reserved area is valid");
+                TDX_ERROR("RSVD_AREA[%d] [0x%llx - 0x%llx] is not contained in TDMR[%d]: [0x%llx - 0x%llx]\n",
+                        j, rsvd_start, rsvd_end, i, tdmr_start, tdmr_end);
+                return api_error_with_multiple_info(TDX_INVALID_RESERVED_IN_TDMR,
+                        (uint8_t)i, (uint8_t)j, 0, 0);
+            }
+            #endif // FLOW_PROOF
         }
     }
 
@@ -830,22 +962,48 @@ static api_error_type check_and_set_tdmrs(tdmr_info_entry_t tdmr_info_copy[MAX_T
         }
     #endif // FLOW_PROOF
 
-    // if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
-    // if ((err = check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
+    // SOPHIA TODO: FLOW_PROOF
+    #ifdef SOURCE
+    if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    #endif //SOURCE
 
-    // if ((err = check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
-    // {
-    //     return err;
-    // }
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i) == TDX_SUCCESS);
+
+    #endif // MODULAR_PROOF
+    
+    #ifdef FLOW_PROOF
+        if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+        {
+            return err;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
+    if ((err = check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array));
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
+    if ((err = check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
+    {
+        return err;
+    }
+    #endif // SOURCE
     // All checks passed for current TDMR, fill it in our module data:
 
-    //set_tdmr_info_in_global_data(tdmr_info_copy, (uint32_t)i);
+    #ifdef SOURCE
+    set_tdmr_info_in_global_data(tdmr_info_copy, (uint32_t)i);
+    #endif // SOURCE
 
     return TDX_SUCCESS;
 
@@ -1049,6 +1207,7 @@ api_error_type tdh_sys_config(uint64_t tdmr_info_array_pa,
             __CPROVER_assume(shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT)); 
         #endif // MODULAR_PROOF
 
+        // SOPHIA TODO: figure out what is wrong with this 
         // #ifdef FLOW_PROOF
         //     retval = shared_hpa_check_with_pwr_2_alignment(tdmr_entry, TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT);
         //     if (retval != TDX_SUCCESS)

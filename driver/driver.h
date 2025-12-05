@@ -101,7 +101,6 @@ struct hardware_states
    bool_t tdcx_lock;
 
    tdmr_entry_t tdmr_table; 
-   tdmr_info_entry_t tdmr_info_table; 
    td_params_t td_params_table;
 
 //    pamt_entry_t tdvpr_pamt_entry;

@@ -92,8 +92,7 @@ void TDX_bootup() {
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     error = tdh_sys_key_config();
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    __CPROVER_assert(false, "False"); 
-    // error code coverage, find a sequence that goes through every one 
+    //__CPROVER_assert(false, "false"); 
 
 }
 #endif // not SOURCE
