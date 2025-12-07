@@ -127,6 +127,19 @@ void driver_main() {
         __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
         __CPROVER_assume(global_data.hkid_start_bit == (64 - n - 1));
 
+        for (uint64_t i = 0; i < MAX_CMR; i++)
+        {
+            uint64_t cmr_area_start = sysinfo.cmr_data[i].cmr_base;
+            uint64_t cmr_area_start_plus_size = sysinfo.cmr_data[i].cmr_base + sysinfo.cmr_data[i].cmr_size;
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_1g_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_1g_base + global_data.tdmr_info_copy[i].pamt_1g_size) <= cmr_area_start_plus_size);  
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_2m_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_2m_base + global_data.tdmr_info_copy[i].pamt_2m_size) <= cmr_area_start_plus_size);  
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_4k_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_4k_base + global_data.tdmr_info_copy[i].pamt_4k_size) <= cmr_area_start_plus_size);  
+            
+        }
+        
         for (int i = 0; i < MAX_TDMRS; i++) { // MAX_TDMRS = 64
             __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_base == 0);
             __CPROVER_assume(global_data.tdmr_info_copy[i].tdmr_size > 0);

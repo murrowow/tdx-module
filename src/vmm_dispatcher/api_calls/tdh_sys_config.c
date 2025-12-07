@@ -411,7 +411,7 @@ static bool_t is_pamt_overlaps_available_area(tdmr_info_entry_t* tdmr_info_ptr,
         #ifdef FLOW_PROOF
         if ((available_size > 0) && is_overlap(pamt_base, pamt_size, available_start, available_size))
         {
-            __CPROVER_assert(!is_overlap(pamt_base, pamt_size, available_start, available_size));
+            __CPROVER_assert(!is_overlap(pamt_base, pamt_size, available_start, available_size), "no overlap on pamt");
             TDX_ERROR("TDMR: PAMT [0x%llx - 0x%llx] overlaps with available area [0x%llx - 0x%llx]\n",
                 pamt_base, pamt_base + pamt_size, available_start, available_end);
             return true;
@@ -536,7 +536,7 @@ static api_error_type check_all_pamt_overlap(tdmr_info_entry_t tdmr_info_copy[MA
 
             if (check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j))
             {
-                __CPROVER_assume(check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j),
+                __CPROVER_assert(check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j),
                                 "pamt 1g overlaps with other pamt");
                 TDX_ERROR("TDMR[%d].PAMT_1GB overlaps other PAMT in TDMR[%d]\n", i, j);
                 return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_1GB, (uint8_t)j, 0);
