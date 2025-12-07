@@ -110,9 +110,7 @@ void init_setup(uint16_t index) {
     __CPROVER_assume(found);
 }
 
-void driver_main() {
-
-    #ifdef BOOTUP_SETUP
+void bootup_setup() {
         __CPROVER_havoc_object(&sysinfo); 
         __CPROVER_havoc_object(&global_data); 
         __CPROVER_havoc_object(&local_data); 
@@ -236,9 +234,9 @@ void driver_main() {
         __CPROVER_assume(global_data.plt_common_config.smrr[0].smrr_mask.raw == msr_values_ptr_model.smrr[0].smrr_mask.raw);
         __CPROVER_assume(global_data.plt_common_config.smrr[1].smrr_base.raw == msr_values_ptr_model.smrr[1].smrr_base.raw);
         __CPROVER_assume(global_data.plt_common_config.smrr[1].smrr_mask.raw == msr_values_ptr_model.smrr[1].smrr_mask.raw);
-    #endif //BOOTUP_SETUP
+}
 
-    #ifdef SYS_LP_INIT_SETUP
+void sys_lp_init_setup() {
         __CPROVER_havoc_object(&sysinfo); 
         __CPROVER_havoc_object(&global_data); 
         __CPROVER_havoc_object(&local_data); 
@@ -289,14 +287,14 @@ void driver_main() {
         __CPROVER_assume(local_data.lp_info.pkg < MAX_PKGS); 
 
         __CPROVER_havoc_object(&num_cached_sub_blocks_model); 
-    #endif //SYS_LP_INIT_SETUP
+}
 
-    #ifdef SYS_RD_SETUP
-        __CPROVER_havoc_object(&local_data); 
-        __CPROVER_assume(local_data.lp_is_init);
-    #endif // SYS_RD_SETUP
+void sys_rd_setup() {
+    __CPROVER_havoc_object(&local_data); 
+    __CPROVER_assume(local_data.lp_is_init);
+}
 
-    #ifdef SYS_CONFIG_SETUP
+void sys_config_setup() {
         __CPROVER_havoc_object(&global_data);
         __CPROVER_havoc_object(&tables); 
         __CPROVER_havoc_object(&sysinfo); 
@@ -324,16 +322,41 @@ void driver_main() {
         //__CPROVER_assume((tables[1].tdmr_info_table.tdmr_base + tables[1].tdmr_info_table.tdmr_size - 1) < MAX_PA );
         //__CPROVER_assume(tables[0].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
         //__CPROVER_assume(tables[1].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
+
+}
+
+void sys_key_config_setup(){
+    __CPROVER_havoc_object(&global_data);
+    __CPROVER_havoc_object(&tables); 
+
+    __CPROVER_assume(global_data.global_state.sys_state == SYSCONFIG_DONE);
+    __CPROVER_assume((global_data.private_hkid_min == 0x00000000)); 
+    __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE)));
+}
+
+
+void driver_main() {
+
+    #ifdef BOOTUP_SETUP 
+        bootup_setup(); 
+    #endif // BOOTUP_SETUP
+
+    #ifdef SYS_LP_INIT_SETUP 
+        sys_lp_init_setup(); 
+    #endif // SYS_LP_INIT_SETUP]
+
+    #ifdef SYS_RD_SETUP
+        sys_rd_setup(); 
+    #endif // SYS_RD_SETUP
+
+    #ifdef SYS_CONFIG_SETUP
+        sys_config_setup(); 
     #endif // SYS_CONFIG_SETUP
 
     #ifdef SYS_KEY_CONFIG_SETUP
-        __CPROVER_havoc_object(&global_data);
-        __CPROVER_havoc_object(&tables); 
-
-        __CPROVER_assume(global_data.global_state.sys_state == SYSCONFIG_DONE);
-        __CPROVER_assume((global_data.private_hkid_min == 0x00000000)); 
-        __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE)));
+        sys_key_config_setup(); 
     #endif // SYS_KEY_CONFIG_SETUP
+    
     uint16_t index = 0; 
     #ifdef SETUP
         setup(); 

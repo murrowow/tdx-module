@@ -583,14 +583,18 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     bool_t                is_sept_locked = false;
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
+    #ifdef SOURCE
     ia32_misc_enable_t misc_enable = { .raw = ia32_rdmsr(IA32_MISC_ENABLES_MSR_ADDR) };
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Boot NT4 bit should not be set
     if (misc_enable.limit_cpuid_maxval)
     {
         return_val = TDX_LIMIT_CPUID_MAXVAL_SET;
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE 
 
     if (vcpu_and_flags.reserved_0 || vcpu_and_flags.reserved_1)
     {
