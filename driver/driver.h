@@ -21,8 +21,6 @@
 
 // SOPHIA: define SOURCE, MODULAR_PROOF, FLOW_PROOF on command line for compile tine defines
 
-#ifdef SOURCE
-#else 
 // from tdx_global_data.h the max number of hkids is 2048 
 #define n 1
 #define HKID_SIZE 0x1 << n
@@ -149,5 +147,4 @@ _STATIC_INLINE_ pa_t set_hkid_to_pa_local(pa_t pa, uint16_t hkid)
     return pa;
 }
 
-#endif // not SOURCE
 #endif

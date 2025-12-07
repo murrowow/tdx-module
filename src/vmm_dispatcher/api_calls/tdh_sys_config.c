@@ -89,18 +89,29 @@ static bool_t is_area_in_cmr(uint64_t area_start, uint64_t area_start_plus_size)
 
     for (uint64_t i = 0; i < MAX_CMR; i++)
     {
+        #ifdef SOURCE
         uint64_t cmr_area_start = sysinfo_table_ptr->cmr_data[i].cmr_base;
         uint64_t cmr_area_start_plus_size = sysinfo_table_ptr->cmr_data[i].cmr_base
                 + sysinfo_table_ptr->cmr_data[i].cmr_size;
+        #else 
+            uint64_t cmr_area_start = sysinfo.cmr_data[i].cmr_base;
+            uint64_t cmr_area_start_plus_size = sysinfo.cmr_data[i].cmr_base + sysinfo.cmr_data[i].cmr_size;
+        #endif //SOURCE
 
+        #ifdef SOURCE
         if (sysinfo_table_ptr->cmr_data[i].cmr_size != 0)
+        #else 
+        if (sysinfo.cmr_data[i].cmr_size != 0)
+        #endif // SOURCE
         {
             if (cmr_area_start == last_cmr_area_start_plus_size)
             {
                 cmr_area_start = last_cmr_area_start;
             }
 
+            #ifdef SOURCE
             tdx_debug_assert(cmr_area_start_plus_size >= cmr_area_start);
+            #endif // SOURCE
 
             if ((area_start >= cmr_area_start) && (area_start_plus_size <= cmr_area_start_plus_size))
             {
@@ -206,6 +217,7 @@ static api_error_type check_tdmr_area_addresses_and_size(tdmr_info_entry_t tdmr_
 static bool_t check_pamt_addresses_and_size(uint64_t pamt_base, uint64_t pamt_size,
                                        uint64_t entry_size, uint64_t tdmr_size)
 {
+    #ifdef SOURCE
     // PAMT size should not cause integer overflow when added to the base
     if (!is_valid_integer_range(pamt_base, pamt_size))
     {
@@ -244,6 +256,61 @@ static bool_t check_pamt_addresses_and_size(uint64_t pamt_base, uint64_t pamt_si
                 pamt_size, (tdmr_size / entry_size) * sizeof(pamt_entry_t));
         return false;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(pamt_base <= MAX_UINT64 - pamt_size); 
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(pamt_base, _4KB) && is_addr_aligned_pwr_of_2(pamt_size, _4KB)); 
+        __CPROVER_assume(is_pa_smaller_than_max_pa(pamt_base) && 
+                        (((pamt_base & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0)); 
+        uint64_t pamt_end = pamt_base + pamt_size - 1;
+        __CPROVER_assume(is_pa_smaller_than_max_pa(pamt_end) && 
+                        (((pamt_end & global_data.hkid_mask) >> global_data.hkid_start_bit) == 0)); 
+        __CPROVER_assume(pamt_size < ((tdmr_size / entry_size) * sizeof(pamt_entry_t))); 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!is_valid_integer_range(pamt_base, pamt_size))
+        {
+            __CPROVER_assert(pamt_base <= MAX_UINT64 - pamt_size, "pamt size and base valid range"); 
+            TDX_ERROR("PAMT size 0x%llx causes integer overflow when added to base 0x%llx\n", pamt_base, pamt_size);
+            return false;
+        }
+
+        // PAMT base address must comply with the alignment requirements.
+        if (!is_addr_aligned_pwr_of_2(pamt_base, _4KB) || !is_addr_aligned_pwr_of_2(pamt_size, _4KB))
+        {
+            __CPROVER_assert(is_addr_aligned_pwr_of_2(pamt_base, _4KB) && is_addr_aligned_pwr_of_2(pamt_size, _4KB),
+                            "pamt addr must be aligned"); 
+            TDX_ERROR("PAMT base=0x%llx or size=0x%llx are not 4KB aligned\n", pamt_base, pamt_size);
+            return false;
+        }
+
+        // PAMT base address must comply with the platform’s maximum PA and their HKID bits must be 0.
+        if (!is_pa_smaller_than_max_pa(pamt_base) || get_hkid_from_pa((pa_t)pamt_base) != 0)
+        {
+            TDX_ERROR("PAMT base=0x%llx doesn't comply with platform max PA = 0x%llx, or HKID=0x%x!=0\n",
+                    pamt_base, BIT(get_global_data()->max_pa), get_hkid_from_pa((pa_t)pamt_base));
+            return false;
+        }
+
+        // PAMT end address must comply with the platform’s maximum PA and their HKID bits must be 0.
+        uint64_t pamt_end = pamt_base + pamt_size - 1;
+        if (!is_pa_smaller_than_max_pa(pamt_end) || get_hkid_from_pa((pa_t)pamt_end) != 0)
+        {
+            TDX_ERROR("PAMT end=0x%llx doesn't comply with platform max PA = 0x%llx, or HKID=0x%x!=0\n",
+                    pamt_end, BIT(get_global_data()->max_pa), get_hkid_from_pa((pa_t)pamt_end));
+            return false;
+        }
+
+        // The size of each PAMT region must be large enough to contain the PAMT for its associated TDMR.
+        if (pamt_size < ((tdmr_size / entry_size) * sizeof(pamt_entry_t)))
+        {
+            TDX_ERROR("PAMT size=0x%llx isn't big enough to contain entries (0x%llx) for current TDMR\n",
+                    pamt_size, (tdmr_size / entry_size) * sizeof(pamt_entry_t));
+            return false;
+        }
+    #endif // FLOW_PROOF
 
     return true;
 }
@@ -289,13 +356,28 @@ static bool_t is_pamt_overlaps_available_area(tdmr_info_entry_t* tdmr_info_ptr,
 
         // At this point PAMT areas, TDMR reserved areas, and TDMR area
         // were already checked to not cause integer overflow
+        #ifdef SOURCE
         if (is_overlap(pamt_base, pamt_size, available_start, available_size))
         {
             TDX_ERROR("TDMR: PAMT [0x%llx - 0x%llx] overlaps with available area [0x%llx - 0x%llx]\n",
                     pamt_base, pamt_base + pamt_size, available_start, available_end);
             return true;
         }
+        #endif // SOURCE
 
+        #ifdef MODULAR_PROOF
+        __CPROVER_assume(!is_overlap(pamt_base, pamt_size, available_start, available_size)); 
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if (is_overlap(pamt_base, pamt_size, available_start, available_size))
+            {
+                __CPROVER_assert(!is_overlap(pamt_base, pamt_size, available_start, available_size), "No overlap in pamt_base and pamt_size"); 
+                TDX_ERROR("TDMR: PAMT [0x%llx - 0x%llx] overlaps with available area [0x%llx - 0x%llx]\n",
+                        pamt_base, pamt_base + pamt_size, available_start, available_end);
+                return true;
+            }
+        #endif // FLOW_PROOF
         if (!valid_rsvd_area) // NULL entry is last - no more reserved areas
         {
             break;
@@ -311,12 +393,30 @@ static bool_t is_pamt_overlaps_available_area(tdmr_info_entry_t* tdmr_info_ptr,
 
         // At this point PAMT areas, TDMR reserved areas, and TDMR area
         // were already checked to not cause integer overflow
+        #ifdef SOURCE
         if ((available_size > 0) && is_overlap(pamt_base, pamt_size, available_start, available_size))
         {
             TDX_ERROR("TDMR: PAMT [0x%llx - 0x%llx] overlaps with available area [0x%llx - 0x%llx]\n",
                 pamt_base, pamt_base + pamt_size, available_start, available_end);
             return true;
         }
+        #endif // SOURCE
+
+        #ifdef MODULAR_PROOF
+        if (available_size > 0) {
+            __CPROVER_assume(!is_overlap(pamt_base, pamt_size, available_start, available_size)); 
+        }
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+        if ((available_size > 0) && is_overlap(pamt_base, pamt_size, available_start, available_size))
+        {
+            __CPROVER_assert(!is_overlap(pamt_base, pamt_size, available_start, available_size));
+            TDX_ERROR("TDMR: PAMT [0x%llx - 0x%llx] overlaps with available area [0x%llx - 0x%llx]\n",
+                pamt_base, pamt_base + pamt_size, available_start, available_end);
+            return true;
+        }
+        #endif // FLOW_PROOF
     }
 
     return false;
@@ -393,6 +493,7 @@ static api_error_type check_all_pamt_overlap(tdmr_info_entry_t tdmr_info_copy[MA
     for (uint32_t j = 0; j < i; j++)
     {
 
+        #ifdef SOURCE
         if (check_pamt_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size, pamt_data_array, j))
         {
             TDX_ERROR("TDMR[%d].PAMT_4KB overlaps other PAMT in TDMR[%d]\n", i, j);
@@ -409,8 +510,41 @@ static api_error_type check_all_pamt_overlap(tdmr_info_entry_t tdmr_info_copy[MA
             TDX_ERROR("TDMR[%d].PAMT_1GB overlaps other PAMT in TDMR[%d]\n", i, j);
             return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_1GB, (uint8_t)j, 0);
         }
+        #endif //SOURCE
+
+         #ifdef MODULAR_PROOF
+            __CPROVER_assume(check_pamt_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size, pamt_data_array, j));
+            __CPROVER_assume(check_pamt_overlap(tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size, pamt_data_array, j));
+            __CPROVER_assume(check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j));
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if (check_pamt_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size, pamt_data_array, j))
+            {
+                __CPROVER_assert(check_pamt_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size, pamt_data_array, j),
+                                "pamt 4k overlaps with other pamt");
+                TDX_ERROR("TDMR[%d].PAMT_4KB overlaps other PAMT in TDMR[%d]\n", i, j);
+                return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_4KB, (uint8_t)j, 0);
+            }
+            if (check_pamt_overlap(tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size, pamt_data_array, j))
+            {
+                __CPROVER_assert(check_pamt_overlap(tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size, pamt_data_array, j),
+                                "pamt 2m overlaps with other pamt");
+                TDX_ERROR("TDMR[%d].PAMT_2MB overlaps other PAMT in TDMR[%d]\n", i, j);
+                return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_2MB, (uint8_t)j, 0);
+            }
+
+            if (check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j))
+            {
+                __CPROVER_assume(check_pamt_overlap(tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size, pamt_data_array, j),
+                                "pamt 1g overlaps with other pamt");
+                TDX_ERROR("TDMR[%d].PAMT_1GB overlaps other PAMT in TDMR[%d]\n", i, j);
+                return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_1GB, (uint8_t)j, 0);
+            }
+        #endif // FLOW_PROOF
     }
 
+    #ifdef SOURCE
     if (is_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size,
                    tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size))
     {
@@ -431,7 +565,16 @@ static api_error_type check_all_pamt_overlap(tdmr_info_entry_t tdmr_info_copy[MA
         TDX_ERROR("TDMR[%d].PAMT_2MB overlaps PAMT_1GB\n", i);
         return api_error_with_multiple_info(TDX_PAMT_OVERLAP, (uint8_t)i, PT_2MB, (uint8_t)i, 0);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size,
+                   tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size));
+        __CPROVER_assume(is_overlap(tdmr_info_copy[i].pamt_4k_base, tdmr_info_copy[i].pamt_4k_size,
+                   tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size));
+        __CPROVER_assume(is_overlap(tdmr_info_copy[i].pamt_2m_base, tdmr_info_copy[i].pamt_2m_size,
+                   tdmr_info_copy[i].pamt_1g_base, tdmr_info_copy[i].pamt_1g_size));
+    #endif // MODULAR_PROOF
     return TDX_SUCCESS;
 }
 
@@ -469,7 +612,7 @@ static api_error_type check_pamt_addresses(tdmr_info_entry_t tdmr_info_copy[MAX_
 static api_error_type check_pamt_in_cmr(tdmr_info_entry_t tdmr_info_copy[MAX_TDMRS], uint32_t i)
 {
     // PAMTs must be contained in convertible memory, i.e., in CMRs.
-
+    #ifdef SOURCE
     if (!is_area_in_cmr(tdmr_info_copy[i].pamt_1g_base,
             tdmr_info_copy[i].pamt_1g_base + tdmr_info_copy[i].pamt_1g_size))
     {
@@ -490,7 +633,48 @@ static api_error_type check_pamt_in_cmr(tdmr_info_entry_t tdmr_info_copy[MAX_TDM
         TDX_ERROR("TDMR[%d].PAMT_4KB info is not contained in any CMR\n", i);
         return api_error_with_multiple_info(TDX_PAMT_OUTSIDE_CMRS, (uint8_t)i, PT_4KB, 0, 0);
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_area_in_cmr(tdmr_info_copy[i].pamt_1g_base,
+                         tdmr_info_copy[i].pamt_1g_base + tdmr_info_copy[i].pamt_1g_size));
+        __CPROVER_assume(is_area_in_cmr(tdmr_info_copy[i].pamt_2m_base,
+                         tdmr_info_copy[i].pamt_2m_base + tdmr_info_copy[i].pamt_2m_size));
+        __CPROVER_assume(is_area_in_cmr(tdmr_info_copy[i].pamt_4k_base,
+                         tdmr_info_copy[i].pamt_4k_base + tdmr_info_copy[i].pamt_4k_size)); 
+    #endif // MODULAR_PROOF
+    
+    #ifdef FLOW_PROOF
+            if (!is_area_in_cmr(tdmr_info_copy[i].pamt_1g_base,
+            tdmr_info_copy[i].pamt_1g_base + tdmr_info_copy[i].pamt_1g_size))
+            {
+                __CPROVER_assert(is_area_in_cmr(tdmr_info_copy[i].pamt_1g_base,
+                                tdmr_info_copy[i].pamt_1g_base + tdmr_info_copy[i].pamt_1g_size),
+                                "1g is not in cmr");
+                TDX_ERROR("TDMR[%d].PAMT_1GB info is not contained in any CMR\n", i);
+                return api_error_with_multiple_info(TDX_PAMT_OUTSIDE_CMRS, (uint8_t)i, PT_1GB, 0, 0);
+            }
+        
+            if (!is_area_in_cmr(tdmr_info_copy[i].pamt_2m_base,
+                    tdmr_info_copy[i].pamt_2m_base + tdmr_info_copy[i].pamt_2m_size))
+            {
+                __CPROVER_assert(is_area_in_cmr(tdmr_info_copy[i].pamt_2m_base,
+                                tdmr_info_copy[i].pamt_2m_base + tdmr_info_copy[i].pamt_2m_size),
+                                "2mb is not in cmr");
+                TDX_ERROR("TDMR[%d].PAMT_2MB info is not contained in any CMR\n", i);
+                return api_error_with_multiple_info(TDX_PAMT_OUTSIDE_CMRS, (uint8_t)i, PT_2MB, 0, 0);
+            }
+        
+            if (!is_area_in_cmr(tdmr_info_copy[i].pamt_4k_base,
+                    tdmr_info_copy[i].pamt_4k_base + tdmr_info_copy[i].pamt_4k_size))
+            {
+                __CPROVER_assert(is_area_in_cmr(tdmr_info_copy[i].pamt_4k_base,
+                         tdmr_info_copy[i].pamt_4k_base + tdmr_info_copy[i].pamt_4k_size),
+                        "4k is not in cmr"); 
+                TDX_ERROR("TDMR[%d].PAMT_4KB info is not contained in any CMR\n", i);
+                return api_error_with_multiple_info(TDX_PAMT_OUTSIDE_CMRS, (uint8_t)i, PT_4KB, 0, 0);
+            }
+    #endif // FLOW_PROOF
     return TDX_SUCCESS;
 
 }
@@ -547,7 +731,9 @@ static api_error_type check_tdmr_reserved_areas(tdmr_info_entry_t tdmr_info_copy
             #endif // SOURCE
 
             #ifdef MODULAR_PROOF
-                __CPROVER_assume(global_data.tdmr_info_copy[i].rsvd_areas[j+1].size == 0); 
+                if (j < MAX_RESERVED_AREAS-1) {
+                    __CPROVER_assume(global_data.tdmr_info_copy[i].rsvd_areas[j+1].size == 0); 
+                }
             #endif // MODULAR_PROOF
 
             #ifdef FLOW_PROOF
@@ -793,6 +979,7 @@ static api_error_type check_tdmr_available_areas(tdmr_info_entry_t tdmr_info_cop
             available_end = reserved_start;
         }
 
+        #ifdef SOURCE
         if (!is_area_in_cmr(available_start, available_end))
         {
             TDX_ERROR("TDMR[%d]: Non-reserved area [0x%llx - 0x%llx] is not in any CMR\n",
@@ -800,7 +987,22 @@ static api_error_type check_tdmr_available_areas(tdmr_info_entry_t tdmr_info_cop
 
             return api_error_with_multiple_info(TDX_TDMR_OUTSIDE_CMRS, (uint8_t)i, 0, 0, 0);
         }
+        #endif // SOURCE
 
+        #ifdef MODULAR_PROOF    
+            __CPROVER_assume(is_area_in_cmr(available_start, available_end)); 
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if (!is_area_in_cmr(available_start, available_end))
+            {
+                __CPROVER_assert(is_area_in_cmr(available_start, available_end), "tdmr in valid cmr area"); 
+                TDX_ERROR("TDMR[%d]: Non-reserved area [0x%llx - 0x%llx] is not in any CMR\n",
+                        i, available_start, available_end);
+
+                return api_error_with_multiple_info(TDX_TDMR_OUTSIDE_CMRS, (uint8_t)i, 0, 0, 0);
+            }
+        #endif // FLOW_PROOF
         if (!valid_rsvd_area) // NULL entry is last - no more reserved areas
         {
             break;
@@ -962,7 +1164,6 @@ static api_error_type check_and_set_tdmrs(tdmr_info_entry_t tdmr_info_copy[MAX_T
         }
     #endif // FLOW_PROOF
 
-    // SOPHIA TODO: FLOW_PROOF
     #ifdef SOURCE
     if ((err = check_tdmr_reserved_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
     {
@@ -989,19 +1190,32 @@ static api_error_type check_and_set_tdmrs(tdmr_info_entry_t tdmr_info_copy[MAX_T
     }
     #endif // SOURCE
 
+    // SOPHIA TODO 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array));
     #endif // MODULAR_PROOF
 
+    // #ifdef FLOW_PROOF
+    //     if ((err = check_tdmr_pamt_areas(tdmr_info_copy, (uint32_t)i, pamt_data_array)) != TDX_SUCCESS)
+    //     {
+    //         return err;
+    //     }
+    // #endif // FLOW_PROOF
+    
     #ifdef SOURCE
     if ((err = check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i)) != TDX_SUCCESS)
     {
         return err;
     }
     #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_tdmr_available_areas(tdmr_info_copy, (uint32_t)i));
+    #endif // MODULAR_PROOF
     // All checks passed for current TDMR, fill it in our module data:
 
-    #ifdef SOURCE
+    #ifdef FLOW_PROOF
+    #else 
     set_tdmr_info_in_global_data(tdmr_info_copy, (uint32_t)i);
     #endif // SOURCE
 

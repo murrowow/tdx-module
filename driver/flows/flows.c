@@ -1,7 +1,5 @@
 #include "driver/flows/flows.h"
 
-#ifdef SOURCE
-#else
 void TD_setup(uint16_t index) {
     uint64_t target_tdr_pa;
     uint64_t target_tdcx_pa; 
@@ -82,6 +80,33 @@ void TDX_bootup() {
     __CPROVER_assume(global_private_hkid.reserved == 0); 
 
     api_error_type error = UNINITIALIZE_ERROR;
+
+    #ifdef TDXBOOTUP
+    error = tdh_sys_init(); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    #endif // BOOTUP_SETUP
+
+    #ifdef SYS_LP_INIT
+    error = tdh_sys_lp_init(); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    #endif //SYS_LP_INIT_SETUP
+
+    #ifdef SYS_RD
+    error = tdh_sys_rd(field_id); 
+    __CPROVER_assert(error == TDX_SUCCESS,  "seamcall success"); 
+    #endif // SYS_RD_SETUP
+
+    #ifdef SYS_CONFIG
+    error = tdh_sys_config(tdmr_info_array_pa, num_of_tdmr_entries, global_private_hkid); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    #endif // SYS_CONFIG_SETUP
+
+    #ifdef SYS_KEY_CONFIG
+    error = tdh_sys_key_config();
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    #endif // SYS_KEY_CONFIG_SETUP
+
+    #ifdef WHOLE_FLOW
     error = tdh_sys_init(); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_sys_lp_init(); 
@@ -93,6 +118,6 @@ void TDX_bootup() {
     error = tdh_sys_key_config();
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     //__CPROVER_assert(false, "false"); 
+    #endif // WHOLE_FLOW
 
 }
-#endif // not SOURCE

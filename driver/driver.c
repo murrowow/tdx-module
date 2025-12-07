@@ -6,8 +6,6 @@
 #include "../src/common/helpers/virt_msr_helpers.h"
 #include "../include/auto_gen/cpuid_configurations.h"
 
-#ifdef SOURCE
-#else 
 void setup() {
     __CPROVER_havoc_object(&global_data); // .private_hkid_min and .private_hkid_max
     __CPROVER_assume((global_data.private_hkid_min == 0x00000000));  //&& (global_data.private_hkid_min < (0xFFFFFFFF - (HKID_SIZE)))); 
@@ -288,14 +286,29 @@ void driver_main() {
     #ifdef SYS_CONFIG_SETUP
         __CPROVER_havoc_object(&global_data);
         __CPROVER_havoc_object(&tables); 
+        __CPROVER_havoc_object(&sysinfo); 
 
         __CPROVER_assume(global_data.global_state.sys_state == SYSINIT_DONE); 
         __CPROVER_assume(global_data.num_of_init_lps == global_data.num_of_lps);
         __CPROVER_assume(global_data.global_lock.raw == SHAREX_FREE);
         __CPROVER_assume(global_data.hkid_mask == HKID_MASK); 
         __CPROVER_assume(global_data.hkid_start_bit == (sizeof(signed long int) - n - 1));
-        __CPROVER_assume((tables[0].tdmr_info_table.tdmr_base + tables[0].tdmr_info_table.tdmr_size - 1) < MAX_PA );
-        __CPROVER_assume((tables[1].tdmr_info_table.tdmr_base + tables[1].tdmr_info_table.tdmr_size - 1) < MAX_PA );
+
+        // SOPHIA TODO: add to BOOTUP
+        for (uint64_t i = 0; i < MAX_CMR; i++)
+        {
+            uint64_t cmr_area_start = sysinfo.cmr_data[i].cmr_base;
+            uint64_t cmr_area_start_plus_size = sysinfo.cmr_data[i].cmr_base + sysinfo.cmr_data[i].cmr_size;
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_1g_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_1g_base + global_data.tdmr_info_copy[i].pamt_1g_size) <= cmr_area_start_plus_size);  
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_2m_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_2m_base + global_data.tdmr_info_copy[i].pamt_2m_size) <= cmr_area_start_plus_size);  
+            __CPROVER_assume(global_data.tdmr_info_copy[i].pamt_4k_base >= cmr_area_start);
+            __CPROVER_assume((global_data.tdmr_info_copy[i].pamt_4k_base + global_data.tdmr_info_copy[i].pamt_4k_size) <= cmr_area_start_plus_size);  
+            
+        }
+        //__CPROVER_assume((tables[0].tdmr_info_table.tdmr_base + tables[0].tdmr_info_table.tdmr_size - 1) < MAX_PA );
+        //__CPROVER_assume((tables[1].tdmr_info_table.tdmr_base + tables[1].tdmr_info_table.tdmr_size - 1) < MAX_PA );
         //__CPROVER_assume(tables[0].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
         //__CPROVER_assume(tables[1].tdmr_table.pa.raw & (TDMR_INFO_ENTRY_PTR_ARRAY_ALIGNMENT -  1) == 0); 
     #endif // SYS_CONFIG_SETUP
@@ -328,4 +341,3 @@ void driver_main() {
     TDX_bootup(); 
     //TD_setup(index); 
 }
-#endif // not SOURCE

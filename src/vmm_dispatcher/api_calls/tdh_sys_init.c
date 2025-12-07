@@ -1838,9 +1838,10 @@ _STATIC_INLINE_ api_error_type check_module_build_time_defs(tdx_module_global_t*
         tdx_global_data_ptr->no_downgrade      = sysinfo_table->no_downgrade;
         tdx_global_data_ptr->num_handoff_pages = sysinfo_table->num_handoff_pages;
 
-        if ((tdx_global_data_ptr->module_hv != TDX_MODULE_HV) ||
-            (tdx_global_data_ptr->min_update_hv < TDX_MIN_UPDATE_HV) ||
-            ((tdx_global_data_ptr->no_downgrade == 0) && (TDX_NO_DOWNGRADE == 1)) ||
+        // SOPHIA: NEED TO CHANGE THIS CUZ NO COMPILE TIMES
+        if ((tdx_global_data_ptr->module_hv != 0) || //TDX_MODULE_HV
+            (tdx_global_data_ptr->min_update_hv < 0) || // TDX_MIN_UPDATE_HV)
+            ((tdx_global_data_ptr->no_downgrade == 0)) || // && (TDX_NO_DOWNGRADE == 1)) ||
             ((tdx_global_data_ptr->num_handoff_pages + 1) < TDX_MIN_HANDOFF_PAGES))
         {
             TDX_ERROR("Incompatible TD preserving defs\n");
@@ -2028,7 +2029,11 @@ api_error_type tdh_sys_init(void)
         }
     #endif // FLOW_PROOF
 
+    #ifdef SOURCE
+    tdx_global_data_ptr->seam_capabilities = caps; 
+    #else 
     tdx_global_data_ptr->seam_capabilities = seamop_cap_model;
+    #endif // SOURCE
 
     uint64_t seamdb_size;
 
@@ -2060,9 +2065,15 @@ api_error_type tdh_sys_init(void)
         __CPROVER_havoc_slice(&seamdb_size, sizeof(uint64_t)); 
     #endif // SOURCE 
     
+    #ifdef SOURCE 
+    tdx_global_data_ptr->seamverifyreport_available = ((caps.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
+    #endif // SOURCE
+    #ifdef MODULAR_PROOF
+    tdx_global_data_ptr->seamverifyreport_available = ((seamop_cap_model.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
+    #endif // MODULAR_PROOF
+
     #ifdef FLOW_PROOF
     #else 
-    tdx_global_data_ptr->seamverifyreport_available = ((seamop_cap_model.raw & BIT(SEAMOPS_SEAMVERIFYREPORT_LEAF)) != 0);
     /*
      * Calculate allowed ATTRIBUTES bits.
      */

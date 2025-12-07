@@ -865,12 +865,20 @@
  
      // TDR related variables
      pa_t                  tdr_pa;                    // TDR physical address
+     #ifdef SOURCE
+     tdr_t               * tdr_ptr; 
+     #else 
      tdr_small_t         * tdr_ptr;                   // Pointer to the TDR page (linear address)
+     #endif // SOURCE
      pamt_block_t          tdr_pamt_block;            // TDR PAMT block
      pamt_entry_t        * tdr_pamt_entry_ptr;        // Pointer to the TDR PAMT entry
      bool_t                tdr_locked_flag = false;   // Indicate TDR is locked
  
+     #ifdef SOURCE
+     tdcs_t              * tdcs_ptr = NULL;
+     #else 
      tdcs_small_t        * tdcs_ptr = NULL;           // Pointer to the TDCS structure (Multi-page)
+     #endif // SOURCE
  
      // TD_PARAMS variables
      pa_t                  td_params_pa;              // Physical address of the params structure
