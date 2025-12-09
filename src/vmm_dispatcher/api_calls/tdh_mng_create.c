@@ -77,6 +77,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         }
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (!((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max))) {
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     #ifdef MODULAR_PROOF
         __CPROVER_assume((td_hkid >= global_data.private_hkid_min) && (td_hkid <= global_data.private_hkid_max)); //hkid within valid bounds
     #endif // MODULAR_PROOF
@@ -119,6 +126,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         }
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdr_pamt_entry_ptr->pt != PT_NDA) {
+            return_val = TDX_PAGE_METADATA_INCORRECT;
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     // Acquire exclusive access to KOT
     #ifdef SOURCE
         if(acquire_sharex_lock_ex(&global_data->kot.lock) != LOCK_RET_SUCCESS) 
@@ -139,6 +153,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
             goto EXIT;
         } 
     #endif //FLOW_PROOF 
+
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (global_data.kot.lock.raw != SHAREX_FREE) {
+            return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_KOT);
+            goto EXIT;
+        } 
+    #endif //SOURCE_WITH_ABSTRACTIONS
     kot_locked_flag = true;
 
     // Protection against speculation attacks with out-of-bound td_hkid user input value
@@ -165,6 +186,13 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         } 
     #endif // FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (global_data.kot.entries[td_hkid & HKID_MASK].state != KOT_STATE_HKID_FREE) {
+            return_val = TDX_HKID_NOT_FREE; 
+            goto EXIT; 
+        } 
+    #endif // SOURCE_WITH_ABSTRACTIONS
+
     // Clear the content of the TDR page using direct writes
     #ifdef SOURCE
         zero_area_cacheline(tdr_ptr, TDX_PAGE_SIZE_IN_BYTES);
@@ -175,6 +203,9 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         tables[td_hkid & HKID_MASK].tdr_mem = 0; 
     #endif // MODULAR_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        tables[td_hkid & HKID_MASK].tdr_mem = 0; 
+    #endif // SOURCE_WITH_ABSTRACTIONS
     /**
      * Initialize the TD Management and Key Management Fields.
      * Fields which are initialized to zero are implicitly zero'd in the
@@ -238,6 +269,28 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
         tdr_pamt_entry_ptr->pt = PT_TDR;
         tdr_pamt_entry_ptr->owner = 0;
     #endif // MODULAR_PROOF
+
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        // Mark the HKID entry in the KOT as assigned
+        global_data.kot.entries[td_hkid & HKID_MASK].state = (uint8_t)KOT_STATE_HKID_ASSIGNED;
+
+        // Set HKID in the TKT entry
+        tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.hkid = td_hkid & HKID_MASK;
+        tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state = TD_HKID_ASSIGNED;
+
+        // SOPHIA: tentatively saying that these are not important fields
+        tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.seamdb_index = global_data.seamdb_index;
+
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.seamdb_nonce.qwords[i] = global_data.seamdb_nonce.qwords[i];
+        }
+        tables[td_hkid & HKID_MASK].tdr_table.td_preserving_fields.handoff_version = global_data.module_hv;
+
+        // Set the new TDR page PAMT fields
+        tdr_pamt_entry_ptr->pt = PT_TDR;
+        tdr_pamt_entry_ptr->owner = 0;
+    #endif // SOURCE_WITH_ABSTRACTIONS
 
     #ifdef FLOW_PROOF
         // Mark the HKID entry in the KOT as assigned

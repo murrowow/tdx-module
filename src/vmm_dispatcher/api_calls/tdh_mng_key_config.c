@@ -91,6 +91,13 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         }
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdr_pamt_entry_ptr->pt != PT_TDR) {
+            return_val = TDX_PAGE_METADATA_INCORRECT;
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     //Verify TDR is not in fatal state
     #ifdef SOURCE
         if (tdr_ptr->management_fields.fatal)
@@ -112,6 +119,13 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         }
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal) {
+            return_val = TDX_TD_FATAL; 
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     // Verify LIFECYCLE_STATE
     #ifdef SOURCE
     if (tdr_ptr->management_fields.lifecycle_state != TD_HKID_ASSIGNED)
@@ -132,6 +146,13 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
         }
     #endif //FLOW_PROOF
     
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state != TD_HKID_ASSIGNED) {
+            return_val = TDX_LIFECYCLE_STATE_INCORRECT; 
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     // Check if the key is already configured
     #ifdef SOURCE
         if (tdr_ptr->key_management_fields.pkg_config_bitmap & (BIT(local_data->lp_info.pkg)))
@@ -152,6 +173,14 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
             goto EXIT;
         }
     #endif //FLOW_PROOF
+
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if ((tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap & (BIT(local_data.lp_info.pkg))))
+        {
+            return_val = TDX_KEY_CONFIGURED;
+            goto EXIT;
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
 
     /** Try to configure the key on the package using a CPU-generated key.
      * This operation acquires an exclusive lock on KET (encryption engine tables)
@@ -188,6 +217,15 @@ api_error_type tdh_mng_key_config(uint64_t target_tdr_pa)
             tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
         }
     #endif //MODULAR_PROOF
+
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap |= BIT(local_data.lp_info.pkg);
+
+        if (tables[td_hkid & HKID_MASK].tdr_table.key_management_fields.pkg_config_bitmap == (uint64_t)global_data.pkg_config_bitmap)
+        {
+            tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state = (uint8_t)TD_KEYS_CONFIGURED;
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
 
     #ifdef FLOW_PROOF
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.key_management_fields, sizeof(&tables[td_hkid & HKID_MASK].tdr_table.key_management_fields));

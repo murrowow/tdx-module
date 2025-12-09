@@ -93,6 +93,13 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "PAMT is labeled correctly");
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdr_pamt_entry_ptr->pt != PT_TDR) {
+            return_val = TDX_PAGE_METADATA_INCORRECT;
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     // Check the TD state
     #ifdef SOURCE
         if (tdr_ptr->management_fields.fatal)
@@ -110,6 +117,13 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assert(!tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal, "Make sure the TD is not in a fatal state");
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.fatal) {
+            return_val = TDX_TD_FATAL; 
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     #ifdef SOURCE
         if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
         {
@@ -125,6 +139,13 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
     #ifdef FLOW_PROOF
         __CPROVER_assert(tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "Lifecycle is in the correct state");
     #endif //FLOW_PROOF
+
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tables[td_hkid & HKID_MASK].tdr_table.management_fields.lifecycle_state != TD_KEYS_CONFIGURED) {
+            return_val = TDX_TD_KEYS_NOT_CONFIGURED; 
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
 
     // Get the current number of TDCS pages and verify
     #ifdef SOURCE
@@ -148,6 +169,12 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         __CPROVER_assert(tdcx_index_num < MAX_NUM_TDCS_PAGES, "ensure valid number of TDCS pages added");
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdcx_index_num > (MAX_NUM_TDCS_PAGES-1)) {
+            return_val = TDX_TDCX_NUM_INCORRECT; 
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
     // Check, lock and map the new TDCX page
     #ifdef SOURCE
         return_val = check_lock_and_map_explicit_private_4k_hpa(tdcx_pa,
@@ -189,6 +216,13 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
             __CPROVER_assert(tdcx_pamt_entry_ptr->pt == PT_NDA, "Make sure TDCX entry is correct");
     #endif //FLOW_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdcx_pamt_entry_ptr->pt != PT_NDA) {
+            return_val = TDX_PAGE_METADATA_INCORRECT;
+            goto EXIT; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
+
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
     /**
@@ -227,6 +261,21 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
             tables[td_hkid & HKID_MASK].tdcx_mem = SEPTE_L2_INIT_VALUE; 
         }
     #endif //MODULAR_PROOF
+    
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (tdcx_index_num == MSR_BITMAPS_PAGE_INDEX)
+        {
+            tables[td_hkid & HKID_MASK].tdcx_mem = ~(uint64_t)0; 
+        }
+        else if (tdcx_index_num == SEPT_ROOT_PAGE_INDEX)
+        {
+            tables[td_hkid & HKID_MASK].tdcx_mem = SEPTE_INIT_VALUE; 
+        }
+        else
+        {
+            tables[td_hkid & HKID_MASK].tdcx_mem = SEPTE_L2_INIT_VALUE; 
+        }
+    #endif //SOURCE_WITH_ABSTRACTIONS
 
     #ifdef FLOW_PROOF
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdcx_mem, sizeof(uint8_t));
@@ -327,6 +376,18 @@ api_error_type tdh_mng_add_cx(uint64_t target_tdcx_pa, uint64_t target_tdr_pa)
         set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
     #endif //MODULAR_PROOF
 
+    #ifdef SOURCE_WITH_ABSTRACTIONS
+        tables[td_hkid & HKID_MASK].tdr_table.management_fields.tdcx_pa[tdcx_index_num].val = tdcx_pa.raw & ((HKID_SIZE << 1) - 1);
+        tables[td_hkid & HKID_MASK].tdr_table.management_fields.num_tdcx = (tdcx_index_num + 1);
+
+        // Complete new TDCX page registration in its parent TDR
+        tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt++;
+
+        // Set the new TDCS page PAMT fields
+        tdcx_pamt_entry_ptr->pt = PT_TDCX;
+        set_pamt_entry_owner(tdcx_pamt_entry_ptr, tdr_pa); 
+    #endif //SOURCE_WITH_ABSTRACTIONS
+    
     #ifdef FLOW_PROOF
         uint64_t currChildCount = tables[td_hkid & HKID_MASK].tdr_table.management_fields.chldcnt;
         __CPROVER_havoc_slice(&tables[td_hkid & HKID_MASK].tdr_table.management_fields, sizeof(tables[td_hkid & HKID_MASK].tdr_table.management_fields));

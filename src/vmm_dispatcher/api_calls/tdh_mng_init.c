@@ -900,6 +900,10 @@
          local_data.vmm_regs.rcx = 0ULL;
      #endif // MODULAR_PROOF
 
+     #ifdef SOURCE_WITH_ABSTRACTIONS
+        local_data.vmm_regs.rcx = 0ULL;
+     #endif // SOURCE_WITH_ABSTRACTIONS
+
      #ifdef FLOW_PROOF
         __CPROVER_havoc_slice(&(local_data.vmm_regs.rcx), sizeof(uint64_t)); 
         __CPROVER_assume(local_data.vmm_regs.rcx == 0ULL);
@@ -960,6 +964,17 @@
         __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES);
      #endif // MODULAR_PROOF
  
+     #ifdef SOURCE_WITH_ABSTRACTIONS
+     if ((tdr_pamt_entry_ptr->pt != PT_TDR) ||
+         (tdr_ptr->management_fields.fatal) ||
+         (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED) ||
+         (tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES))
+     {
+         TDX_ERROR("TDH_MNG_INIT: TD in invalid state\n");
+         goto EXIT;
+     }
+     #endif // SOURCE_WITH_ABSTRACTIONS
+
      #ifdef FLOW_PROOF
         
         __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_TDR, "Page Metadata Table should be correct"); //, "Page Metadata Table should be correct"
@@ -986,6 +1001,15 @@
          //SOPHIA: shared_hpa_check from helpers.c
         __CPROVER_assume(is_pa_smaller_than_max_pa(td_params_pa.raw));
      #endif // MODULAR_PROOF
+
+     #ifdef SOURCE_WITH_ABSTRACTIONS
+         if (!is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES) ||
+             !is_pa_smaller_than_max_pa(td_params_pa.raw)) {
+                TDX_ERROR("Failed on source shared HPA 0x%llx check - error = %llx\n", td_params_pa.raw, return_val);
+                return_val = api_error_with_operand_id(return_val, OPERAND_ID_RDX);
+                goto EXIT;
+         }
+     #endif // SOURCE_WITH_ABSTRACTIONS
 
      #ifdef FLOW_PROOF
          __CPROVER_assert(is_addr_aligned_pwr_of_2(td_params_pa.raw, TD_PARAMS_ALIGN_IN_BYTES), "TD_PARAMS_PA is aligned pwr of 2");
@@ -1057,6 +1081,14 @@
          __CPROVER_assert(return_val == TDX_SUCCESS, "this should pass"); 
      #endif // SOURCE
 
+     #ifdef SOURCE_WITH_ABSTRACTIONS
+         if (return_val != TDX_SUCCESS)
+         {
+             TDX_ERROR("read_and_set_td_configurations failed\n");
+             goto EXIT;
+         }
+     #endif // SOURCE_WITH_ABSTRACTIONS
+
      #ifdef FLOW_PROOF
          __CPROVER_assert(return_val == TDX_SUCCESS, "this should pass"); 
      #endif // SOURCE
@@ -1098,6 +1130,15 @@
         // SOPHIA: assume all the work has been done and no more configurable bits
         __CPROVER_assume((config_value.raw == 0));
      #endif // MODULAR_PROOF
+
+     #ifdef SOURCE_WITH_ABSTRACTIONS
+        if (config_value.raw != 0)
+        {
+            TDX_ERROR("Incorrect IA32_ARCH_CAPABILITIES configuration\n");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_IA32_ARCH_CAPABILITIES_CONFIG);
+            goto EXIT;
+        }
+    #endif // SOURCE_WITH_ABSTRACTIONS
 
      #ifdef FLOW_PROOF
         // SOPHIA: assume all the work has been done and no more configurable bits
