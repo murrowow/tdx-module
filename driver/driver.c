@@ -374,6 +374,6 @@ void driver_main() {
         init_setup(index); 
     #endif // INIT_SETUP
 
-    TDX_bootup(); 
-    //TD_setup(index); 
+    //TDX_bootup(); 
+    TD_setup(index); 
 }
