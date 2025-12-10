@@ -20,6 +20,6 @@
 
 void TD_setup(uint16_t);
 void TDX_bootup(); 
-void TD_mem_setup(); 
+void TD_mem_setup(page_info_api_input_t); 
 
 #endif 

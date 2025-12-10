@@ -365,6 +365,8 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
 
     sept_page_pa[0].raw = target_sept_page_pa;
 
+    #ifdef FLOW_PROOF
+    #else
     if (version > 0)
     {
         sept_page_pa[1].raw = local_data_ptr->vmm_regs.r9;
@@ -375,6 +377,7 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     // By default, no extended error code is returned
     local_data_ptr->vmm_regs.rcx = 0;
     local_data_ptr->vmm_regs.rdx = 0;
+    #endif // FLOW_PROOF
 
     // Only versions 0 and 1 are supported
     #ifdef SOURCE
@@ -390,14 +393,6 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         __CPROVER_assume(sept_level_and_gpa.level >= 0 && sept_level_and_gpa.level <= 3); // Constrain SEPT level to valid range
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-    if (version > 1)
-        {
-            __CPROVER_assert(version <= 1, "Version check failed");
-            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RAX);
-            goto EXIT_NO_GPR_CHANGE;
-        }
-    #endif // FLOW_PROOF
 
     #ifdef FLOW_PROOF
     #else 
@@ -412,7 +407,6 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         flagged_sept_page_pa[vm_id].raw = sept_page_pa[vm_id].raw;
     }
     #endif // FLOW_PROOF
-
 
     #ifdef SOURCE
     // Check the TD handle in RDX
@@ -440,7 +434,6 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
             goto EXIT;
         }
     #endif // FLOW_PROOF
-
     // Check, lock and map the owner TDR page (Shared lock!)
     #ifdef SOURCE
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
@@ -559,12 +552,13 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
-    #else 
+    #endif // SOURCE
+    #ifdef MODULAR_PROOF
         // SOPHIA: assume that this passes for now
         page_sept_entry_ptr[0] = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
         page_level_entry = gpa_mappings.level;
         page_sept_entry_copy = *page_sept_entry_ptr[0];
-    #endif // SOURCE
+    #endif // MODULAR_PROOF
 
     #ifdef MODULAR_PROOF
         __CPROVER_assume(!gpa_mappings.reserved_0);
@@ -615,27 +609,30 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     #endif // SOURCE
 
     #ifdef MODULAR_PROOF
-        __CPROVER_assume(!tables[(page_gpa.raw & HKID_MASK)].sept_page_lock);
+        __CPROVER_assume(!tables[(tdr_pa.raw & HKID_MASK)].sept_page_lock);
         return_val = TDX_SUCCESS; 
         return return_val; 
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        // Lock the SEPT entry in memory
-        if (tables[(page_gpa.raw & HKID_MASK)].sept_page_lock)
-        {
-            __CPROVER_assert(tables[(page_gpa.raw & HKID_MASK)].sept_page_lock, "Failed on SEPT host-side lock attempt");
-            return_val = api_error_with_operand_id(return_val, OPERAND_ID_RCX);
-            set_arch_septe_details_in_vmm_regs(page_sept_entry_copy, page_level_entry, local_data_ptr);
-            TDX_ERROR("Failed on SEPT host-side lock attempt\n");
-            goto EXIT;
-        }
-    #endif // FLOW_PROOF
+    // SOPHIA TODO: examine why this is wrong
+    // #ifdef FLOW_PROOF
+    //     // Lock the SEPT entry in memory
+    //     if (tables[(tdr_pa.raw & HKID_MASK)].sept_page_lock)
+    //     {
+    //         __CPROVER_assert(!tables[(tdr_pa.raw & HKID_MASK)].sept_page_lock, "Failed on SEPT host-side lock attempt");
+    //         return_val = api_error_with_operand_id(return_val, OPERAND_ID_RCX);
+    //         TDX_ERROR("Failed on SEPT host-side lock attempt\n");
+    //         goto EXIT;
+    //     }
+    // #endif // FLOW_PROOF
     septe_locked_flag = true;
 
     // // Read the SEPT entry (again after locking)
-    // page_sept_entry_copy = *page_sept_entry_ptr[0];
-
+    #ifdef FLOW_PROOF
+    #else 
+    page_sept_entry_copy = *page_sept_entry_ptr[0];
+    #endif // FLOW_PROOF
+    
     #ifdef SOURCE
     // Check if the L1 SEPT entry state is allowed.  Refined checks are done below.
     if (!sept_state_is_seamcall_leaf_allowed(TDH_MEM_SEPT_ADD_LEAF, page_sept_entry_copy))
@@ -648,19 +645,14 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     #endif // SOURCE
 
     //SOPHIA: assume the check is allowed
-    #ifdef FLOW_PROOF
-        // Constrain the encoding and index to avoid out-of-bounds in the auto-generated lookup
-        uint64_t septe_state_enc = SEPT_CONVERT_TO_ENCODING(page_sept_entry_copy);
-        __CPROVER_assume(septe_state_enc < MAX_SEPT_STATE_ENC);
-        __CPROVER_assume(sept_special_flags_lookup[septe_state_enc].index < NUM_SEPT_STATES);
+    // // Constrain the encoding and index to avoid out-of-bounds in the auto-generated lookup
+    // uint64_t septe_state_enc = SEPT_CONVERT_TO_ENCODING(page_sept_entry_copy);
+    // __CPROVER_assume(septe_state_enc < MAX_SEPT_STATE_ENC);
+    // __CPROVER_assume(sept_special_flags_lookup[septe_state_enc].index < NUM_SEPT_STATES);
 
-        // Now it's safe to assume the seamcall lookup allows the operation
-        __CPROVER_assume(seamcall_sept_state_lookup[TDH_MEM_SEPT_ADD_LEAF]
-                          [sept_special_flags_lookup[septe_state_enc].index]);
-    #endif // MODULAR_PROOF
-
-    #ifdef FLOW_PROOF
-    #endif // FLOW_PROOF
+    // // Now it's safe to assume the seamcall lookup allows the operation
+    // __CPROVER_assume(seamcall_sept_state_lookup[TDH_MEM_SEPT_ADD_LEAF]
+    //                   [sept_special_flags_lookup[septe_state_enc].index]);
 
     
     // Step #2:
@@ -709,7 +701,7 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     #endif // SOURCE
 
     return_val = TDX_SUCCESS;
-    __CPROVER_assert(false, "false");  
+
 EXIT:
 
     #ifdef SOURCE

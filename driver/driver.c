@@ -375,21 +375,40 @@ void driver_main() {
         init_setup(index); 
     #endif // INIT_SETUP
 
+    page_info_api_input_t sept_level_and_gpa;
+    __CPROVER_havoc_object(&sept_level_and_gpa);
+    __CPROVER_assume(sept_level_and_gpa.level >= 0 && sept_level_and_gpa.level <= 3); 
     #ifdef TD_MEM_SETUP
     __CPROVER_havoc_object(&local_data);
     __CPROVER_havoc_object(&global_data);
     __CPROVER_havoc_object(&tables);
 
     for (int i = 0; i < HKID_SIZE; i++) {
-        __CPROVER_assume(!tables[i].tdr_table.management_fields.fatal); // TD is not in fatal state
-        __CPROVER_assume(tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured 
-        __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES); // Minimal num of TDCS pages allocated
+        __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+        __CPROVER_assume(tables[i].tdr.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured 
+        __CPROVER_assume(tables[i].tdr.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES); // Minimal num of TDCS pages allocated
+        __CPROVER_assume(tables[i].tdcs_table.management_fields.num_l2_vms < MAX_VMS);
+        __CPROVER_assume(tables[i].tdr.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES);
+        __CPROVER_assume(!tables[i].sept_page_lock);
+        __CPROVER_assume(verify_page_info_input(sept_level_and_gpa, LVL_PD, tables[i].tdcs_table.executions_ctl_fields.eptp.fields.ept_pwl));
     }
+    
+    /* Bounds for global data fields used by helpers to avoid undefined shifts and NULL-pointer style warnings */
+    __CPROVER_assume(global_data.hkid_mask != 0);
+    __CPROVER_assume(global_data.hkid_start_bit >= 0 && global_data.hkid_start_bit <= 52);
+
+    /* Make a few platform fields concrete enough for helpers that read plt_common_config */
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_basic.vmcs_region_size <= TD_VMCS_SIZE);
+    __CPROVER_assume(global_data.plt_common_config.ia32_vmx_basic.ia32_vmx_true_available == 1U);
+    __CPROVER_assume(global_data.plt_common_config.ia32_mtrrcap.smrr != 0);
+
+    /* Constrain generic sizes used by index calculations */
+    __CPROVER_assume(MAX_VMS > 0 && MAX_VMS <= 16);
     #endif // TD_MEM_SETUP
 
 
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
-    TD_mem_setup(); 
+    TD_mem_setup(sept_level_and_gpa); 
 }
