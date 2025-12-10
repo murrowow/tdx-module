@@ -143,11 +143,12 @@ void TD_mem_setup( page_info_api_input_t sept_level_and_gpa, page_info_api_input
     __CPROVER_assume(version == 0); // SOPHIA: limit to version 0 for now
     __CPROVER_assume(!target_tdr_and_flags.reserved_0); 
     __CPROVER_assume(!target_tdr_and_flags.reserved_1); 
+    __CPROVER_assume(is_addr_aligned_pwr_of_2(target_page_pa, 256));
 
     error = tdh_mem_sept_add(sept_level_and_gpa,target_tdr_and_flags, target_sept_page_pa, version);
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_mem_page_add(gpa_page_info, target_tdr_pa, target_page_pa, source_page_pa);
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_mr_extend(target_page_pa, target_tdr_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mr_extend(target_page_pa, target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }

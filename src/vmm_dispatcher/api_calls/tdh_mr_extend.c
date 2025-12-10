@@ -24,24 +24,30 @@
  * @file tdh_mr_extend
  * @brief TDHMREXTEND API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
-#include "crypto/sha384.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/crypto/sha384.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
 {
     // Local data for return values
+    #ifdef SOURCE
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE
+
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
     tdr_t               * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -69,10 +75,14 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
     page_gpa.raw = target_page_gpa;
     tdr_pa.raw = target_tdr_pa;
 
+    #ifdef FLOW_PROOF
+    #else
     // By default, no extended error code is returned
     local_data_ptr->vmm_regs.rcx = 0ULL;
     local_data_ptr->vmm_regs.rdx = 0ULL;
+    #endif // FLOW_PROOF
 
+    #ifdef SOURCE
     // Check, lock and map the owner TDR page
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RDX,
@@ -88,7 +98,13 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+        tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Map the TDCS structure and check the state
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_NO_LOCK,
                                                false, TDH_MR_EXTEND_LEAF, &tdcs_ptr);
@@ -98,7 +114,12 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        tdcs_ptr = &tables[tdr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check the page GPA is 256 Byte aligned
     if (!is_addr_aligned_pwr_of_2(page_gpa.raw, 256))
     {
@@ -106,9 +127,25 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(page_gpa.raw, 256));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!is_addr_aligned_pwr_of_2(page_gpa.raw, 256))
+        {
+            __CPROVER_assert(is_addr_aligned_pwr_of_2(page_gpa.raw, 256), "Page GPA 256 Byte alignment check failed");
+            TDX_ERROR("Page GPA is not aligned to 256 Bytes\n");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
 
     // SEPT tree is implicitly locked in exclusive mode, since TDR is exclusively locked
 
+    #ifdef SOURCE
     // Check GPA, don't lock SEPT and walk to find entry
     return_val = check_and_walk_private_gpa_to_leaf(tdcs_ptr,
                                                     OPERAND_ID_RCX,
@@ -131,7 +168,16 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
         TDX_ERROR("Failed on GPA check or any other error = %llx\n", return_val);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        // SOPHIA: assume that this passes for now
+        page_sept_entry_ptr = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
+        page_level_entry = LVL_PT;
+        page_sept_entry_copy = *page_sept_entry_ptr;
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     // Verify the EPT entry state is MAPPED
     if (!sept_state_is_seamcall_leaf_allowed(TDH_MR_EXTEND_LEAF, page_sept_entry_copy))
     {
@@ -139,13 +185,22 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
         TDX_ERROR("EPT entry is not present %llx\n", return_val);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Calculate HPA from SEPT page entry and GPA offset
     page_hpa.raw = leaf_ept_entry_to_hpa(page_sept_entry_copy, page_gpa.raw, page_level_entry);
 
     // Map the page to measure
     page_ptr = map_pa_with_hkid(page_hpa.raw_void, tdr_ptr->key_management_fields.hkid, TDX_RANGE_RO);
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        // SOPHIA: assume that this passes for now
+        page_ptr = &tables[page_hpa.raw & HKID_MASK].sept_entries[0];
+    #endif // MODULAR_PROOF
+    
+    #ifdef SOURCE
     /**
      *  Update the TD measurements with the page's measurement using SHA384.
      *  SHA384 works on 128 Byte block sizes, therefore we process 3 blocks (= 384 Byte).
@@ -182,11 +237,12 @@ api_error_type tdh_mr_extend(uint64_t target_page_gpa, uint64_t target_tdr_pa)
 
     load_xmms_from_buffer(xmms);
     basic_memset_to_zero(xmms, sizeof(xmms));
-
+    #endif // SOURCE
     return_val = TDX_SUCCESS;
 
 EXIT:
     // Release all acquired locks and free keyhole mappings
+    #ifdef SOURCE
     if (tdr_locked_flag)
     {
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
@@ -204,5 +260,6 @@ EXIT:
     {
         free_la(page_ptr);
     }
+    #endif // SOURCE
     return return_val;
 }
