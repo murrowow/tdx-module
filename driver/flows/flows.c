@@ -122,12 +122,11 @@ void TDX_bootup() {
 
 }
 
-void TD_mem_setup( page_info_api_input_t sept_level_and_gpa) {
+void TD_mem_setup( page_info_api_input_t sept_level_and_gpa, page_info_api_input_t gpa_page_info) {
     td_handle_and_flags_t target_tdr_and_flags;
     uint64_t target_sept_page_pa;
     uint64_t version;
 
-    page_info_api_input_t gpa_page_info;
     uint64_t target_tdr_pa;
     uint64_t target_page_pa;
     uint64_t source_page_pa;
@@ -135,7 +134,6 @@ void TD_mem_setup( page_info_api_input_t sept_level_and_gpa) {
     __CPROVER_havoc_object(&target_tdr_and_flags);
     __CPROVER_havoc_object(&target_sept_page_pa);
     __CPROVER_havoc_object(&version);
-    __CPROVER_havoc_object(&gpa_page_info);
     __CPROVER_havoc_object(&target_tdr_pa);
     __CPROVER_havoc_object(&target_page_pa);
     __CPROVER_havoc_object(&source_page_pa);
@@ -147,10 +145,9 @@ void TD_mem_setup( page_info_api_input_t sept_level_and_gpa) {
     __CPROVER_assume(!target_tdr_and_flags.reserved_1); 
 
     error = tdh_mem_sept_add(sept_level_and_gpa,target_tdr_and_flags, target_sept_page_pa, version);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_mem_page_add(gpa_page_info, target_tdr_pa,
-    //                  target_page_pa, source_page_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mem_page_add(gpa_page_info, target_tdr_pa, target_page_pa, source_page_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // error = tdh_mr_extend(target_page_pa, target_tdr_pa);
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }

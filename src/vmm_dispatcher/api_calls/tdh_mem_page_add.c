@@ -193,6 +193,7 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
     page_gpa = page_info_to_pa(gpa_mappings);
     #endif // SOURCE
 
+    #ifdef SOURCE
     // SEPT tree is implicitly locked in exclusive mode, since TDR is exclusively locked
     // Check GPA
     if (!check_gpa_validity(page_gpa, tdcs_ptr->executions_ctl_fields.gpaw, PRIVATE_ONLY))
@@ -201,7 +202,23 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed on GPA check - error = 0x%llx\n", return_val);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(check_gpa_validity(page_gpa, tdcs_ptr->executions_ctl_fields.gpaw, PRIVATE_ONLY));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!check_gpa_validity(page_gpa, tdcs_ptr->executions_ctl_fields.gpaw, PRIVATE_ONLY))
+        {
+            __CPROVER_assert(check_gpa_validity(page_gpa, tdcs_ptr->executions_ctl_fields.gpaw, PRIVATE_ONLY), "GPA is valid");
+            TDX_ERROR("Failed on GPA check - error = 0x%llx\n", return_val);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // SEPT and walk to find entry
     return_val = walk_private_gpa(tdcs_ptr, page_gpa, tdr_ptr->key_management_fields.hkid,
                                   &page_sept_entry_ptr, &page_level_entry, &page_sept_entry_copy);
@@ -214,7 +231,14 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed on SEPT walk - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: hardware model stub
+        page_sept_entry_ptr = &(tables[page_gpa.raw & HKID_MASK].sept_entries[0]);
+        page_level_entry = gpa_mappings.level;
+        page_sept_entry_copy = *page_sept_entry_ptr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // SEPT tree is implicitly locked in exclusive mode, since TDR is exclusively locked
     page_sept_entry_copy = *page_sept_entry_ptr;
 
@@ -225,7 +249,9 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
         TDX_ERROR("TDH_MEM_PAGE_ADD is not allowed in current SEPT entry state - 0x%llx\n", page_sept_entry_copy.raw);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Verify the source physical address is aligned, canonical and shared
     if ((return_val = shared_hpa_check_with_pwr_2_alignment(source_pa, TDX_PAGE_SIZE_IN_BYTES)) != TDX_SUCCESS)
     {
@@ -233,7 +259,13 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
         return_val = api_error_with_operand_id(return_val, OPERAND_ID_R9);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_addr_aligned_pwr_of_2(source_pa.raw, TDX_PAGE_SIZE_IN_BYTES) == TDX_SUCCESS);
+    #endif // MODULAR_PROOF 
+
+    #ifdef SOURCE
     // Check, lock and map the new TD page
     return_val = check_lock_and_map_explicit_private_4k_hpa(td_page_pa,
                                                             OPERAND_ID_R8,
@@ -250,16 +282,32 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed to check/lock/map the new TD page - error = %llx\n", return_val);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        // SOPHIA: assume that this passes for now
+        td_page_pamt_entry_ptr = &(tables[td_page_pa.raw & HKID_MASK].pamt_entry);
+        td_page_ptr = &tables[td_page_pa.raw & HKID_MASK].sept_entries[0];
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     // Map the source page
     source_page_ptr = map_pa((void*)source_pa.raw, TDX_RANGE_RO);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Copy the source image to the target TD page, using the TD’s ephemeral
     // private HKID and direct writes (MOVDIR64B)
     cache_aligned_copy_direct((uint64_t)source_page_ptr, (uint64_t)td_page_ptr, TDX_PAGE_SIZE_IN_BYTES);
 
     // Update the parent EPT entry with the new TD page HPA and SEPT_PRESENT state
     sept_set_leaf_unlocked_entry(page_sept_entry_ptr, SEPT_PERMISSIONS_RWX, td_page_pa, SEPT_STATE_MAPPED_MASK);
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        // SOPHIA: assume that this passes for now
+        tables[page_gpa.raw & HKID_MASK].sept_entries[0].raw = 0xFFFFFFFFFFFFFFFF;
+    #endif // MODULAR_PROOF
 
     #ifdef SOURCE
     /**
@@ -291,19 +339,33 @@ api_error_type tdh_mem_page_add(page_info_api_input_t gpa_page_info,
     }
     #endif // SOURCE
 
+    // SOPHIA: cryptographic function assume to pass
     #ifdef SOURCE
     load_xmms_from_buffer(xmms);
     basic_memset_to_zero(xmms, sizeof(xmms));
     #endif // SOURCE
 
     // Increment TDR child count
+    #ifdef FLOW_PROOF 
+    #else 
     tdr_ptr->management_fields.chldcnt++;
+    #endif // FLOW_PROOF
 
-    // Update the new Secure EPT page’s PAMT entry
+    // // Update the new Secure EPT page’s PAMT entry
     #ifdef SOURCE
     td_page_pamt_entry_ptr->pt = PT_REG;
     set_pamt_entry_owner(td_page_pamt_entry_ptr, tdr_pa);
     td_page_pamt_entry_ptr->bepoch.raw = 0;  // Setting BEPOCH to 0 is required to avoid confusion during page export
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+    td_page_pamt_entry_ptr->pt = PT_REG;
+    td_page_pamt_entry_ptr->bepoch.raw = 0; 
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
+    #else 
+    return_val = TDX_SUCCESS;
     #endif // SOURCE
 EXIT:
     #ifdef SOURCE

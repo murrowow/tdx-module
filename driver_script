@@ -11,4 +11,4 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mem_sept_add.c \
        src/vmm_dispatcher/api_calls/tdh_mem_page_add.c "
 
-cbmc driver/driver.c -DMODULAR_PROOF -DTD_MEM_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt
+cbmc driver/driver.c -DFLOW_PROOF -DTD_MEM_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt
