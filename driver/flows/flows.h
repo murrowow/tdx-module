@@ -20,5 +20,6 @@
 
 void TD_setup(uint16_t);
 void TDX_bootup(); 
+void TD_mem_setup(); 
 
 #endif 

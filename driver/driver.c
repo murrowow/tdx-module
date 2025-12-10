@@ -334,9 +334,9 @@ void sys_key_config_setup(){
     __CPROVER_assume((global_data.private_hkid_max == global_data.private_hkid_min + (HKID_SIZE)));
 }
 
-
 void driver_main() {
 
+    // TDX Setup 
     #ifdef BOOTUP_SETUP 
         bootup_setup(); 
     #endif // BOOTUP_SETUP
@@ -357,6 +357,7 @@ void driver_main() {
         sys_key_config_setup(); 
     #endif // SYS_KEY_CONFIG_SETUP
     
+    // TD Setup
     uint16_t index = 0; 
     #ifdef SETUP
         setup(); 
@@ -374,6 +375,21 @@ void driver_main() {
         init_setup(index); 
     #endif // INIT_SETUP
 
-    //TDX_bootup(); 
-    TD_setup(index); 
+    #ifdef TD_MEM_SETUP
+    __CPROVER_havoc_object(&local_data);
+    __CPROVER_havoc_object(&global_data);
+    __CPROVER_havoc_object(&tables);
+
+    for (int i = 0; i < HKID_SIZE; i++) {
+        __CPROVER_assume(!tables[i].tdr_table.management_fields.fatal); // TD is not in fatal state
+        __CPROVER_assume(tables[i].tdr_table.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured 
+        __CPROVER_assume(tables[i].tdr_table.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES); // Minimal num of TDCS pages allocated
+    }
+    #endif // TD_MEM_SETUP
+
+
+    // Call the flows
+    // TDX_bootup(); 
+    // TD_setup(index); 
+    TD_mem_setup(); 
 }

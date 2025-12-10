@@ -24,17 +24,19 @@
  * @file tdh_mem_sept_add
  * @brief TDHMEMSEPTADD API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
+
+#include "driver/driver.h"
 
 static void init_new_sept_page(tdr_t* tdr_ptr, pa_t tdr_pa, pa_t sept_page_pa,
                                pamt_entry_t* sept_page_pamt_entry_ptr, uint64_t sept_page_init_val)
@@ -70,16 +72,42 @@ static api_error_type process_l1_page(tdx_module_local_t* local_data_ptr, uint64
     {
         /* No new L1 SEPT page was provided.  This is only allowed for version 1 or higher, and an L1 SEPT page
            must already exist.  The existing L1 SEPT entry should be non-leaf, mapped. */
+        #ifdef SOURCE
         if (version == 0)
         {
             return api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_R8);
         }
+        #endif // SOURCE
+
+        #ifdef MODULAR_PROOF
+            __CPROVER_assume(version > 0); //"Version is greater than 0 when no new L1 SEPT page is provided"
+        #endif // MODULAR_PROOF
+
+        #ifdef FLOW_PROOF
+            if (version == 0) {
+                __CPROVER_assert(version > 0, "Version is greater than 0 when no new L1 SEPT page is provided");
+                return api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_R8); 
+            }
+        #endif // FLOW_PROOF
+
+        #ifdef SOURCE
         if (!is_sept_nl_mapped(&page_sept_entry_copy))
         {
             set_arch_septe_details_in_vmm_regs(page_sept_entry_copy, page_level_entry, local_data_ptr);
             TDX_ERROR("Parent entry is not non-leaf and mapped - 0x%llx\n", page_sept_entry_copy.raw);
             return api_error_with_operand_id(TDX_EPT_ENTRY_STATE_INCORRECT, OPERAND_ID_RCX);
         }
+        #endif // SOURCE 
+
+        #ifdef MODULAR_PROOF
+            __CPROVER_assume(is_sept_nl_mapped(&page_sept_entry_copy)); //"The parent SEPT entry is non-leaf and mapped"
+        #endif // MODULAR_PROOF
+        #ifdef FLOW_PROOF
+            if (!is_sept_nl_mapped(&page_sept_entry_copy)) {
+                __CPROVER_assert(is_sept_nl_mapped(&page_sept_entry_copy), "The parent SEPT entry is non-leaf and mapped");
+                return api_error_with_operand_id(TDX_EPT_ENTRY_STATE_INCORRECT, OPERAND_ID_RCX); 
+            }
+        #endif // FLOW_PROOF    
     }
     else
     {
@@ -88,6 +116,7 @@ static api_error_type process_l1_page(tdx_module_local_t* local_data_ptr, uint64
 
         if (is_sept_free(&page_sept_entry_copy))
         {
+            #ifdef SOURCE
             // Prepare the new L1 SEPT page. The page will be added later after all checks are done.
             // Check and lock the new SEPT page in PAMT
             return_val = check_and_lock_explicit_4k_private_hpa(sept_page_pa[0],
@@ -104,20 +133,34 @@ static api_error_type process_l1_page(tdx_module_local_t* local_data_ptr, uint64
                            sept_page_pa[0].raw, return_val);
                 return return_val;
             }
+            #endif // SOURCE 
+
+            #ifdef MODULAR_PROOF
+                __CPROVER_assume(is_sept_free(&page_sept_entry_copy));  //"The parent SEPT entry is free" 
+            #endif // MODULAR_PROOF
+
+            #ifdef FLOW_PROOF
+            __CPROVER_assert(is_sept_free(&page_sept_entry_copy), "The parent SEPT entry is free");
+            #endif // FLOW_PROOF
         }
         else
         {
             // An SEPT page already exists
             if (allow_existing)
             {
+                #ifdef FLOW_PROOF
+                #else 
                 flagged_sept_page_pa[0].raw |= BIT(63); // Set bit 63 to indicate that the page has not been used
+                #endif // FLOW_PROOF
             }
+            #ifdef SOURCE
             else
             {
                 set_arch_septe_details_in_vmm_regs(page_sept_entry_copy, page_level_entry, local_data_ptr);
                 TDX_ERROR("SEPT page already exists - 0x%llx, but existing pages are not allowed\n", page_sept_entry_copy.raw);
                 return api_error_with_operand_id(TDX_EPT_ENTRY_STATE_INCORRECT, OPERAND_ID_RCX);
             }
+            #endif // SOURCE
         }
     }   // A new L1 SEPT page was provided
 
@@ -203,24 +246,45 @@ static api_error_type add_l1_and_l2_pages(uint64_t version, tdr_t* tdr_ptr, pa_t
                                           uint64_t original_rdx)
 {
     // Local data for return values
+    #ifdef SOURCE
     tdx_module_local_t* local_data_ptr = get_local_data();
+    #else
+    tdx_module_local_t* local_data_ptr = &local_data;
+    #endif // SOURCE
 
     bool_t sept_page_added_flag = false;
 
+    #ifdef FLOW_PROOF
+    #else 
     if (!(flagged_sept_page_pa[0].raw & BIT(63)))
     {
         // There's a new SEPT page (non-NULL and not pre-existing)
+        #ifdef SOURCE
         init_new_sept_page(tdr_ptr, tdr_pa, sept_page_pa[0], sept_page_pamt_entry_ptr[0], SEPTE_INIT_VALUE);
+        #endif // SOURCE
+
+        #ifdef MODULAR_PROOF
+            sept_page_pamt_entry_ptr[0]->pt = PT_EPT;
+            sept_page_pamt_entry_ptr[0]->owner = tdr_pa;
+            sept_page_pamt_entry_ptr[0]->bepoch.raw = 0;
+        #endif // MODULAR_PROOF
 
         // Update the L1 SEPT entry in memory with the new Secure EPT page HPA and NL_MAPPED state.
         // Keep the L1 SEPT entry locked.
+        #ifdef SOURCE
         sept_set_mapped_non_leaf(page_sept_entry_ptr[0], sept_page_pa[0], true);
+        #endif // SOURCE
 
+        #ifdef SOURCE
         // Nullify the page HPA to indicate it no longer needs to be allocated
         flagged_sept_page_pa[0].raw = NULL_PA;
         sept_page_added_flag = true;
+        #endif // SOURCE
     }
+    #endif // FLOW_PROOF
 
+    // SOPHIA: not consider this case for now
+    #ifdef SOURCE
     if (version > 0)
     {
         for (uint16_t vm_id = 1; vm_id < MAX_VMS; vm_id++)
@@ -253,6 +317,7 @@ static api_error_type add_l1_and_l2_pages(uint64_t version, tdr_t* tdr_ptr, pa_t
             }
         }
     }
+    #endif // SOURCE
 
     return TDX_SUCCESS;
 }
@@ -263,7 +328,11 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
                                 uint64_t version)
 {
     // Local data for return values
+    #ifdef SOURCE 
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE 
     // TDR related variables
     pa_t                  tdr_pa = { .raw = 0 };     // TDR physical address
     tdr_t               * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -308,12 +377,30 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     local_data_ptr->vmm_regs.rdx = 0;
 
     // Only versions 0 and 1 are supported
+    #ifdef SOURCE
     if (version > 1)
     {
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RAX);
         goto EXIT_NO_GPR_CHANGE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(version <= 1);
+        __CPROVER_assume(sept_level_and_gpa.level >= 0 && sept_level_and_gpa.level <= 3); // Constrain SEPT level to valid range
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    if (version > 1)
+        {
+            __CPROVER_assert(version <= 1, "Version check failed");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RAX);
+            goto EXIT_NO_GPR_CHANGE;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef FLOW_PROOF
+    #else 
     // If the input new SEPT page pa is not NULL_PA, then we ignore bit 63
     for (uint16_t vm_id = 0; vm_id < MAX_VMS; vm_id++)
     {
@@ -324,9 +411,10 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         }
         flagged_sept_page_pa[vm_id].raw = sept_page_pa[vm_id].raw;
     }
+    #endif // FLOW_PROOF
 
 
-
+    #ifdef SOURCE
     // Check the TD handle in RDX
     if (target_tdr_and_flags.reserved_0 || target_tdr_and_flags.reserved_1)
     {
@@ -334,10 +422,27 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
         goto EXIT;
     }
-
+    #endif // SOURCE
     tdr_pa.page_4k_num  = target_tdr_and_flags.tdr_hpa_51_12;
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!target_tdr_and_flags.reserved_0); 
+        __CPROVER_assume(!target_tdr_and_flags.reserved_1); 
+    #endif // MODULAR_PROOF 
+
+    #ifdef FLOW_PROOF
+        if (target_tdr_and_flags.reserved_0 || target_tdr_and_flags.reserved_1)
+        {
+            __CPROVER_assert(!target_tdr_and_flags.reserved_0, "TD handle reserved_0 check failed");
+            __CPROVER_assert(!target_tdr_and_flags.reserved_1, "TD handle reserved_1 check failed");
+            TDX_ERROR("Input TD handle (0x%llx) is not valid\n", target_tdr_and_flags.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RDX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
     // Check, lock and map the owner TDR page (Shared lock!)
+    #ifdef SOURCE
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RDX,
                                                  TDX_RANGE_RW,
@@ -352,7 +457,13 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+        tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Map the TDCS structure and check the state
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
                                                false, TDH_MEM_SEPT_ADD_LEAF, &tdcs_ptr);
@@ -362,20 +473,72 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: hardware model stub
+        tdcs_ptr = &tables[tdr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!tdr_ptr->management_fields.fatal); // TD is not in fatal state
+        __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured 
+        __CPROVER_assume(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES); // Minimal num of TDCS pages allocated
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdr_ptr->management_fields.fatal)
+            {
+                __CPROVER_assert(!tdr_ptr->management_fields.fatal, "TD is not in fatal state");
+                TDX_ERROR("TD is in fatal state\n");
+                return api_error_fatal(TDX_TD_FATAL);
+            }
+        
+            if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
+            {
+                __CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD keys are configured");
+                TDX_ERROR("TD key are not configured\n");
+                return TDX_TD_KEYS_NOT_CONFIGURED;
+            }
+        
+            if (tdr_ptr->management_fields.num_tdcx < MIN_NUM_TDCS_PAGES)
+            {
+                __CPROVER_assert(tdr_ptr->management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES, "Minimal num of TDCS pages allocated");
+                TDX_ERROR("TDCS minimal num of pages %d is not allocated\n", MIN_NUM_TDCS_PAGES);
+                return TDX_TDCS_NOT_ALLOCATED;
+            }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE 
     if (!verify_page_info_input(gpa_mappings, LVL_PD, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl))
     {
         TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE 
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PD, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!verify_page_info_input(gpa_mappings, LVL_PD, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl))
+        {
+            __CPROVER_assert(verify_page_info_input(gpa_mappings, LVL_PD, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl), "Input GPA page info is valid");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
+    #endif // SOURCE
 
-    // Step #1:
-    // L1 SEPT tree walk and state checks
+    // // Step #1:
+    // // L1 SEPT tree walk and state checks
 
     // Check GPA, lock SEPT and walk to find entry
+    #ifdef SOURCE
     return_val = lock_sept_check_and_walk_private_gpa(tdcs_ptr,
                                                       OPERAND_ID_RCX,
                                                       page_gpa,
@@ -396,8 +559,51 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        page_sept_entry_ptr[0] = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
+        page_level_entry = gpa_mappings.level;
+        page_sept_entry_copy = *page_sept_entry_ptr[0];
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!gpa_mappings.reserved_0);
+        __CPROVER_assume(!gpa_mappings.reserved_1);
+        __CPROVER_assume(gpa_mappings.level >= LVL_PD && gpa_mappings.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl);
+        __CPROVER_assume((gpa_mappings.gpa << 12) % (1ULL << (12 + (gpa_mappings.level * 9))) == 0);  // GPA is aligned
+    #endif // MODULAR_PROOF 
+
+    #ifdef FLOW_PROOF
+        if (gpa_mappings.reserved_0 || gpa_mappings.reserved_1)
+        {
+            __CPROVER_assert(!gpa_mappings.reserved_0, "GPA mappings reserved_0 check failed");
+            __CPROVER_assert(!gpa_mappings.reserved_1, "GPA mappings reserved_1 check failed");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+
+        if (gpa_mappings.level < LVL_PD || gpa_mappings.level > tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl)
+        {
+            __CPROVER_assert(gpa_mappings.level >= LVL_PD && gpa_mappings.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl,
+                             "GPA mappings level check failed");
+            TDX_ERROR("Input GPA page info (0x%llx) has invalid level %d\n", gpa_mappings.raw, gpa_mappings.level);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+
+        if ((gpa_mappings.gpa << 12) % (1ULL << (12 + (gpa_mappings.level * 9))) != 0)
+        {
+            __CPROVER_assert((gpa_mappings.gpa << 12) % (1ULL << (12 + (gpa_mappings.level * 9))) == 0,
+                             "GPA mappings alignment check failed");
+            TDX_ERROR("Input GPA page info (0x%llx) has unaligned GPA\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
 
     // Lock the SEPT entry in memory
+    #ifdef SOURCE
     return_val = sept_lock_acquire_host(page_sept_entry_ptr[0]);
     if (TDX_SUCCESS != return_val)
     {
@@ -406,11 +612,31 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on SEPT host-side lock attempt\n");
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!tables[(page_gpa.raw & HKID_MASK)].sept_page_lock);
+        return_val = TDX_SUCCESS; 
+        return return_val; 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        // Lock the SEPT entry in memory
+        if (tables[(page_gpa.raw & HKID_MASK)].sept_page_lock)
+        {
+            __CPROVER_assert(tables[(page_gpa.raw & HKID_MASK)].sept_page_lock, "Failed on SEPT host-side lock attempt");
+            return_val = api_error_with_operand_id(return_val, OPERAND_ID_RCX);
+            set_arch_septe_details_in_vmm_regs(page_sept_entry_copy, page_level_entry, local_data_ptr);
+            TDX_ERROR("Failed on SEPT host-side lock attempt\n");
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
     septe_locked_flag = true;
 
-    // Read the SEPT entry (again after locking)
-    page_sept_entry_copy = *page_sept_entry_ptr[0];
+    // // Read the SEPT entry (again after locking)
+    // page_sept_entry_copy = *page_sept_entry_ptr[0];
 
+    #ifdef SOURCE
     // Check if the L1 SEPT entry state is allowed.  Refined checks are done below.
     if (!sept_state_is_seamcall_leaf_allowed(TDH_MEM_SEPT_ADD_LEAF, page_sept_entry_copy))
     {
@@ -419,21 +645,43 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
         return_val = api_error_with_operand_id(TDX_EPT_ENTRY_STATE_INCORRECT, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    //SOPHIA: assume the check is allowed
+    #ifdef FLOW_PROOF
+        // Constrain the encoding and index to avoid out-of-bounds in the auto-generated lookup
+        uint64_t septe_state_enc = SEPT_CONVERT_TO_ENCODING(page_sept_entry_copy);
+        __CPROVER_assume(septe_state_enc < MAX_SEPT_STATE_ENC);
+        __CPROVER_assume(sept_special_flags_lookup[septe_state_enc].index < NUM_SEPT_STATES);
+
+        // Now it's safe to assume the seamcall lookup allows the operation
+        __CPROVER_assume(seamcall_sept_state_lookup[TDH_MEM_SEPT_ADD_LEAF]
+                          [sept_special_flags_lookup[septe_state_enc].index]);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+    #endif // FLOW_PROOF
+
+    
     // Step #2:
     // Check and lock the new L1 and L2 SEPT physical pages.
 
+    #ifdef SOURCE
     // Process the L1 SEPT page. Either add a new page or make sure it exists.
     return_val = process_l1_page(local_data_ptr, version, sept_page_pa, flagged_sept_page_pa,
                                  page_level_entry, page_sept_entry_copy,
                                  sept_page_pamt_block, sept_page_pamt_entry_ptr, sept_page_locked_flag,
                                  target_tdr_and_flags.allow_existing);
+    #endif // SOURCE
 
+    #ifdef SOURCE 
     if (return_val != TDX_SUCCESS)
     {
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Process the L2 SEPT pages
     if (version > 0)
     {
@@ -446,9 +694,11 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
             goto EXIT;
         }
     }
+    #endif // SOURCE
 
     // Step #3:
     // Add the new L1 and L2 SEPT pages
+    #ifdef SOURCE
     return_val = add_l1_and_l2_pages(version, tdr_ptr, tdr_pa, sept_page_pa, flagged_sept_page_pa,
                                      sept_page_pamt_entry_ptr, page_sept_entry_ptr, original_rcx, original_rdx);
 
@@ -456,11 +706,13 @@ api_error_type tdh_mem_sept_add(page_info_api_input_t sept_level_and_gpa,
     {
         goto EXIT;
     }
+    #endif // SOURCE
 
     return_val = TDX_SUCCESS;
-
+    __CPROVER_assert(false, "false");  
 EXIT:
 
+    #ifdef SOURCE
     if (version > 0)
     {
         local_data_ptr->vmm_regs.r8  = flagged_sept_page_pa[0].raw;
@@ -468,11 +720,12 @@ EXIT:
         local_data_ptr->vmm_regs.r10 = flagged_sept_page_pa[2].raw;
         local_data_ptr->vmm_regs.r11 = flagged_sept_page_pa[3].raw;
     }
-
+    #endif // SOURCE
 EXIT_NO_GPR_CHANGE:
 
     // Release all acquired locks and free keyhole mappings
 
+    #ifdef SOURCE
     if (septe_locked_flag)
     {
         sept_lock_release(page_sept_entry_ptr[0]);
@@ -508,6 +761,7 @@ EXIT_NO_GPR_CHANGE:
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
         free_la(tdr_ptr);
     }
+    #endif // SOURCE
 
     return return_val;
 }

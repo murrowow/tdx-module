@@ -121,6 +121,7 @@ api_error_type tdh_mng_create(uint64_t target_tdr_pa, hkid_api_input_t hkid_info
 
     #ifdef FLOW_PROOF
         if (tdr_pamt_entry_ptr->pt != PT_NDA) {
+            __CPROVER_assert(tdr_pamt_entry_ptr->pt == PT_NDA, "metadata is labeled correctly");
             return_val = TDX_PAGE_METADATA_INCORRECT;
             goto EXIT; 
         }

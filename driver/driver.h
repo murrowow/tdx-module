@@ -89,17 +89,27 @@ typedef struct tdvps_small_s
 struct hardware_states
 {
    pamt_entry_t pamt_entry; 
+   // SOPHIA: changed tdr_t to tdr_small_t
    tdr_small_t  tdr_table; 
+   tdr_t  tdr;
    uint8_t tdr_mem; 
    bool_t tdr_lock;
    
    pamt_entry_t tdcx_pamt_entry;
+   // SOPHIA: changed tdcs_t to tdcs_small_t
    tdcs_small_t tdcx_table;
+   tdcs_t tdcs_table;
    uint8_t tdcx_mem;
    bool_t tdcx_lock;
 
    tdmr_entry_t tdmr_table; 
    td_params_t td_params_table;
+
+   // SEPT page structure for modeling SEPT page additions
+   pamt_entry_t sept_page_pamt_entry;
+   ia32e_sept_t sept_entries[512]; // Max 512 SEPT entries per page
+   uint8_t sept_page_mem;   // Memory backing for SEPT page
+   bool_t sept_page_lock;   // Lock state for SEPT page
 
 //    pamt_entry_t tdvpr_pamt_entry;
 //    tdvps_small_t tdvpr_table;

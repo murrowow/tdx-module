@@ -7,6 +7,7 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mng_create.c \
        src/vmm_dispatcher/api_calls/tdh_mng_key_config.c \
        src/vmm_dispatcher/api_calls/tdh_mng_add_cx.c \
-       src/vmm_dispatcher/api_calls/tdh_mng_init.c"
+       src/vmm_dispatcher/api_calls/tdh_mng_init.c \
+       src/vmm_dispatcher/api_calls/tdh_mem_sept_add.c "
 
-cbmc -DFLOW_PROOF -DSETUP -DWHOLE_FLOW driver/driver.c --function driver_main $FILES -I "$PWD" --trace > driver_log.txt
+cbmc driver/driver.c -DMODULAR_PROOF -DTD_MEM_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt
