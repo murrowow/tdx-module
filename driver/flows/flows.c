@@ -169,3 +169,38 @@ void TD_enter() {
 void TD_exit(uint64_t controller_value) {
     tdg_vp_vmcall(controller_value);
 }
+
+void TD_add_page(uint64_t controller_value, page_info_api_input_t sept_level_and_gpa, page_info_api_input_t gpa_page_info) {
+    td_handle_and_flags_t target_tdr_and_flags;
+    uint64_t target_sept_page_pa;
+    uint64_t version;
+
+    uint64_t target_tdr_pa;
+    uint64_t target_page_pa;
+    uint64_t source_page_pa;
+
+    __CPROVER_havoc_object(&target_tdr_and_flags);
+    __CPROVER_havoc_object(&target_sept_page_pa);
+    __CPROVER_havoc_object(&version);
+    __CPROVER_havoc_object(&target_tdr_pa);
+    __CPROVER_havoc_object(&target_page_pa);
+    __CPROVER_havoc_object(&source_page_pa);
+
+    api_error_type error = UNINITIALIZE_ERROR;
+
+    __CPROVER_assume(version == 0); // SOPHIA: limit to version 0 for now
+    __CPROVER_assume(!target_tdr_and_flags.reserved_0); 
+    __CPROVER_assume(!target_tdr_and_flags.reserved_1); 
+    __CPROVER_assume(is_addr_aligned_pwr_of_2(target_page_pa, 256));
+
+    // error = tdg_vp_vmcall(controller_value); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    // error = tdh_mem_sept_add(sept_level_and_gpa,target_tdr_and_flags, target_sept_page_pa, version);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mem_page_aug(gpa_page_info, target_tdr_pa, target_page_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_vp_enter(target_page_pa, target_tdr_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdg_mem_page_accept(); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+}

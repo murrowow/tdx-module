@@ -163,6 +163,10 @@ api_error_type tdg_vp_vmcall(uint64_t controller_value)
     __CPROVER_assert(tdx_local_data_ptr->vmm_regs.rax == vm_exit_reason.raw, 
                      "RAX register holds the VM exit reason after TDGVPVMCALL");
     #endif // MODULAR_PROOF
+    #ifdef SOURCE
+    #else 
+    retval = TDX_SUCCESS; 
+    #endif // SOURCE
     EXIT_FAILURE:
 
     return retval;

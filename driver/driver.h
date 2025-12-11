@@ -89,6 +89,7 @@ typedef struct tdvps_small_s
 struct hardware_states
 {
    pamt_entry_t pamt_entry; 
+   pamt_entry_t page_pamt_entry; 
    // SOPHIA: changed tdr_t to tdr_small_t
    tdr_small_t  tdr_table; 
    tdr_t  tdr;

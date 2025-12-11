@@ -442,10 +442,37 @@ void driver_main() {
         __CPROVER_assume(control.reserved == 0);
     #endif // TD_EXIT_SETUP
 
+    #ifdef TD_ADD_PAGE_SETUP
+        __CPROVER_havoc_object(&local_data);
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables);
+
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+            __CPROVER_assume(tables[i].tdvps_table.management.state == VCPU_READY);
+            __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
+            __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
+            __CPROVER_assume(tables[i].tdr.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured 
+            __CPROVER_assume(tables[i].tdr.management_fields.num_tdcx >= MIN_NUM_TDCS_PAGES); // Minimal num of TDCS pages allocated
+            __CPROVER_assume(tables[i].tdcs_table.management_fields.num_l2_vms < MAX_VMS);
+            __CPROVER_assume(tables[i].tdr.management_fields.num_tdcx < MAX_NUM_TDCS_PAGES);
+            __CPROVER_assume(!tables[i].sept_page_lock);
+            __CPROVER_assume(verify_page_info_input(sept_level_and_gpa, LVL_PD, tables[i].tdcs_table.executions_ctl_fields.eptp.fields.ept_pwl));
+            __CPROVER_assume(verify_page_info_input(gpa_page_info, LVL_PT, LVL_PT));
+        }
+        uint64_t controller_value;
+        __CPROVER_havoc_object(&controller_value);
+        uint16_t gpr_check_mask = (uint16_t)(BIT(0) | BIT(1) | BIT(4));
+        tdvmcall_control_t control = { .raw = controller_value };
+        __CPROVER_assume((control.gpr_select & gpr_check_mask) == 0);
+        __CPROVER_assume(control.reserved == 0);
+    #endif // TD_ADD_PAGE_SETUP
+
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
     // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
     // TD_enter();
-    TD_exit(controller_value);
+    // TD_exit(controller_value);
+    TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
 }

@@ -24,25 +24,30 @@
  * @file tdh_mem_page_aug
  * @brief TDHMEMPAGEAUG API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
 
-
+#include "driver/driver.h"
 api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
                            uint64_t target_tdr_pa,
                            uint64_t target_page_pa)
 {
     // Local data for return values
+    #ifdef SOURCE
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE
+
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
     tdr_t               * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -76,6 +81,7 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
     local_data_ptr->vmm_regs.rcx = 0ULL;
     local_data_ptr->vmm_regs.rdx = 0ULL;
 
+    #ifdef SOURCE
     // Check, lock and map the owner TDR page (Shared lock!)
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RDX,
@@ -91,7 +97,13 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+        tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Map the TDCS structure and check the state
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
                                                false, TDH_MEM_PAGE_AUG_LEAF, &tdcs_ptr);
@@ -101,16 +113,29 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        tdcs_ptr = &tables[tdr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (!verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD))
     {
         TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD));
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check GPA, lock SEPT and walk to find entry
     return_val = lock_sept_check_and_walk_private_gpa(tdcs_ptr,
                                                       OPERAND_ID_RCX,
@@ -132,7 +157,9 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Lock the SEPT entry in memory
     return_val = sept_lock_acquire_host(page_sept_entry_ptr);
     if (TDX_SUCCESS != return_val)
@@ -143,7 +170,9 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         goto EXIT;
     }
     septe_locked_flag = true;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Read the SEPT entry (again after locking)
     page_sept_entry_copy = *page_sept_entry_ptr;
 
@@ -154,7 +183,9 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         TDX_ERROR("TDH_MEM_PAGE_AUG is not allowed in current SEPT entry state - 0x%llx\n", page_sept_entry_copy.raw);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check, lock and map the new SEPT EPT page
     return_val = check_and_lock_free_range_hpa(td_page_pa,
                                                OPERAND_ID_R8,
@@ -169,22 +200,41 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         TDX_ERROR("Failed to check/lock/map the new TD private page - error = %llx\n", return_val);
         goto EXIT;
     }
-
+    #else 
+        td_page_pamt_entry_ptr = &tables[td_page_pa.raw & HKID_MASK].page_pamt_entry;
+    #endif // SOURCE
+    
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
+    #ifdef SOURCE
     // Update the parent EPT entry with the new TD page HPA and SEPT_PENDING state
     sept_set_leaf_and_release_locks(page_sept_entry_ptr, SEPT_PERMISSIONS_NONE, td_page_pa, SEPT_STATE_PEND_MASK);
     septe_locked_flag = false;
 
     // Increment TDR child count, use an atomic operation since we have SHARED lock on TDR
     (void)_lock_xadd_64b(&(tdr_ptr->management_fields.chldcnt), 1 << (9 * page_level_entry));
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Update the new Secure EPT page’s PAMT entry
     td_page_pamt_entry_ptr->pt = PT_REG;
     set_pamt_entry_owner(td_page_pamt_entry_ptr, tdr_pa);
     td_page_pamt_entry_ptr->bepoch.raw = 0;   // Setting BEPOCH to 0 is required to avoid confusion during page export
+    #endif // FLOW_PROOF
+
+    // SOPHIA: why is this an issue
+    #ifdef MODULAR_PROOF
+    tables[td_page_pa.raw & HKID_MASK].page_pamt_entry.pt = PT_REG;
+    tables[td_page_pa.raw & HKID_MASK].page_pamt_entry.bepoch.raw = 0; 
+    #endif // MODULAR_PROOF 
+
+    #ifdef SOURCE
+    #else 
+    return_val = TDX_SUCCESS;
+    #endif // SOURCE
 
 EXIT:
+    #ifdef SOURCE
     // Release all acquired locks and free keyhole mappings
     if (td_page_locked_flag)
     {
@@ -212,5 +262,6 @@ EXIT:
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
         free_la(tdr_ptr);
     }
+    #endif // SOURCE
     return return_val;
 }
