@@ -410,11 +410,22 @@ void driver_main() {
         __CPROVER_assume(MAX_VMS > 0 && MAX_VMS <= 16);
     #endif // TD_MEM_SETUP
 
-    #ifdef TD_MEM_PAGE_ADD_SETUP
-    #endif // TD_MEM_PAGE_ADD_SETUP
+    #ifdef TD_ENTER_SETUP
+        __CPROVER_havoc_object(&local_data);
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables);
+
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+            __CPROVER_assume(tables[i].tdvps_table.management.state == VCPU_READY);
+            __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
+            __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
+        }
+    #endif // TD_ENTER_SETUP
 
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
-    TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
+    // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
+    TD_enter();
 }

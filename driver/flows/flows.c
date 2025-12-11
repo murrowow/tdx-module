@@ -152,3 +152,16 @@ void TD_mem_setup( page_info_api_input_t sept_level_and_gpa, page_info_api_input
     error = tdh_mr_extend(target_page_pa, target_tdr_pa);
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }
+
+void TD_enter() {
+    uint64_t vcpu_handle_and_flags;
+    __CPROVER_havoc_object(&vcpu_handle_and_flags);
+    api_error_type error = UNINITIALIZE_ERROR;
+    vcpu_and_flags_t      vcpu_and_flags = { .raw = vcpu_handle_and_flags };
+    __CPROVER_assume(vcpu_and_flags.reserved_0 == 0);
+    __CPROVER_assume(vcpu_and_flags.reserved_1 == 0);
+    __CPROVER_assume(vcpu_and_flags.resume_l1 == 0);
+
+    error = tdh_vp_enter(vcpu_handle_and_flags); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+}

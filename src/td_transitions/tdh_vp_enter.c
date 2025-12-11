@@ -24,22 +24,24 @@
  * @file tdh_vp_enter
  * @brief TDHVPENTER API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
-#include "td_dispatcher/tdx_td_dispatcher.h"
-#include "td_transitions/td_exit_stepping.h"
-#include "td_dispatcher/vm_exits/td_vmexit.h"
-#include "td_transitions/td_exit.h"
-#include "helpers/virt_msr_helpers.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/td_dispatcher/tdx_td_dispatcher.h"
+#include "src/td_transitions/td_exit_stepping.h"
+#include "src/td_dispatcher/vm_exits/td_vmexit.h"
+#include "src/td_transitions/td_exit.h"
+#include "src/common/helpers/virt_msr_helpers.h"
+
+#include "driver/driver.h"
 
 _STATIC_INLINE_ void guest_ext_state_load_failure()
 {
@@ -558,6 +560,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         // Local data for return values and global data
         tdx_module_local_t  * local_data_ptr = get_local_data();
         tdx_module_global_t * global_data_ptr = get_global_data();
+    #else 
+        tdx_module_local_t  * local_data_ptr = &local_data;
+        tdx_module_global_t * global_data_ptr = &global_data;
     #endif // SOURCE
 
     // TDVPR related variables
@@ -596,16 +601,38 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     }
     #endif // SOURCE 
 
+    #ifdef SOURCE
     if (vcpu_and_flags.reserved_0 || vcpu_and_flags.reserved_1)
     {
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         TDX_ERROR("Input VCPU handle and flags has reserved bits sets - 0x%llx\n", vcpu_and_flags.raw);
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(vcpu_and_flags.reserved_0 == 0);
+        __CPROVER_assume(vcpu_and_flags.reserved_1 == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (vcpu_and_flags.reserved_0 || vcpu_and_flags.reserved_1)
+        {
+            __CPROVER_assert(vcpu_and_flags.reserved_0 == 0, "TDH.VP.ENTER: reserved_0 must be zero");
+            __CPROVER_assert(vcpu_and_flags.reserved_1 == 0, "TDH.VP.ENTER: reserved_1 must be zero");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            TDX_ERROR("Input VCPU handle and flags has reserved bits sets - 0x%llx\n", vcpu_and_flags.raw);
+            goto EXIT_FAILURE;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef FLOW_PROOF
+    #else 
     tdvpr_pa.raw = 0;
     tdvpr_pa.page_4k_num = vcpu_and_flags.tdvpra_hpa_51_12;
+    #endif // FLOW_PROOF
 
+    #ifdef SOURCE
     // Check and lock the TDVPR page
     return_val = check_and_lock_explicit_4k_private_hpa(tdvpr_pa,
                                                          OPERAND_ID_RCX,
@@ -620,7 +647,13 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("Failed to check/lock a TDVPR (0x%llx) - error = %llx\n", tdvpr_pa.raw, return_val);
         goto EXIT_FAILURE;
     }
+    #else 
+    // In proof, assume TDVPR check_and_lock is successful
+    tdvpr_pamt_entry_ptr = &(tables[tdvpr_pa.raw & HKID_MASK].tdvpr_pamt_entry);
+    tdvpr_locked_flag = true;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Get and lock the owner TDR page
     // TDR is mapped in static keyhole range, and thus doesn't need to be freed
     tdr_pa = get_pamt_entry_owner(tdvpr_pamt_entry_ptr);
@@ -637,7 +670,12 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("Failed to lock/map a TDR - error = %lld\n", return_val);
         goto EXIT_FAILURE;
     }
+    #else 
+    // In proof, assume TDR lock_and_map is successful
+    tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Map the TDCS structure and check the state
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
                                                false, TDH_VP_ENTER_LEAF, &tdcs_ptr);
@@ -647,11 +685,18 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT_FAILURE;
     }
+    #else 
+    // In proof, assume TDCS mapping and state check is successful
+    tdcs_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdcs_table);
+    tdr_ptr = &(tables[tdr_pa.raw & HKID_MASK].tdr);
+    #endif // SOURCE
+
     op_state_locked_flag = true;
 
     // Get the TD's ephemeral HKID
     td_hkid = tdr_ptr->key_management_fields.hkid;
 
+    #ifdef SOURCE
     // Map the TDVPS structure
     // TDVPS is mapped in static keyhole range, and thus doesn't need to be freed
     tdvps_ptr = map_tdvps(tdvpr_pa, td_hkid, tdcs_ptr->management_fields.num_l2_vms, TDX_RANGE_RW);
@@ -662,7 +707,12 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         return_val = TDX_TDCX_NUM_INCORRECT;
         goto EXIT_FAILURE;
     }
+    #else 
+    // In proof, assume TDVPS mapping is successful
+    tdvps_ptr = &(tables[tdvpr_pa.raw & HKID_MASK].tdvps_table);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Associate the VCPU
     bool_t new_associate_flag = false;
     return_val = check_and_associate_vcpu(tdvps_ptr, tdcs_ptr, &new_associate_flag, false);
@@ -672,17 +722,37 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("Failed to associate VCPU - error = %llx\n", return_val);
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdvps_ptr->management.state == VCPU_READY);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assert(tdvps_ptr->management.state == VCPU_READY, "TDH.VP.ENTER: TDVPS state must be VCPU_READY");
+    #endif // FLOW_PROOF
+
+    // SOPHIA: only one LP at the moment cuz single core
+    #ifdef SOURCE
     set_vm_vmcs_as_active(tdvps_ptr, tdvps_ptr->management.curr_vm);
     td_vmcs_loaded = true;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if ((vcpu_and_flags.host_recoverability_hint) && (tdvps_ptr->management.last_td_exit != LAST_EXIT_ASYNC_TRAP))
     {
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         TDX_ERROR("Host recoverability is set, but last exit wasn't ASYNC_TRAP - %d\n", tdvps_ptr->management.last_td_exit);
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((vcpu_and_flags.host_recoverability_hint == 0) ||
+                         (tdvps_ptr->management.last_td_exit == LAST_EXIT_ASYNC_TRAP));
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     if (vcpu_and_flags.resume_l1)
     {
         // Resume to L1 is only supported on exit from L2
@@ -696,7 +766,23 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         // RESUME_L1 is sticky; the internal flag is cleared later, only if actual L1 entry happens
         set_l2_exit_host_routing(tdvps_ptr);
     }
+    #endif // SOURCE 
 
+    #ifdef MODULAR_PROOF
+        if (vcpu_and_flags.resume_l1)
+        {
+            __CPROVER_assume(tdvps_ptr->management.curr_vm != 0);
+        }
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (vcpu_and_flags.resume_l1)
+        {
+            __CPROVER_assert(tdvps_ptr->management.curr_vm != 0, "TDH.VP.ENTER: RESUME_L1 is only supported on exit from L2");      
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // We read TSC below.  Compare IA32_TSC_ADJUST to the value sampled on TDHSYSINIT
     // to make sure the host VMM doesn't play any trick on us.
     IF_RARE (ia32_rdmsr(IA32_TSC_ADJ_MSR_ADDR) != global_data_ptr->plt_common_config.ia32_tsc_adjust)
@@ -705,7 +791,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("Inconsistent IA32_TSC_ADJUST MSR!\n");
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Read TSC and verify that it is higher than LAST_EXIT_TSC.
     // Do the calculation as signed 64b, works even if TSC rolls over.
     IF_RARE (((int64_t)(ia32_rdtsc() - tdvps_ptr->management.last_exit_tsc)) < 0)
@@ -714,7 +802,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("TSC is lower than LAST_EXIT_TSC!\n");
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // If MONITOR/MWAIT support is enabled, then MONITOR_FSM must be enabled
     if (tdcs_ptr->executions_ctl_fields.cpuid_flags.monitor_mwait_supported &&
         !misc_enable.enable_monitor_fsm)
@@ -723,7 +813,21 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("If MONITOR/MWAIT support is enabled, then MONITOR_FSM must be enabled\n");
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(!tdcs_ptr->executions_ctl_fields.cpuid_flags.monitor_mwait_supported);
+    #endif // MODULAR_PROOF
+    
+    #ifdef FLOW_PROOF
+        if (tdcs_ptr->executions_ctl_fields.cpuid_flags.monitor_mwait_supported)
+        {
+            __CPROVER_assert(!tdcs_ptr->executions_ctl_fields.cpuid_flags.monitor_mwait_supported,
+                             "TDH.VP.ENTER: If MONITOR/MWAIT support is enabled, then MONITOR_FSM must be enabled");
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // Save the VMM value of IA32_DS_AREA
     local_data_ptr->vmm_non_extended_state.ia32_ds_area = ia32_rdmsr(IA32_DS_AREA_MSR_ADDR);
 
@@ -735,9 +839,11 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         return_val = api_error_with_operand_id(TDX_OPERAND_BUSY, OPERAND_ID_TD_EPOCH);
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
     stepping_filter_e filter_result = FILTER_OK_CONTINUE;
 
+    #ifdef SOURCE
     // Sample current VMCS state for handling stepping filter FILTER_OK_NOTIFY_EPS_FAULT case
     vm_vmexit_exit_reason_t exit_reason;
     vmx_exit_qualification_t exit_qualification;
@@ -753,7 +859,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         TDX_ERROR("Failed handling stepping filter - error = %llx\n", return_val);
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdvps_ptr->management.curr_vm != 0)
     {
         return_val = handle_l2_entry(tdr_ptr, tdcs_ptr, tdvps_ptr,
@@ -765,6 +873,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
             goto EXIT_FAILURE;
         }
     }
+    #endif // SOURCE
+
+    #ifdef SOURCE
     // If the stepping filter above indicated a #VE injection, inject it now to the L1 VMM
     // being entered, with the values sampled above from the VMCS of the VM that previously exited.
     else if ((filter_result == FILTER_OK_NOTIFY_EPS_FAULT) && can_inject_epf_ve(exit_qualification, tdvps_ptr))
@@ -772,6 +883,7 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         tdx_debug_assert(tdvps_ptr->management.curr_vm == 0);
         tdx_inject_ve((uint32_t)exit_reason.raw, exit_qualification.raw, tdvps_ptr, faulting_gpa.raw, 0);
     }
+    #endif // SOURCE
     
     /*-------------------------------------------------------------------------------------
     At this point we're at the VM to be entered - if there was an L2->L1 virtual exit
@@ -781,6 +893,7 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     exposed to the 0-step attack.
     -------------------------------------------------------------------------------------*/
 
+    #ifdef SOURCE
     if (filter_result == FILTER_FAIL_TDENTER_EPFS)
     {
         tdx_debug_assert(is_sept_locked == false);
@@ -794,7 +907,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         return_val = VMEXIT_REASON_EPT_VIOLATION;
         goto EXIT_FAILURE;
     }
-
+    #endif // SOURCE
+    
+    #ifdef SOURCE
     // Translate soft-translated GPAs, if required
     if ((tdvps_ptr->management.curr_vm != 0) &&
         !translate_gpas(tdr_ptr, tdcs_ptr, tdvps_ptr, tdvps_ptr->management.curr_vm, &faulting_gpa.raw))
@@ -808,15 +923,27 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         return_val = VMEXIT_REASON_EPT_VIOLATION;
         goto EXIT_FAILURE;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume((tdvps_ptr->management.curr_vm == 0));
+    #endif // MODULAR_PROOF
     // ALL CHECKS PASSED:
 
+    #ifdef FLOW_PROOF
+        __CPROVER_assert((tdvps_ptr->management.curr_vm == 0),
+                         "TDH.VP.ENTER: GPA translation must succeed for L2 entries");
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     /* OP_STATE has been locked in a temporary mode; it is released before
        entering non-root mode. */
     tdx_debug_assert(op_state_locked_flag);
     release_sharex_lock_hp_sh(&(tdcs_ptr->management_fields.op_state_lock));
     op_state_locked_flag = false;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // If the current VCPU to be executed on this LP is not the same as the last one,
     // issue an indirect branch prediction barrier (IBPB) command
     if (tdvpr_pa.raw != local_data_ptr->vp_ctx.last_tdvpr_pa.raw)
@@ -835,7 +962,10 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         ia32_wrmsr(IA32_PRED_CMD_MSR_ADDR, pred_cmd.raw);
         local_data_ptr->vp_ctx.last_tdvpr_pa.raw = tdvpr_pa.raw;
     }
+    #endif // SOURCE
 
+    #ifdef FLOW_PROOF
+    #else 
     // Save the TDR, TDCS and TDVPS linear pointers for use after every VM exit
     local_data_ptr->vp_ctx.tdr               = tdr_ptr;
     local_data_ptr->vp_ctx.tdr_pamt_entry    = tdr_pamt_entry_ptr;
@@ -847,14 +977,19 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     local_data_ptr->vp_ctx.tdvpr_pa          = tdvpr_pa;
 
     local_data_ptr->vp_ctx.tdcs              = tdcs_ptr;
+    #endif // FLOW_PROOF
 
+    #ifdef FLOW_PROOF
+    #else 
     // Save some other TD state to avoid accessing TDCS and TDVPS in case of a
     // memory integrity error
     local_data_ptr->vp_ctx.attributes = tdcs_ptr->executions_ctl_fields.attributes;
     local_data_ptr->vp_ctx.xfam = tdvps_ptr->management.xfam;
     local_data_ptr->vp_ctx.xfd_supported = tdcs_ptr->executions_ctl_fields.cpuid_flags.xfd_supported;
     local_data_ptr->vp_ctx.ia32_perf_global_status = tdvps_ptr->guest_msr_state.ia32_perf_global_status;
+    #endif // FLOW_PROOF
 
+    #ifdef SOURCE
     // Restore Guest Extended State
     if (tdvps_ptr->management.last_td_exit == LAST_EXIT_TDVMCALL)
     {
@@ -873,7 +1008,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
         guest_tdcall_status.host_recoverability_hint = vcpu_and_flags.host_recoverability_hint;
         tdvps_ptr->guest_state.gpr_state.rax = guest_tdcall_status.raw;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdvps_ptr->management.curr_vm == 0)
     {
         vmx_procbased_ctls_t vm_procbased_ctls;
@@ -895,7 +1032,9 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
             set_guest_inter_blocking_by_nmi();
         }
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Set the guest TD's IA32_DEBUGCTL.ENABLE_UNCORE_PMI to the VMM's value.
     ia32_debugctl_t debugctl;
     ia32_vmread(VMX_GUEST_IA32_DEBUGCTLMSR_FULL_ENCODE, &debugctl.raw);
@@ -925,9 +1064,14 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     update_host_state_in_td_vmcs(local_data_ptr, tdvps_ptr, tdvps_ptr->management.curr_vm);
 
     local_data_ptr->single_step_def_state.last_entry_tsc = ia32_rdtsc();
+    #endif // SOURCE
 
+    #ifdef FLOW_PROOF
+    #else 
     tdvps_ptr->management.state = VCPU_ACTIVE;
+    #endif // FLOW_PROOF
 
+    #ifdef SOURCE
     if (tdvps_ptr->management.vm_launched[tdvps_ptr->management.curr_vm])
     {
         tdx_return_to_td(true, true, &tdvps_ptr->guest_state.gpr_state);
@@ -936,12 +1080,27 @@ api_error_type tdh_vp_enter(uint64_t vcpu_handle_and_flags)
     {
         tdx_return_to_td(false, true, &tdvps_ptr->guest_state.gpr_state);
     }
-
     // Flow should never reach here
     tdx_sanity_check(0, SCEC_SEAMCALL_SOURCE(TDH_VP_ENTER_LEAF), 0);
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        tdvps_ptr->management.vm_launched[td_hkid & HKID_MASK] = true; 
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        __CPROVER_assume(tdvps_ptr->management.vm_launched[td_hkid & HKID_MASK]);
+    #endif // FLOW_PROOF
+
+    #ifdef MODULAR_PROOF 
+        if (!tdvps_ptr->management.vm_launched[td_hkid & HKID_MASK]) {
+            __CPROVER_assert(tdvps_ptr->management.vm_launched[td_hkid & HKID_MASK], "TDH.VP.ENTER: VM should be marked as launched after TD entry");
+            goto EXIT_FAILURE; 
+        }
+    #endif // MODULAR_PROOF
+    return TDX_SUCCESS;
 EXIT_FAILURE:
-
+    #ifdef SOURCE
     if (is_sept_locked)
     {
         release_sharex_lock_ex(&tdcs_ptr->executions_ctl_fields.secure_ept_lock);
@@ -977,6 +1136,6 @@ EXIT_FAILURE:
             free_la(tdvps_ptr);
         }
     }
-
+    #endif // SOURCE
     return return_val;
 }
