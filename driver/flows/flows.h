@@ -24,6 +24,6 @@ void TD_setup(uint16_t);
 void TDX_bootup(); 
 void TD_mem_setup(page_info_api_input_t, page_info_api_input_t); 
 void TD_enter();
-void TD_exit(); 
+void TD_exit(uint64_t); 
 
 #endif 

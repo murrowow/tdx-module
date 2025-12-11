@@ -166,9 +166,6 @@ void TD_enter() {
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }
 
-void TD_exit() {
-    uint64_t controller_value;
-    __CPROVER_havoc_object(&controller_value);
-
+void TD_exit(uint64_t controller_value) {
     tdg_vp_vmcall(controller_value);
 }

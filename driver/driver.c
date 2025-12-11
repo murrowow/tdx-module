@@ -424,6 +424,22 @@ void driver_main() {
     #endif // TD_ENTER_SETUP
 
     #ifdef TD_EXIT_SETUP
+        __CPROVER_havoc_object(&local_data);
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables);
+
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+            __CPROVER_assume(tables[i].tdvps_table.management.state == VCPU_READY);
+            __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
+            __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
+        }
+        uint64_t controller_value;
+        __CPROVER_havoc_object(&controller_value);
+        uint16_t gpr_check_mask = (uint16_t)(BIT(0) | BIT(1) | BIT(4));
+        tdvmcall_control_t control = { .raw = controller_value };
+        __CPROVER_assume((control.gpr_select & gpr_check_mask) == 0);
+        __CPROVER_assume(control.reserved == 0);
     #endif // TD_EXIT_SETUP
 
     // Call the flows
@@ -431,5 +447,5 @@ void driver_main() {
     // TD_setup(index); 
     // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
     // TD_enter();
-    TD_exit();
+    TD_exit(controller_value);
 }
