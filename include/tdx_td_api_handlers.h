@@ -28,10 +28,10 @@
 #ifndef INCLUDE_TDX_TD_API_HANDLERS_H_
 #define INCLUDE_TDX_TD_API_HANDLERS_H_
 
-#include "tdx_api_defs.h"
-#include "x86_defs/vmcs_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_tdvps.h"
+#include "include/tdx_api_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_tdvps.h"
 
 
 /**

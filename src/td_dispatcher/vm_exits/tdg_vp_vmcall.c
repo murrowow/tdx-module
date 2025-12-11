@@ -25,22 +25,24 @@
  * @brief TDGVPVMCALL API handler
  */
 
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
-#include "tdx_api_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "tdx_td_api_handlers.h"
-#include "debug/tdx_debug.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_api_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "include/tdx_td_api_handlers.h"
+#include "src/common/debug/tdx_debug.h"
 
-#include "helpers/tdx_locks.h"
-#include "helpers/helpers.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "data_structures/tdx_local_data.h"
-#include "accessors/data_accessors.h"
-#include "vmm_dispatcher/tdx_vmm_dispatcher.h"
-#include "x86_defs/x86_defs.h"
+#include "src/common/helpers/tdx_locks.h"
+#include "src/common/helpers/helpers.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/vmm_dispatcher/tdx_vmm_dispatcher.h"
+#include "src/common/x86_defs/x86_defs.h"
 
-#include "td_transitions/td_exit.h"
+#include "src/td_transitions/td_exit.h"
+
+#include "driver/driver.h"
 
 static void copy_gprs_data_from_td_to_vmm(tdx_module_local_t* tdx_local_data_ptr,
                                           tdvmcall_control_t control)

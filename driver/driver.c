@@ -423,9 +423,13 @@ void driver_main() {
         }
     #endif // TD_ENTER_SETUP
 
+    #ifdef TD_EXIT_SETUP
+    #endif // TD_EXIT_SETUP
+
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
     // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
-    TD_enter();
+    // TD_enter();
+    TD_exit();
 }
