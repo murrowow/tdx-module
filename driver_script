@@ -13,6 +13,7 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mr_extend.c \
        src/td_transitions/tdh_vp_enter.c \
        src/td_dispatcher/vm_exits/tdg_vp_vmcall.c \
-       src/vmm_dispatcher/api_calls/tdh_mem_page_aug.c"
+       src/vmm_dispatcher/api_calls/tdh_mem_page_aug.c \
+       src/td_dispatcher/vm_exits/tdg_mem_page_accept.c"
 
-cbmc driver/driver.c -DMODULAR_PROOF -DTD_ADD_PAGE_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt
+cbmc driver/driver.c -DFLOW_PROOF -DTD_ADD_PAGE_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt

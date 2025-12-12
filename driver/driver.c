@@ -468,6 +468,14 @@ void driver_main() {
         __CPROVER_assume(control.reserved == 0);
     #endif // TD_ADD_PAGE_SETUP
 
+    #ifdef TD_REMOVE_PAGE_SETUP
+        __CPROVER_havoc_object(&local_data);
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables);
+
+        uint64_t controller_value;
+        __CPROVER_havoc_object(&controller_value);
+    #endif // TD_REMOVE_PAGE_SETUP
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
@@ -475,4 +483,5 @@ void driver_main() {
     // TD_enter();
     // TD_exit(controller_value);
     TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
+    //TD_remove_page(controller_value); 
 }

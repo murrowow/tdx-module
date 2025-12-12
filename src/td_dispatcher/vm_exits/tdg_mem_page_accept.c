@@ -24,19 +24,20 @@
  * @file tdg_mem_page_accept.c
  * @brief TDGMEMPAGEACCEPT API handler
  */
-#include "tdx_td_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "tdx_basic_types.h"
-#include "tdx_api_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "data_structures/tdx_local_data.h"
-#include "accessors/ia32_accessors.h"
-#include "memory_handlers/sept_manager.h"
-#include "x86_defs/x86_defs.h"
-#include "accessors/ia32_accessors.h"
-#include "helpers/helpers.h"
-#include "td_dispatcher/vm_exits/td_vmexit.h"
+#include "include/tdx_td_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/tdx_basic_types.h"
+#include "include/tdx_api_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/helpers/helpers.h"
+#include "src/td_dispatcher/vm_exits/td_vmexit.h"
 
+#include "driver/driver.h"
 typedef enum tdaccept_failure_type_e
 {
     TDACCEPT_SUCCESS              = 0,
@@ -145,9 +146,13 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
 {
     api_error_type return_val = TDX_OPERAND_INVALID;
     // Local data
+    #ifdef SOURCE
     tdx_module_local_t* tdx_local_data_ptr = get_local_data();
     tdr_t* current_tdr = tdx_local_data_ptr->vp_ctx.tdr;
-
+    #else 
+    tdx_module_local_t* tdx_local_data_ptr = &local_data;
+    tdr_t* current_tdr = tdx_local_data_ptr->vp_ctx.tdr;
+    #endif 
     page_info_api_input_t gpa_mappings = {.raw = page_to_accept_gpa}; // GPA and level
     ia32e_sept_t* sept_entry_ptr = NULL;
     ia32e_sept_t  sept_entry_copy;
@@ -156,6 +161,7 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
 
     pa_t page_gpa = {.raw = 0}; // Target page GPA
 
+    #ifdef SOURCE
     /**
      * Memory operand checks
      */
@@ -165,12 +171,33 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD));
+    #endif // MODULAR_PROOF     
+
+    #ifdef FLOW_PROOF
+        if (!verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD))
+        {
+            __CPROVER_assert(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD), "Input GPA page info is valid");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
 
     tdr_t* tdr_p = tdx_local_data_ptr->vp_ctx.tdr;
     tdcs_t* tdcs_p = tdx_local_data_ptr->vp_ctx.tdcs;
+    #else 
+    tdr_t* tdr_p = &tables[(page_to_accept_gpa & HKID_MASK)].tdr;
+    tdcs_t* tdcs_p = &tables[(page_to_accept_gpa & HKID_MASK)].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     tdx_sanity_check(tdr_p != NULL, SCEC_TDCALL_SOURCE(TDG_MEM_PAGE_ACCEPT_LEAF), 0);
     tdx_sanity_check(tdcs_p != NULL, SCEC_TDCALL_SOURCE(TDG_MEM_PAGE_ACCEPT_LEAF), 1);
 
@@ -180,7 +207,26 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdr_p != NULL);
+        __CPROVER_assume(tdcs_p != NULL);
+        __CPROVER_assume(check_gpa_validity(page_gpa, tdcs_p->executions_ctl_fields.gpaw, PRIVATE_ONLY));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!check_gpa_validity(page_gpa, tdcs_p->executions_ctl_fields.gpaw, PRIVATE_ONLY))
+        {
+            __CPROVER_assert(check_gpa_validity(page_gpa, tdcs_p->executions_ctl_fields.gpaw, PRIVATE_ONLY),
+                             "Page to accept GPA is valid");
+            TDX_ERROR("Page to accept GPA (=0x%llx) is not not valid\n", page_gpa.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     ept_level_t ept_level = req_accept_level;
     return_val = walk_private_gpa(tdcs_p, page_gpa, tdr_p->key_management_fields.hkid,
                                   &sept_entry_ptr, &ept_level, &sept_entry_copy);
@@ -224,6 +270,31 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
             FATAL_ERROR();
         }
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(sept_entry_copy.leaf == 1 );
+        __CPROVER_assume((sept_entry_copy.raw & SEPT_STATE_ENCODING_MASK) == SEPT_STATE_FREE_MASK); // should be pending
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (sept_entry_copy.leaf != 1 )
+        {
+            __CPROVER_assert(sept_entry_copy.leaf == 1 , "SEPT entry is a leaf");
+            TDX_ERROR("SEPT entry is not a leaf\n");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+
+        if ((sept_entry_copy.raw & SEPT_STATE_ENCODING_MASK) != SEPT_STATE_FREE_MASK)
+        {
+            __CPROVER_assert((sept_entry_copy.raw & SEPT_STATE_ENCODING_MASK) == SEPT_STATE_FREE_MASK,
+                             "SEPT entry is in PENDING state");
+            TDX_ERROR("SEPT entry is not in PENDING state\n");
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
 
     // At this point we know that the page was PENDING when we sampled the SEPT entry above.
     // Atomically check that the entry has not changed and lock it on the guest side.
@@ -234,6 +305,7 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
     // until the next TD exit, septe_p is valid throughout this function, and the page can be freely written.
     // However the state of the SEPT entry itself may change concurrently by the host VMM.
 
+    #ifdef SOURCE
     bool_t interrupt_pending = false;
 
     if (req_accept_level == LVL_PT)
@@ -260,7 +332,9 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
             }
         } while (!tdaccept_2mb_done && !interrupt_pending);
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (!interrupt_pending)
     {
         // We're done.  Prepare a new SEPT entry value as MAPPED or EXPORTED_DIRTY as required
@@ -302,15 +376,21 @@ api_error_type tdg_mem_page_accept(uint64_t page_to_accept_gpa, bool_t* interrup
     atomic_mem_write_64b(&sept_entry_ptr->raw, sept_entry_copy.raw);
     sept_lock_release(sept_entry_ptr);
     sept_entry_locked_flag = false;
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        tables[page_to_accept_gpa & HKID_MASK].sept_entries[0] = sept_entry_copy;
+    #endif // MODULAR_PROOF
     // Secure EPT entry can be modified by a concurrent host-side function. Attempt to write it to memory.
     // This will also unlock the entry since  we're using the original, unlocked entry.
 
+    #ifdef SOURCE
     *interrupt_occurred = interrupt_pending;
-
+    #endif // SOURCE
     return_val = TDX_SUCCESS;
 
 EXIT:
+    #ifdef SOURCE
     // Free keyhole mappings
     if (sept_entry_ptr != NULL)
     {
@@ -321,6 +401,7 @@ EXIT:
 
         free_la(sept_entry_ptr);
     }
+    #endif // SOURCE
 
     return return_val;
 }

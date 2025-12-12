@@ -131,6 +131,16 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
         __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PD));
     #endif // MODULAR_PROOF
 
+    #ifdef FLOW_PROOF
+        if (!((gpa_page_info.level >= LVL_PT) && (gpa_page_info.level <= LVL_PD)))
+        {
+            __CPROVER_assert(((gpa_page_info.level >= LVL_PT) && (gpa_page_info.level <= LVL_PD)), "Input GPA page info is valid");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
     #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
     #endif // SOURCE
@@ -220,13 +230,21 @@ api_error_type tdh_mem_page_aug(page_info_api_input_t gpa_page_info,
     td_page_pamt_entry_ptr->pt = PT_REG;
     set_pamt_entry_owner(td_page_pamt_entry_ptr, tdr_pa);
     td_page_pamt_entry_ptr->bepoch.raw = 0;   // Setting BEPOCH to 0 is required to avoid confusion during page export
-    #endif // FLOW_PROOF
+    #endif // SOURCE
 
     // SOPHIA: why is this an issue
     #ifdef MODULAR_PROOF
     tables[td_page_pa.raw & HKID_MASK].page_pamt_entry.pt = PT_REG;
     tables[td_page_pa.raw & HKID_MASK].page_pamt_entry.bepoch.raw = 0; 
     #endif // MODULAR_PROOF 
+
+    return TDX_SUCCESS; 
+    #ifdef FLOW_PROOF
+    __CPROVER_havoc_slice(&tables[target_page_pa & HKID_MASK].page_pamt_entry, sizeof(pamt_entry_t));
+    __CPROVER_havoc_slice(&tables[target_page_pa & HKID_MASK].page_pamt_entry.bepoch.raw, sizeof(uint64_t));
+    __CPROVER_assume(tables[target_page_pa & HKID_MASK].page_pamt_entry.pt == PT_REG);
+    __CPROVER_assume(tables[target_page_pa & HKID_MASK].page_pamt_entry.bepoch.raw == 0);
+    #endif // FLOW_PROOF
 
     #ifdef SOURCE
     #else 
