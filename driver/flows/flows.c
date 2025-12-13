@@ -227,9 +227,10 @@ void TD_remove_page(uint64_t controller_value) {
     api_error_type error = UNINITIALIZE_ERROR;
     // tdg_vp_vmcall(controller_value); 
     // tdh_vp_enter(vcpu_handle_and_flags); 
-    error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
-    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    // tdh_mem_track(); 
+    // error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    error = tdh_mem_track(target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // tdh_mem_page_remove(); 
     // tdh_phymem_page_wbinvd(); 
 }

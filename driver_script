@@ -15,6 +15,7 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/td_dispatcher/vm_exits/tdg_vp_vmcall.c \
        src/vmm_dispatcher/api_calls/tdh_mem_page_aug.c \
        src/td_dispatcher/vm_exits/tdg_mem_page_accept.c \
-       src/vmm_dispatcher/api_calls/tdh_mem_range_block.c"
+       src/vmm_dispatcher/api_calls/tdh_mem_range_block.c \
+       src/vmm_dispatcher/api_calls/tdh_mem_track.c"
 
 cbmc driver/driver.c -DMODULAR_PROOF -DTD_REMOVE_PAGE_SETUP --function driver_main $FILES -I "$PWD" --trace > mem_driver_log.txt

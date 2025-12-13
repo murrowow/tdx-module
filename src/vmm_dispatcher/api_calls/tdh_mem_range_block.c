@@ -193,9 +193,9 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (!((sept_level_and_gpa.level >= LVL_PT) && (sept_level_and_gpa.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl)))
+        if (!verify_page_info_input(sept_level_and_gpa, LVL_PT, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl))
         {
-            __CPROVER_assert(((sept_level_and_gpa.level >= LVL_PT) && (sept_level_and_gpa.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl)), "Input GPA page info is valid");
+            __CPROVER_assert(verify_page_info_input(sept_level_and_gpa, LVL_PT, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl), "Input GPA page info is valid");
             TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", sept_level_and_gpa.raw);
             return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
             goto EXIT;
