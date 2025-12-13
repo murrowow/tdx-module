@@ -473,6 +473,10 @@ void driver_main() {
         __CPROVER_havoc_object(&global_data);
         __CPROVER_havoc_object(&tables);
 
+         page_info_api_input_t target_page_info;
+        __CPROVER_havoc_object(&target_page_info);
+        __CPROVER_assume(target_page_info.level >= 0 && target_page_info.level <= 3);
+
         uint64_t controller_value;
         __CPROVER_havoc_object(&controller_value);
     #endif // TD_REMOVE_PAGE_SETUP
@@ -483,6 +487,6 @@ void driver_main() {
     // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
     // TD_enter();
     // TD_exit(controller_value);
-    //TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
-    TD_remove_page(controller_value); 
+    // TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
+    TD_remove_page(controller_value, target_page_info); 
 }

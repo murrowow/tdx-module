@@ -211,7 +211,7 @@ void TD_add_page(uint64_t controller_value, page_info_api_input_t sept_level_and
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }
 
-void TD_remove_page(uint64_t controller_value) {
+void TD_remove_page(uint64_t controller_value, page_info_api_input_t target_page_info) {
     uint64_t vcpu_handle_and_flags;
     __CPROVER_havoc_object(&vcpu_handle_and_flags);
     vcpu_and_flags_t      vcpu_and_flags = { .raw = vcpu_handle_and_flags };
@@ -229,8 +229,10 @@ void TD_remove_page(uint64_t controller_value) {
     // tdh_vp_enter(vcpu_handle_and_flags); 
     // error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    error = tdh_mem_track(target_tdr_pa); 
+    // error = tdh_mem_track(target_tdr_pa); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mem_page_remove( target_page_info, target_tdr_pa); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // tdh_mem_page_remove(); 
     // tdh_phymem_page_wbinvd(); 
+    //__CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }

@@ -24,23 +24,28 @@
  * @file tdh_mem_page_remove
  * @brief TDHMEMPAGEREMOVE API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint64_t target_tdr_pa)
 {
     // Local data for return values
+    #ifdef SOURCE
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE 
     // TDR related variables
     pa_t                  tdr_pa = {.raw = target_tdr_pa};  // TDR physical address
     tdr_t               * tdr_ptr;                          // Pointer to the TDR page (linear address)
@@ -71,6 +76,7 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     local_data_ptr->vmm_regs.rcx = 0ULL;
     local_data_ptr->vmm_regs.rdx = 0ULL;
 
+    #ifdef SOURCE
     // Check, lock and map the owner TDR page (Shared lock!)
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RDX,
@@ -86,7 +92,12 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+    tdr_pamt_entry_ptr = &tables[tdr_pa.raw & HKID_MASK].pamt_entry;
+    tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Map the TDCS structure and check the state
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
                                                false, TDH_MEM_PAGE_REMOVE_LEAF, &tdcs_ptr);
@@ -96,16 +107,39 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+    tdcs_ptr = &tables[tdr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (!verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT))
     {
         TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT));
+    #endif // MODULAR_PROOF
+    #ifdef FLOW_PROOF
+        if (!verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT))
+        {
+            __CPROVER_assert(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT), "Input GPA page info is valid");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
+    #else 
+    page_gpa.raw = gpa_mappings.gpa & HKID_MASK; 
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check GPA, lock SEPT and walk to located entry of to-be-removed page
     return_val = lock_sept_check_and_walk_private_gpa(tdcs_ptr,
                                                       OPERAND_ID_RCX,
@@ -127,7 +161,14 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
-
+    #else 
+        // SOPHIA: hardware model stub
+        page_sept_entry_ptr = &(tables[page_gpa.raw & HKID_MASK].sept_entries[0]);
+        page_level_entry = gpa_mappings.level;
+        page_sept_entry_copy = *page_sept_entry_ptr;
+    #endif // SOURCE
+ 
+    #ifdef SOURCE
     // Lock the SEPT entry in memory
     return_val = sept_lock_acquire_host(page_sept_entry_ptr);
     if (TDX_SUCCESS != return_val)
@@ -137,11 +178,13 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         TDX_ERROR("Failed on SEPT host-side lock attempt\n");
         goto EXIT;
     }
+    #endif // SOURCE
     septe_locked_flag = true;
 
     // Read the SEPT entry (again after locking)
     page_sept_entry_copy = *page_sept_entry_ptr;
 
+    #ifdef SOURCE
     // Verify the located entry points is a leaf entry and relocate is allowed
     if (!is_secure_ept_leaf_entry(&page_sept_entry_copy) ||
         !sept_state_is_seamcall_leaf_allowed(TDH_MEM_PAGE_REMOVE_LEAF, page_sept_entry_copy))
@@ -151,10 +194,18 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         TDX_ERROR("Is leaf entry, or not allowed in current SEPT entry - 0x%llx!\n", page_sept_entry_copy.raw);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(is_secure_ept_leaf_entry(&page_sept_entry_copy));  
+    #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     // Cleanup leftover ACCEPT_COUNTER bits
     sept_cleanup_if_pending(&page_sept_entry_copy, page_level_entry);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Get removed page HPA PAMT entry
     removed_page_pa.raw = leaf_ept_entry_to_hpa(page_sept_entry_copy, page_gpa.raw, page_level_entry);
 
@@ -165,9 +216,16 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         return_val = api_error_with_operand_id(return_val, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        // SOPHIA: assume that this passes for now
+        removed_page_pamt_entry_ptr = &(tables[removed_page_pa.raw & HKID_MASK].pamt_entry);
+    #endif 
 
     removed_page_locked_flag = true;
 
+    #ifdef SOURCE
     if (sept_state_is_tlb_tracking_required(page_sept_entry_copy) &&
         op_state_is_tlb_tracking_required(tdcs_ptr->management_fields.op_state))
     {
@@ -190,9 +248,16 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
             goto EXIT;
         }
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        if  (op_state_is_tlb_tracking_required(tdcs_ptr->management_fields.op_state)) {
+            __CPROVER_assume(state_flags_lookup[op_state].tlb_tracking_required);
+        }
+    #endif // MODULAR_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
-
+    #ifdef SOURCE
     for (uint16_t vm_id = 1; vm_id <= tdcs_ptr->management_fields.num_l2_vms; vm_id++)
     {
         if (!sept_state_is_aliased(page_sept_entry_copy, vm_id))
@@ -210,12 +275,16 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
 
         free_la(l2_sept_entry_ptr);
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Atomically set the removed page Secure-EPT entry to SEPT_FREE or REMOVED (if import is in progress)
     septe_set_free_or_removed_and_release_locks(&page_sept_entry_copy, tdcs_ptr);
     atomic_mem_write_64b(&page_sept_entry_ptr->raw, page_sept_entry_copy.raw);
     septe_locked_flag = false;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Atomically decrement TDR child count by the amount of removed 4KB pages
     (void)_lock_xadd_64b(&tdr_ptr->management_fields.chldcnt, -(1 << (9 * page_level_entry)));
 
@@ -224,9 +293,16 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
 
     // Update RCX with the removed page HPA
     local_data_ptr->vmm_regs.rcx = removed_page_pa.raw;
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        removed_page_pamt_entry_ptr->pt = PT_NDA;
+        local_data_ptr->vmm_regs.rcx = removed_page_pa.raw;
+    #endif // MODULAR_PROOF
+    return_val = TDX_SUCCESS;   
 EXIT:
     // Release all acquired locks and free keyhole mappings
+    #ifdef SOURCE
     if (removed_page_locked_flag)
     {
         pamt_implicit_release_lock(removed_page_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE);
@@ -257,6 +333,6 @@ EXIT:
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
         free_la(tdr_ptr);
     }
-
+    #endif // SOURCE
     return return_val;
 }
