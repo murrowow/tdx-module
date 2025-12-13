@@ -24,17 +24,19 @@
  * @file tdh_mem_range_block
  * @brief TDHMEMRANGEBLOCK API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "memory_handlers/sept_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/memory_handlers/sept_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
+
+#include "driver/driver.h"
 
 static void block_sept_entry(ia32e_sept_t* sept_entry, ept_level_t level)
 {
@@ -105,7 +107,12 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
                         uint64_t target_tdr_pa)
 {
     // Local data for return values
+    #ifdef SOURCE
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE
+
     // TDR related variables
     pa_t                  tdr_pa;                    // TDR physical address
     tdr_t               * tdr_ptr;                   // Pointer to the TDR page (linear address)
@@ -137,6 +144,7 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
     local_data_ptr->vmm_regs.rcx = 0ULL;
     local_data_ptr->vmm_regs.rdx = 0ULL;
 
+    #ifdef SOURCE
     // Check, lock and map the owner TDR page (Shared lock!)
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RDX,
@@ -153,8 +161,12 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed to check/lock/map a TDR - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
     // Map the TDCS structure and check the state
+    #ifdef SOURCE
     return_val = check_state_map_tdcs_and_lock(tdr_ptr, TDX_RANGE_RW, TDX_LOCK_SHARED,
                                                false, TDH_MEM_RANGE_BLOCK_LEAF, &tdcs_ptr);
 
@@ -163,16 +175,40 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("State check or TDCS lock failure - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        tdcs_ptr = &tables[tdr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (!verify_page_info_input(sept_level_and_gpa, LVL_PT, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl))
     {
         TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", sept_level_and_gpa.raw);
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(verify_page_info_input(sept_level_and_gpa, LVL_PT, tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl));
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (!((sept_level_and_gpa.level >= LVL_PT) && (sept_level_and_gpa.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl)))
+        {
+            __CPROVER_assert(((sept_level_and_gpa.level >= LVL_PT) && (sept_level_and_gpa.level <= tdcs_ptr->executions_ctl_fields.eptp.fields.ept_pwl)), "Input GPA page info is valid");
+            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", sept_level_and_gpa.raw);
+            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+            goto EXIT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     page_gpa = page_info_to_pa(sept_level_and_gpa);
+    #else 
+    page_gpa.raw = sept_level_and_gpa.raw & HKID_MASK;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check GPA, lock SEPT and walk to find entry
     return_val = lock_sept_check_and_walk_private_gpa(tdcs_ptr,
                                                       OPERAND_ID_RCX,
@@ -194,7 +230,14 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        page_sept_entry_ptr = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
+        page_level_entry = sept_level_and_gpa.level;
+        page_sept_entry_copy.raw = tables[(page_gpa.raw & HKID_MASK)].sept_entries[0].raw;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Lock the SEPT entry
     return_val = sept_lock_acquire_host(page_sept_entry_ptr);
     if (TDX_SUCCESS != return_val)
@@ -204,11 +247,18 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on SEPT host-side lock attempt\n");
         goto EXIT;
     }
+    #endif // SOURCE
     septe_locked_flag = true;
 
     // Read the SEPT entry after being locked
+    #ifdef SOURCE
     page_sept_entry_copy.raw = page_sept_entry_ptr->raw;
+    #else 
+        // SOPHIA: hardware model stub
+        page_sept_entry_copy.raw = tables[(page_gpa.raw & HKID_MASK)].sept_entries[0].raw;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Verify the Secure-EPT entry to block
     if (!sept_state_is_seamcall_leaf_allowed(TDH_MEM_RANGE_BLOCK_LEAF, page_sept_entry_copy))
     {
@@ -225,20 +275,26 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("MEM.RANGE.BLOCK not allowed in current SEPT entry - 0x%llx!\n", page_sept_entry_copy.raw);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Prepare the EPT entry value with TDB set, RWX cleared and suppress VE set
     ia32e_sept_t new_septe_val;
     new_septe_val.raw = page_sept_entry_copy.raw;
 
     block_sept_entry(&new_septe_val, sept_level_and_gpa.level);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Update the SEPT entry in memory
     atomic_mem_write_64b(&page_sept_entry_ptr->raw, new_septe_val.raw);
+    #endif // SOURCE
 
     // Block any L2 aliases
     // This is done after blocking the L1 SEPT entry.  This way, if there's an EPT violation in an
     // L2 VM before we blocked the L2 SEPT entries, the VM exit handler will understand that the
     // range has been blocked and will TD exit to the host VMM.
+    #ifdef SOURCE
     for (uint16_t vm_id = 1; vm_id <= tdcs_ptr->management_fields.num_l2_vms; vm_id++)
     {
         if (!sept_state_is_aliased(page_sept_entry_copy, vm_id))
@@ -256,7 +312,7 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
 
         free_la(l2_sept_entry_ptr);
     }
-
+    #endif // SOURCE
     /*---------------------------------------------------------------
         ALL_CHECKS_PASSED:  The function is guaranteed to succeed
     ---------------------------------------------------------------*/
@@ -264,6 +320,7 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
     // Atomically update the PAMT.BEPOCH for the blocked page
     // Read the TD’s epoch (TDCS.TD_EPOCH) and write it to the PAMT entry of the
     // blocked Secure EPT page or TD private page (PAMT.BEPOCH)
+    #ifdef SOURCE
     td_page_pa.raw = 0;
     td_page_pa.page_4k_num = page_sept_entry_copy.base;
 
@@ -277,9 +334,14 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
     }
 
     td_page_pamt_entry_ptr->bepoch.raw = tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch;
-
+    #else
+    td_page_pamt_entry_ptr = &tables[td_page_pa.raw & HKID_MASK].pamt_entry; 
+    td_page_pamt_entry_ptr->bepoch.raw = &tables[tdr_pa.raw & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.td_epoch;
+    #endif // MODULAR_PROOF
+    return TDX_SUCCESS; 
 EXIT:
 
+#ifdef SOURCE
     // Release all acquired locks
     if (td_page_pamt_entry_ptr != NULL)
     {
@@ -311,6 +373,7 @@ EXIT:
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_SHARED, PT_4KB);
         free_la(tdr_ptr);
     }
+    #endif // SOURCE
 
     return return_val;
 }

@@ -476,12 +476,13 @@ void driver_main() {
         uint64_t controller_value;
         __CPROVER_havoc_object(&controller_value);
     #endif // TD_REMOVE_PAGE_SETUP
+    
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
     // TD_mem_setup(sept_level_and_gpa, gpa_page_info); 
     // TD_enter();
     // TD_exit(controller_value);
-    TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
-    //TD_remove_page(controller_value); 
+    //TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
+    TD_remove_page(controller_value); 
 }

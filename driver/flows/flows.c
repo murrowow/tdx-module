@@ -218,10 +218,17 @@ void TD_remove_page(uint64_t controller_value) {
     __CPROVER_assume(vcpu_and_flags.reserved_0 == 0);
     __CPROVER_assume(vcpu_and_flags.reserved_1 == 0);
     __CPROVER_assume(vcpu_and_flags.resume_l1 == 0);
+    page_info_api_input_t sept_level_and_gpa;
+    uint64_t target_tdr_pa;
 
-    tdg_vp_vmcall(controller_value); 
-    tdh_vp_enter(vcpu_handle_and_flags); 
-    // tdh_mem_range_block();
+    __CPROVER_havoc_object(&sept_level_and_gpa);
+    __CPROVER_assume(sept_level_and_gpa.level >= 0 && sept_level_and_gpa.level <= 3); 
+    __CPROVER_havoc_object(&target_tdr_pa);
+    api_error_type error = UNINITIALIZE_ERROR;
+    // tdg_vp_vmcall(controller_value); 
+    // tdh_vp_enter(vcpu_handle_and_flags); 
+    error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
     // tdh_mem_track(); 
     // tdh_mem_page_remove(); 
     // tdh_phymem_page_wbinvd(); 
