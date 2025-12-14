@@ -497,6 +497,21 @@ void driver_main() {
 
     #endif // TD_REMOVE_PAGE_SETUP
     
+    #ifdef TD_DESTROY_SETUP
+        __CPROVER_havoc_object(&local_data);
+        __CPROVER_havoc_object(&global_data);
+        __CPROVER_havoc_object(&tables);
+
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+            __CPROVER_assume(tables[i].tdvps_table.management.state == VCPU_READY);
+            __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
+            __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
+            __CPROVER_assume(tables[i].tdvps_table.management.assoc_lpid == local_data.lp_info.lp_id);
+            __CPROVER_assume(tables[i].tdr.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured
+        }
+    #endif // TD_DESTROY_SETUP
+
     // Call the flows
     // TDX_bootup(); 
     // TD_setup(index); 
@@ -504,5 +519,6 @@ void driver_main() {
     // TD_enter();
     // TD_exit(controller_value);
     // TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
-    TD_remove_page(controller_value, target_page_info, sept_level_and_gpa); 
+    // TD_remove_page(controller_value, target_page_info, sept_level_and_gpa); 
+        destroy_TD(); 
 }

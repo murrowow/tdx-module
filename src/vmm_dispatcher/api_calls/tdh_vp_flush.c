@@ -24,24 +24,29 @@
  * @file tdh_vp_flush
  * @brief TDHVPFLUSH API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "x86_defs/vmcs_defs.h"
-#include "data_structures/tdx_local_data.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
-#include "accessors/vt_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/x86_defs/vmcs_defs.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
+#include "src/common/accessors/vt_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
 {
     // TDX Local data
+    #ifdef SOURCE
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE
 
     // TDVPS related variables
     pa_t                  tdvpr_pa = {.raw = target_tdvpr_pa};  // TDVPR physical address
@@ -61,6 +66,7 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
 
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
+    #ifdef SOURCE
     // Check and lock the parent TDVPR page
     return_val = check_and_lock_explicit_4k_private_hpa(tdvpr_pa,
                                                          OPERAND_ID_RCX,
@@ -74,7 +80,11 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
         TDX_ERROR("Failed to check/lock a TDVPR page - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+    tdvpr_pamt_entry_ptr = &tables[tdvpr_pa.raw & HKID_MASK].tdvpr_pamt_entry; 
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Lock and map the TDR page
     return_val = lock_and_map_implicit_tdr(get_pamt_entry_owner(tdvpr_pamt_entry_ptr),
                                            OPERAND_ID_TDR,
@@ -88,7 +98,12 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
         TDX_ERROR("Failed to lock/map a TDR page - error = %llx\n", return_val);
         goto EXIT;
     }
+    #else 
+    tdr_pamt_entry_ptr = &tables[tdvpr_pa.raw & HKID_MASK].pamt_entry;
+    tdr_ptr = &tables[tdvpr_pa.raw & HKID_MASK].tdr;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check the TD's key state
     if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
     {
@@ -96,23 +111,61 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
         return_val = TDX_TD_KEYS_NOT_CONFIGURED;
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
+        {
+            //__CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD keys are configured");
+            TDX_ERROR("TD in incorrect life cycle state\n");
+            return TDX_TD_KEYS_NOT_CONFIGURED;
+        }
+    #endif // FLOW_PROOF
 
     // Get the TD's ephemeral HKID
     curr_hkid = tdr_ptr->key_management_fields.hkid;
 
     // Map the TDCS structure and check the state.  No need to lock
+    #ifdef SOURCE
     tdcs_ptr = map_implicit_tdcs(tdr_ptr, TDX_RANGE_RW, false);
+    #else 
+    tdcs_ptr = &tables[tdvpr_pa.raw & HKID_MASK].tdcs_table;
+    #endif // SOURCE
 
     // Map the multi-page TDVPS structure
+    #ifdef SOURCE
     tdvps_ptr = map_tdvps(tdvpr_pa, curr_hkid, tdcs_ptr->management_fields.num_l2_vms, TDX_RANGE_RW);
+    #else 
+    tdvps_ptr = &tables[tdvpr_pa.raw & HKID_MASK].tdvps_table;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     if (tdvps_ptr == NULL)
     {
         TDX_ERROR("TDVPS mapping failed\n");
         return_val = TDX_TDCX_NUM_INCORRECT;
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdvps_ptr != NULL); // TDVPS mapping succeeded
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdvps_ptr == NULL)
+        {
+            //__CPROVER_assert(tdvps_ptr != NULL, "TDVPS mapping succeeded");
+            TDX_ERROR("TDVPS mapping failed\n");
+            return TDX_TDCX_NUM_INCORRECT;
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // Check if this VCPU is associated with the current LP
     if (tdvps_ptr->management.assoc_lpid != local_data_ptr->lp_info.lp_id)
     {
@@ -120,12 +173,27 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
         return_val = TDX_VCPU_NOT_ASSOCIATED;
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdvps_ptr->management.assoc_lpid == local_data.lp_info.lp_id); // VCPU is associated with the current LP
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tdvps_ptr->management.assoc_lpid != local_data_ptr->lp_info.lp_id)
+        {
+            //__CPROVER_assert(tdvps_ptr->management.assoc_lpid == local_data_ptr->lp_info.lp_id, "VCPU is associated with the current LP");
+            TDX_ERROR("TD VCPU not associated - LPID = %d\n", local_data_ptr->lp_info.lp_id);
+            return TDX_VCPU_NOT_ASSOCIATED;
+        }
+    #endif // FLOW_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 
     // Flush the TLB context and extended paging structure (EPxE) caches associated
     // with all VMs of the current TD, using INVEPT single-context invalidation (type 1).
 
+    #ifdef SOURCE
     // Execute INVEPT type 1 for each Secure EPT
     flush_all_td_asids(tdr_ptr, tdcs_ptr);
 
@@ -140,17 +208,44 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
     {
         vmclear_vmcs(tdvps_ptr, vm_id);
     }
+    #endif // SOURCE
 
+    #ifdef FLOW_PROOF
+    // __CPROVER_havoc_slice(&tdvps_ptr->management.assoc_lpid, sizeof(uint32_t));
+    // __CPROVER_assume(tdvps_ptr->management.assoc_lpid == (uint32_t)-1);
+    #else 
     // Mark the VCPU as not associated with any LP
     tdvps_ptr->management.assoc_lpid = (uint32_t)-1;
+    #endif // FLOW_PROOF
 
+    // #ifdef MODULAR_PROOF
+    //     __CPROVER_assert(tdvps_ptr->management.assoc_lpid == (uint32_t)-1, "VCPU is not associated with any LP"); //"VCPU is not associated with any LP"
+    // #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
     // Atomically decrement the associated VCPUs counter.
     (void)_lock_xadd_32b(&(tdcs_ptr->management_fields.num_assoc_vcpus), (uint32_t)-1);
+    #endif // SOURCE
 
+    #ifdef FLOW_PROOF
+    // __CPROVER_havoc_slice(&local_data_ptr->vp_ctx.last_tdvpr_pa.raw, sizeof(uint64_t));
+    // __CPROVER_assume(local_data_ptr->vp_ctx.last_tdvpr_pa.raw == NULL_PA);
+    #else
     // Make sure the current VCPU is not marked as the last one that ran on this LP
     local_data_ptr->vp_ctx.last_tdvpr_pa.raw = NULL_PA;
+    #endif // FLOW_PROOF
+
+    // #ifdef MODULAR_PROOF
+    //     __CPROVER_assert(local_data_ptr->vp_ctx.last_tdvpr_pa.raw == NULL_PA, "The current VCPU is not marked as the last one that ran on this LP"); //"The current VCPU is not marked as the last one that ran on this LP"
+    // #endif // MODULAR_PROOF
+
+    #ifdef SOURCE
+    #else 
+    return_val = TDX_SUCCESS;
+    #endif // SOURCE
 
 EXIT:
+    #ifdef SOURCE
     // Release all acquired locks and free keyhole mappings
     if (tdr_locked_flag)
     {
@@ -169,5 +264,6 @@ EXIT:
     {
         free_la(tdcs_ptr);
     }
+    #endif // SOURCE
     return return_val;
 }
