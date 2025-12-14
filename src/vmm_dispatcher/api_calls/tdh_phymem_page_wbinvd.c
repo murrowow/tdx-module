@@ -24,16 +24,17 @@
  * @file tdh_phymem_page_wbinvd
  * @brief TDHPHYMEMPAGEWBINVD API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/ia32_accessors.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/ia32_accessors.h"
+#include "src/common/accessors/data_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_phymem_page_wbinvd(uint64_t tdmr_page_pa)
 {
@@ -48,9 +49,15 @@ api_error_type tdh_phymem_page_wbinvd(uint64_t tdmr_page_pa)
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
     // Get HKID from PA and remove it for the checks
+    #ifdef SOURCE
     curr_hkid = get_hkid_from_pa(page_wbinvd_pa);
     page_wbinvd_pa.raw &= ~(get_global_data()->hkid_mask);
+    #else 
+    curr_hkid = page_wbinvd_pa.raw & HKID_MASK;
+    page_wbinvd_pa.raw &= ~(HKID_MASK);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Check and lock the page
     return_val = check_and_lock_explicit_4k_private_hpa(page_wbinvd_pa,
                                                          OPERAND_ID_RCX,
@@ -65,17 +72,24 @@ api_error_type tdh_phymem_page_wbinvd(uint64_t tdmr_page_pa)
         TDX_ERROR("Failed to check/lock the given TDMR physical address - error = %lld\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: assume that this passes for now
+        page_wbinvd_pamt_entry_ptr = &tables[page_wbinvd_pa.raw & HKID_MASK].pamt_entry;
+    #endif // SOURCE
 
     // ALL_CHECKS_PASSED:  The instruction is guaranteed to succeed
 
+    #ifdef SOURCE
     // Map the page to get a linear address pointer
     page_wbinvd_ptr = map_pa_with_hkid(page_wbinvd_pa.raw_void, curr_hkid, TDX_RANGE_RO);
-
     // Perform write back and invalidate on all the page’s cache lines
     invalidate_cache_lines((uint64_t)page_wbinvd_ptr, TDX_PAGE_SIZE_IN_BYTES);
+    #endif // SOURCE
+    return_val = TDX_SUCCESS;
 
 EXIT:
     // Release all acquired locks and free keyhole mappings
+    #ifdef SOURCE
     if (page_wbinvd_locked_flag)
     {
         pamt_unwalk(page_wbinvd_pa,
@@ -88,5 +102,6 @@ EXIT:
             free_la(page_wbinvd_ptr);
         }
     }
+    #endif // SOURCE
     return return_val;
 }

@@ -108,7 +108,7 @@ struct hardware_states
 
    // SEPT page structure for modeling SEPT page additions
    pamt_entry_t sept_page_pamt_entry;
-   ia32e_sept_t sept_entries[512]; // Max 512 SEPT entries per page
+   ia32e_sept_t sept_entries[2]; // Max 512 SEPT entries per page
    uint8_t sept_page_mem;   // Memory backing for SEPT page
    bool_t sept_page_lock;   // Lock state for SEPT page
    tdvps_t tdvps_table; 

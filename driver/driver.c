@@ -477,8 +477,24 @@ void driver_main() {
         __CPROVER_havoc_object(&target_page_info);
         __CPROVER_assume(target_page_info.level >= 0 && target_page_info.level <= 3);
 
+        for (int i = 0; i < HKID_SIZE; i++) {
+            __CPROVER_assume(!tables[i].tdr.management_fields.fatal); // TD is not in fatal state
+            __CPROVER_assume(tables[i].tdvps_table.management.state == VCPU_READY);
+            __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
+            __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
+            __CPROVER_assume(verify_page_info_input(sept_level_and_gpa, LVL_PT, LVL_PDPT));
+            __CPROVER_assume(tables[i].tdcs_table.management_fields.op_state < 11); 
+            __CPROVER_assume(tables[i].tdcs_table.management_fields.op_state * 7l >= 0); 
+        }
+
         uint64_t controller_value;
         __CPROVER_havoc_object(&controller_value);
+        __CPROVER_havoc_object(&controller_value);
+        uint16_t gpr_check_mask = (uint16_t)(BIT(0) | BIT(1) | BIT(4));
+        tdvmcall_control_t control = { .raw = controller_value };
+        __CPROVER_assume((control.gpr_select & gpr_check_mask) == 0);
+        __CPROVER_assume(control.reserved == 0);
+
     #endif // TD_REMOVE_PAGE_SETUP
     
     // Call the flows
@@ -488,5 +504,5 @@ void driver_main() {
     // TD_enter();
     // TD_exit(controller_value);
     // TD_add_page(controller_value, sept_level_and_gpa, gpa_page_info); 
-    TD_remove_page(controller_value, target_page_info); 
+    TD_remove_page(controller_value, target_page_info, sept_level_and_gpa); 
 }

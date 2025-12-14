@@ -211,28 +211,31 @@ void TD_add_page(uint64_t controller_value, page_info_api_input_t sept_level_and
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }
 
-void TD_remove_page(uint64_t controller_value, page_info_api_input_t target_page_info) {
+void TD_remove_page(uint64_t controller_value, page_info_api_input_t target_page_info, page_info_api_input_t sept_level_and_gpa) {
     uint64_t vcpu_handle_and_flags;
     __CPROVER_havoc_object(&vcpu_handle_and_flags);
     vcpu_and_flags_t      vcpu_and_flags = { .raw = vcpu_handle_and_flags };
     __CPROVER_assume(vcpu_and_flags.reserved_0 == 0);
     __CPROVER_assume(vcpu_and_flags.reserved_1 == 0);
     __CPROVER_assume(vcpu_and_flags.resume_l1 == 0);
-    page_info_api_input_t sept_level_and_gpa;
     uint64_t target_tdr_pa;
 
-    __CPROVER_havoc_object(&sept_level_and_gpa);
-    __CPROVER_assume(sept_level_and_gpa.level >= 0 && sept_level_and_gpa.level <= 3); 
     __CPROVER_havoc_object(&target_tdr_pa);
+    //uint64_t td_epoch = tables[target_tdr_pa & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.td_epoch;
+    //uint16_t* refcount = tables[target_tdr_pa & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.refcount;
+    // __CPROVER_assume(refcount[1 - (td_epoch  & 1)] == 0);
     api_error_type error = UNINITIALIZE_ERROR;
-    // tdg_vp_vmcall(controller_value); 
-    // tdh_vp_enter(vcpu_handle_and_flags); 
-    // error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
-    // error = tdh_mem_track(target_tdr_pa); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    error = tdh_mem_page_remove( target_page_info, target_tdr_pa); 
+
+    error = tdg_vp_vmcall(controller_value); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // tdh_phymem_page_wbinvd(); 
-    //__CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_vp_enter(vcpu_handle_and_flags); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    error = tdh_mem_range_block(sept_level_and_gpa, target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success"); 
+    error = tdh_mem_track(target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mem_page_remove(sept_level_and_gpa, target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    tdh_phymem_page_wbinvd(target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
 }

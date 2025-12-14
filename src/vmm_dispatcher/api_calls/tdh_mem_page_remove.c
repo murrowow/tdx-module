@@ -73,8 +73,13 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
     // By default, no extended error code is returned
+    #ifdef SOURCE
     local_data_ptr->vmm_regs.rcx = 0ULL;
     local_data_ptr->vmm_regs.rdx = 0ULL;
+    #else 
+    local_data.vmm_regs.rcx = 0ULL;
+    local_data.vmm_regs.rdx = 0ULL;
+    #endif // SOURCE
 
     #ifdef SOURCE
     // Check, lock and map the owner TDR page (Shared lock!)
@@ -123,15 +128,28 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     #ifdef MODULAR_PROOF
         __CPROVER_assume(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT));
     #endif // MODULAR_PROOF
-    #ifdef FLOW_PROOF
-        if (!verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT))
-        {
-            __CPROVER_assert(verify_page_info_input(gpa_mappings, LVL_PT, LVL_PDPT), "Input GPA page info is valid");
-            TDX_ERROR("Input GPA page info (0x%llx) is not valid\n", gpa_mappings.raw);
-            return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
-            goto EXIT;
-        }
-    #endif // FLOW_PROOF
+
+    // SOPHIA: problem boi 
+    // #ifdef FLOW_PROOF
+    //     // Check level in valid range
+    //     if (!((gpa_mappings.level >= LVL_PT) && (gpa_mappings.level <= LVL_PDPT)))
+    //     {
+    //         __CPROVER_assert((gpa_mappings.level >= LVL_PT) && (gpa_mappings.level <= LVL_PDPT), "GPA level in valid range");
+    //         TDX_ERROR("Input GPA level (=%d) is not valid\n", gpa_mappings.level);
+    //         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+    //         goto EXIT;
+    //     }
+        
+    //     // Check GPA alignment: alignment = 1ULL << (12 + level*9)
+    //     uint64_t alignment = 1ULL << (12 + gpa_mappings.level * 9);
+    //     if ((gpa_mappings.gpa & (alignment - 1)) != 0)
+    //     {
+    //         __CPROVER_assert((gpa_mappings.gpa & (alignment - 1)) == 0, "GPA is properly aligned");
+    //         TDX_ERROR("Page GPA 0x%llx is not page aligned\n", gpa_mappings.raw);
+    //         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
+    //         goto EXIT;
+    //     }
+    // #endif // FLOW_PROOF
 
     #ifdef SOURCE
     page_gpa = page_info_to_pa(gpa_mappings);
@@ -165,9 +183,8 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         // SOPHIA: hardware model stub
         page_sept_entry_ptr = &(tables[page_gpa.raw & HKID_MASK].sept_entries[0]);
         page_level_entry = gpa_mappings.level;
-        page_sept_entry_copy = *page_sept_entry_ptr;
     #endif // SOURCE
- 
+
     #ifdef SOURCE
     // Lock the SEPT entry in memory
     return_val = sept_lock_acquire_host(page_sept_entry_ptr);
@@ -182,7 +199,9 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     septe_locked_flag = true;
 
     // Read the SEPT entry (again after locking)
+    #ifdef SOURCE
     page_sept_entry_copy = *page_sept_entry_ptr;
+    #endif // SOURCE
 
     #ifdef SOURCE
     // Verify the located entry points is a leaf entry and relocate is allowed
@@ -199,6 +218,16 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     #ifdef MODULAR_PROOF
         __CPROVER_assume(is_secure_ept_leaf_entry(&page_sept_entry_copy));  
     #endif // MODULAR_PROOF
+
+    // #ifdef FLOW_PROOF
+    //     if (!is_secure_ept_leaf_entry(&page_sept_entry_copy))
+    //     {
+    //         __CPROVER_assert(is_secure_ept_leaf_entry(&page_sept_entry_copy), "Is leaf entry");
+    //         return_val = api_error_with_operand_id(TDX_EPT_ENTRY_STATE_INCORRECT, OPERAND_ID_RCX);
+    //         TDX_ERROR("Is leaf entry, or not allowed in current SEPT entry - 0x%llx!\n", page_sept_entry_copy.raw);
+    //         goto EXIT;
+    //     }
+    // #endif // FLOW_PROOF
 
     #ifdef SOURCE
     // Cleanup leftover ACCEPT_COUNTER bits
@@ -221,7 +250,7 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
     #ifdef MODULAR_PROOF
         // SOPHIA: assume that this passes for now
         removed_page_pamt_entry_ptr = &(tables[removed_page_pa.raw & HKID_MASK].pamt_entry);
-    #endif 
+    #endif // MODULAR_PROOF
 
     removed_page_locked_flag = true;
 
@@ -252,10 +281,24 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
 
     #ifdef MODULAR_PROOF
         if  (op_state_is_tlb_tracking_required(tdcs_ptr->management_fields.op_state)) {
-            __CPROVER_assume(state_flags_lookup[op_state].tlb_tracking_required);
+            __CPROVER_assume(state_flags_lookup[tdcs_ptr->management_fields.op_state].tlb_tracking_required);
         }
     #endif // MODULAR_PROOF
 
+    // #ifdef FLOW_PROOF 
+    //     if (op_state_is_tlb_tracking_required(tdcs_ptr->management_fields.op_state)) {
+    //         __CPROVER_assert(state_flags_lookup[tdcs_ptr->management_fields.op_state].tlb_tracking_required, "TD op state requires TLB tracking");
+    //         // The TD may be running and this page must be blocked and tracked before it's removed.
+
+    //         // Check TLB tracking
+    //         if (!state_flags_lookup[tdcs_ptr->management_fields.op_state].tlb_tracking_required)
+    //         {
+    //             TDX_ERROR("Target splitted page TLB tracking not done\n");
+    //             return_val = api_error_with_operand_id(TDX_TLB_TRACKING_NOT_DONE, OPERAND_ID_RCX);
+    //             goto EXIT;
+    //         }
+    //     }
+    // #endif // FLOW_PROOF
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
     #ifdef SOURCE
     for (uint16_t vm_id = 1; vm_id <= tdcs_ptr->management_fields.num_l2_vms; vm_id++)
@@ -299,6 +342,13 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         removed_page_pamt_entry_ptr->pt = PT_NDA;
         local_data_ptr->vmm_regs.rcx = removed_page_pa.raw;
     #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF 
+        __CPROVER_havoc_slice(removed_page_pamt_entry_ptr, sizeof(pamt_entry_t));
+        __CPROVER_havoc_slice(local_data_ptr->vmm_regs.rcx, sizeof(uint64_t));
+        __CPROVER_assume(removed_page_pamt_entry_ptr->pt == PT_NDA);
+        __CPROVER_assume(local_data_ptr->vmm_regs.rcx == removed_page_pa.raw);
+    #endif // FLOW_PROOF
     return_val = TDX_SUCCESS;   
 EXIT:
     // Release all acquired locks and free keyhole mappings

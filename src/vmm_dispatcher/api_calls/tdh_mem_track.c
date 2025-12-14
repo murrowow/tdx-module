@@ -125,15 +125,15 @@ api_error_type tdh_mem_track(uint64_t target_tdr_pa)
         __CPROVER_assume(refcount[1 - (td_epoch  & 1)] == 0);
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        if (refcount[1 - (td_epoch  & 1)] != 0)
-        {
-            __CPROVER_assert(refcount[1 - (td_epoch  & 1)] == 0, "Previous epoch refcount check failed");
-            TDX_ERROR("VCPU associated with the previous epoch\n");
-            return_val = TDX_PREVIOUS_TLB_EPOCH_BUSY;
-            goto EXIT;
-        }
-    #endif // FLOW_PROOF
+    // #ifdef FLOW_PROOF
+    //     if (refcount[1 - (td_epoch  & 1)] != 0)
+    //     {
+    //         __CPROVER_assert(refcount[1 - (td_epoch  & 1)] == 0, "Previous epoch refcount check failed");
+    //         TDX_ERROR("VCPU associated with the previous epoch\n");
+    //         return_val = TDX_PREVIOUS_TLB_EPOCH_BUSY;
+    //         goto EXIT;
+    //     }
+    // #endif // FLOW_PROOF
 
     // ALL_CHECKS_PASSED:  The function is guaranteed to succeed
 

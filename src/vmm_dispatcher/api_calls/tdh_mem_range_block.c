@@ -201,7 +201,6 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
             goto EXIT;
         }
     #endif // FLOW_PROOF
-
     #ifdef SOURCE
     page_gpa = page_info_to_pa(sept_level_and_gpa);
     #else 
@@ -230,13 +229,15 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on GPA check, SEPT lock or walk - error = %llx\n", return_val);
         goto EXIT;
     }
-    #else 
-        // SOPHIA: assume that this passes for now
-        page_sept_entry_ptr = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
+    #else
+    // SOPHIA: This is the problem area it seems
+        page_sept_entry_ptr = &(tables[page_gpa.raw & HKID_MASK].sept_entries[0]);
         page_level_entry = sept_level_and_gpa.level;
-        page_sept_entry_copy.raw = tables[(page_gpa.raw & HKID_MASK)].sept_entries[0].raw;
+        // page_sept_entry_ptr = &tables[(page_gpa.raw & HKID_MASK)].sept_entries[0];
+        // page_level_entry = sept_level_and_gpa.level;
+        // page_sept_entry_copy.raw = tables[(page_gpa.raw & HKID_MASK)].sept_entries[0].raw;
     #endif // SOURCE
-
+    
     #ifdef SOURCE
     // Lock the SEPT entry
     return_val = sept_lock_acquire_host(page_sept_entry_ptr);
@@ -247,15 +248,13 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
         TDX_ERROR("Failed on SEPT host-side lock attempt\n");
         goto EXIT;
     }
-    #endif // SOURCE
     septe_locked_flag = true;
+    #endif // SOURCE
 
     // Read the SEPT entry after being locked
     #ifdef SOURCE
+    // SOPHIA TODO: this is a problem
     page_sept_entry_copy.raw = page_sept_entry_ptr->raw;
-    #else 
-        // SOPHIA: hardware model stub
-        page_sept_entry_copy.raw = tables[(page_gpa.raw & HKID_MASK)].sept_entries[0].raw;
     #endif // SOURCE
 
     #ifdef SOURCE
@@ -334,11 +333,14 @@ api_error_type tdh_mem_range_block(page_info_api_input_t sept_level_and_gpa,
     }
 
     td_page_pamt_entry_ptr->bepoch.raw = tdcs_ptr->epoch_tracking.epoch_and_refcount.td_epoch;
-    #else
-    td_page_pamt_entry_ptr = &tables[td_page_pa.raw & HKID_MASK].pamt_entry; 
-    td_page_pamt_entry_ptr->bepoch.raw = &tables[tdr_pa.raw & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.td_epoch;
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF 
+        td_page_pamt_entry_ptr = &tables[td_page_pa.raw & HKID_MASK].pamt_entry; 
+        td_page_pamt_entry_ptr->bepoch.raw = &tables[tdr_pa.raw & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.td_epoch;
     #endif // MODULAR_PROOF
-    return TDX_SUCCESS; 
+
+    return_val = TDX_SUCCESS; 
 EXIT:
 
 #ifdef SOURCE
