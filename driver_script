@@ -8,6 +8,11 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mng_key_config.c \
        src/vmm_dispatcher/api_calls/tdh_mng_add_cx.c \
        src/vmm_dispatcher/api_calls/tdh_mng_init.c \
+       src/vmm_dispatcher/api_calls/tdh_sys_init.c \
+       src/vmm_dispatcher/api_calls/tdh_sys_lp_init.c \
+       src/vmm_dispatcher/api_calls/tdh_sys_rd.c \
+       src/vmm_dispatcher/api_calls/tdh_sys_config.c \
+       src/vmm_dispatcher/api_calls/tdh_sys_key_config.c \
        src/vmm_dispatcher/api_calls/tdh_mem_sept_add.c \
        src/vmm_dispatcher/api_calls/tdh_mem_page_add.c \
        src/vmm_dispatcher/api_calls/tdh_mr_extend.c \

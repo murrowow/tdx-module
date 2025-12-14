@@ -343,12 +343,13 @@ api_error_type tdh_mem_page_remove(page_info_api_input_t target_page_info, uint6
         local_data_ptr->vmm_regs.rcx = removed_page_pa.raw;
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF 
-        __CPROVER_havoc_slice(removed_page_pamt_entry_ptr, sizeof(pamt_entry_t));
-        __CPROVER_havoc_slice(local_data_ptr->vmm_regs.rcx, sizeof(uint64_t));
-        __CPROVER_assume(removed_page_pamt_entry_ptr->pt == PT_NDA);
-        __CPROVER_assume(local_data_ptr->vmm_regs.rcx == removed_page_pa.raw);
-    #endif // FLOW_PROOF
+    // SOPHIA: also a problem area
+    // #ifdef FLOW_PROOF 
+    //     __CPROVER_havoc_slice(removed_page_pamt_entry_ptr, sizeof(pamt_entry_t));
+    //     __CPROVER_havoc_slice(local_data_ptr->vmm_regs.rcx, sizeof(uint64_t));
+    //     __CPROVER_assume(removed_page_pamt_entry_ptr->pt == PT_NDA);
+    //     __CPROVER_assume(local_data_ptr->vmm_regs.rcx == removed_page_pa.raw);
+    // #endif // FLOW_PROOF
     return_val = TDX_SUCCESS;   
 EXIT:
     // Release all acquired locks and free keyhole mappings
