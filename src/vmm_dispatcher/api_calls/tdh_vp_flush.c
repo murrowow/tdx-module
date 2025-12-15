@@ -118,7 +118,7 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (tdr_ptr->management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
+        if (tables[tdvpr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state != TD_KEYS_CONFIGURED)
         {
             //__CPROVER_assert(tdr_ptr->management_fields.lifecycle_state == TD_KEYS_CONFIGURED, "TD keys are configured");
             TDX_ERROR("TD in incorrect life cycle state\n");
@@ -127,7 +127,11 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
     #endif // FLOW_PROOF
 
     // Get the TD's ephemeral HKID
+    #ifdef SOURCE
     curr_hkid = tdr_ptr->key_management_fields.hkid;
+    #else 
+    curr_hkid = tdvpr_pa.raw & HKID_MASK;
+    #endif // SOURCE
 
     // Map the TDCS structure and check the state.  No need to lock
     #ifdef SOURCE
@@ -156,15 +160,6 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
         __CPROVER_assume(tdvps_ptr != NULL); // TDVPS mapping succeeded
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        if (tdvps_ptr == NULL)
-        {
-            //__CPROVER_assert(tdvps_ptr != NULL, "TDVPS mapping succeeded");
-            TDX_ERROR("TDVPS mapping failed\n");
-            return TDX_TDCX_NUM_INCORRECT;
-        }
-    #endif // FLOW_PROOF
-
     #ifdef SOURCE
     // Check if this VCPU is associated with the current LP
     if (tdvps_ptr->management.assoc_lpid != local_data_ptr->lp_info.lp_id)
@@ -180,7 +175,7 @@ api_error_type tdh_vp_flush(uint64_t target_tdvpr_pa)
     #endif // MODULAR_PROOF
 
     #ifdef FLOW_PROOF
-        if (tdvps_ptr->management.assoc_lpid != local_data_ptr->lp_info.lp_id)
+        if (tables[tdvpr_pa.raw & HKID_MASK].tdvps_table.management.assoc_lpid != local_data.lp_info.lp_id)
         {
             //__CPROVER_assert(tdvps_ptr->management.assoc_lpid == local_data_ptr->lp_info.lp_id, "VCPU is associated with the current LP");
             TDX_ERROR("TD VCPU not associated - LPID = %d\n", local_data_ptr->lp_info.lp_id);

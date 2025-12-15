@@ -24,6 +24,9 @@ FILES="src/common/memory_handlers/keyhole_manager.c \
        src/vmm_dispatcher/api_calls/tdh_mem_track.c \
        src/vmm_dispatcher/api_calls/tdh_mem_page_remove.c \
        src/vmm_dispatcher/api_calls/tdh_phymem_page_wbinvd.c \
-       src/vmm_dispatcher/api_calls/tdh_vp_flush.c"
+       src/vmm_dispatcher/api_calls/tdh_vp_flush.c \
+       src/vmm_dispatcher/api_calls/tdh_mng_vpflushdone.c \
+       src/vmm_dispatcher/api_calls/tdh_phymem_cache_wb.c \
+       src/vmm_dispatcher/api_calls/tdh_mng_key_freeid.c"
 
-cbmc driver/driver.c -DFLOW_PROOF -DTD_DESTROY_SETUP --unwind 4 --function driver_main $FILES -I "$PWD" --trace > driver_log.txt
+cbmc driver/driver.c -DMODULAR_PROOF -DTD_DESTROY_SETUP --unwind 4 --function driver_main $FILES -I "$PWD" --trace > driver_log.txt

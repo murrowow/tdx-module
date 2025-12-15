@@ -24,22 +24,28 @@
  * @file tdh_phymem_cache_wb
  * @brief TDHPHYMEMCACHEWB API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_global_data.h"
-#include "data_structures/tdx_local_data.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/data_structures/tdx_local_data.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
 {
     // TDX Global and Local data
+    #ifdef SOURCE
     tdx_module_global_t * global_data_ptr = get_global_data();
     tdx_module_local_t  * local_data_ptr = get_local_data();
+    #else 
+    tdx_module_global_t * global_data_ptr = &global_data;
+    tdx_module_local_t  * local_data_ptr = &local_data;
+    #endif // SOURCE
 
     // KOT and PHYMEMCACHEWB related variables
     uint64_t              curr_cachewb_cmd = cachewb_cmd;
@@ -53,6 +59,7 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
 
     api_error_type        return_val = UNINITIALIZE_ERROR;
 
+    #ifdef SOURCE
     // Verify the command value
     if (curr_cachewb_cmd > TDH_PHYMEM_CACHEWB_RESUME_CMD)
     {
@@ -60,12 +67,21 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
         return_val = api_error_with_operand_id(TDX_OPERAND_INVALID, OPERAND_ID_RCX);
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(curr_cachewb_cmd <=TDH_PHYMEM_CACHEWB_RESUME_CMD);
+    #endif // MODULAR_PROOF
     /**
      * Get the index for PHYMEMCACHEWB.  Depending on the CPU, this would be current package.
      */
+    #ifdef SOURCE
     cachewb_index = (uint64_t)local_data_ptr->lp_info.pkg;
+    #else 
+    cachewb_index = (uint64_t)local_data.lp_info.pkg;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Acquire package-scope TDHPHYMEMCACHEWB mutex
     if (acquire_mutex_lock(&global_data_ptr->wbt_entries[cachewb_index].entry_lock) != LOCK_RET_SUCCESS)
     {
@@ -74,7 +90,9 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
         goto EXIT;
     }
     cachewb_locked_flag = true;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Acquire shared access to KOT
     if (acquire_sharex_lock_sh(&global_data_ptr->kot.lock) != LOCK_RET_SUCCESS)
     {
@@ -85,7 +103,9 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
     kot_locked_flag = true;
 
     basic_memset_to_zero(cachewb_flushed_bitmap, sizeof(cachewb_flushed_bitmap));
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Handle initial TDBWINVD (that is not a resumption of an interrupted TDWBINVD)
     if (curr_cachewb_cmd == TDH_PHYMEM_CACHEWB_START_CMD)
     {
@@ -145,7 +165,8 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
             goto EXIT;
         }
     }
-
+    #endif // SOURCE
+    #ifdef SOURCE
     // Execute WBNOINVDP in a loop until either done or an event has been detected
     do
     {
@@ -166,13 +187,16 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
         }
     }
     while (intr_point_for_cachewb < global_data_ptr->num_of_cached_sub_blocks);
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Mark the interruption point as invalid
     global_data_ptr->wbt_entries[cachewb_index].intr_point = 0;
-
+    #endif // SOURCE
     // At this point TDHPHYMEMCACHEWB has completed without interruption.
     // ALL_CHECKS_PASSED:  The instruction is guaranteed to succeed
 
+    #ifdef SOURCE
     /**
      * Go over all applicable KOT entries.  For those entries where WBINVD_INIT_BITMAP
      * bit for the current package is 1, clear the same bit in the WBINVD_BITMAP.
@@ -189,10 +213,12 @@ api_error_type tdh_phymem_cache_wb(uint64_t cachewb_cmd)
             _lock_btr_32b(&global_data_ptr->kot.entries[curr_hkid].wbinvd_bitmap, (uint32_t)cachewb_index);
         }
     }
+    #endif // SOURCE
 
     return_val = TDX_SUCCESS;
 
 EXIT:
+#ifdef SOURCE
     // Release all acquired locks
     if (kot_locked_flag)
     {
@@ -202,6 +228,7 @@ EXIT:
     {
         release_mutex_lock(&global_data_ptr->wbt_entries[cachewb_index].entry_lock);
     }
+#endif // SOURCE
     return return_val;
 }
 

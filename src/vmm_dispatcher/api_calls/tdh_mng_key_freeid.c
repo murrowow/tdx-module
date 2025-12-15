@@ -24,22 +24,27 @@
  * @file tdh_mng_key_freeid
  * @brief TDHMNGKEYFREEID API handler
  */
-#include "tdx_vmm_api_handlers.h"
-#include "tdx_basic_defs.h"
-#include "auto_gen/tdx_error_codes_defs.h"
-#include "x86_defs/x86_defs.h"
-#include "data_structures/tdx_global_data.h"
-#include "data_structures/td_control_structures.h"
-#include "memory_handlers/keyhole_manager.h"
-#include "memory_handlers/pamt_manager.h"
-#include "helpers/helpers.h"
-#include "accessors/data_accessors.h"
+#include "include/tdx_vmm_api_handlers.h"
+#include "include/tdx_basic_defs.h"
+#include "include/auto_gen/tdx_error_codes_defs.h"
+#include "src/common/x86_defs/x86_defs.h"
+#include "src/common/data_structures/tdx_global_data.h"
+#include "src/common/data_structures/td_control_structures.h"
+#include "src/common/memory_handlers/keyhole_manager.h"
+#include "src/common/memory_handlers/pamt_manager.h"
+#include "src/common/helpers/helpers.h"
+#include "src/common/accessors/data_accessors.h"
 
+#include "driver/driver.h"
 
 api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
 {
     // TDX Global data
-    tdx_module_global_t * global_data_ptr = get_global_data();
+    #ifdef SOURCE
+        tdx_module_global_t * global_data = get_global_data();
+    #else 
+        tdx_module_global_t * global_data_ptr = &global_data;
+    #endif //SOURCE
 
     // TDR related variables
     pa_t                  tdr_pa = {.raw = target_tdr_pa}; // TDR physical address
@@ -56,6 +61,7 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
     /**
      * Check TDR (explicit access, opaque semantics, exclusive lock).
      */
+     #ifdef SOURCE
     return_val = check_lock_and_map_explicit_tdr(tdr_pa,
                                                  OPERAND_ID_RCX,
                                                  TDX_RANGE_RW,
@@ -70,7 +76,14 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
         TDX_ERROR("Failed to check/lock/map a TDR - error = %lld\n", return_val);
         goto EXIT;
     }
+    #else 
+        // SOPHIA: hardware model stub
+        tdr_pamt_entry_ptr = &(tables[tdr_pa.raw & HKID_MASK].pamt_entry);
+        tdr_ptr = &tables[tdr_pa.raw & HKID_MASK].tdr;
+        curr_hkid = tdr_pa.raw & HKID_MASK;
+    #endif // SOURCE
 
+    #ifdef SOURCE
     // Verify the TD's key state
     if (tdr_ptr->management_fields.lifecycle_state != TD_BLOCKED)
     {
@@ -78,7 +91,21 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
         return_val = TDX_LIFECYCLE_STATE_INCORRECT;
         goto EXIT;
     }
+    #endif // SOURCE
 
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_BLOCKED); // TD is in blocked state
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (tables[tdr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state != TD_BLOCKED) {
+            //__CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state == TD_BLOCKED, "TD is in blocked state");
+            return_val = TDX_LIFECYCLE_STATE_INCORRECT;
+            goto EXIT; 
+        }
+    #endif // FLOW_PROOF
+
+    #ifdef SOURCE
     // Acquire exclusive access to KOT
     if (acquire_sharex_lock_ex(&global_data_ptr->kot.lock) != LOCK_RET_SUCCESS)
     {
@@ -87,11 +114,13 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
         goto EXIT;
     }
     kot_locked_flag = true;
+    #endif // SOURCE
 
     /**
      * If TDH_PHYMEM_CACHE_WB was executed on all packages/cores,
      * set the KOT entry, set the KOT entry state to HKID_FREE.
      */
+     #ifdef SOURCE
     curr_hkid = tdr_ptr->key_management_fields.hkid;
     tdx_debug_assert(global_data_ptr->kot.entries[curr_hkid].state == KOT_STATE_HKID_FLUSHED);
     if (global_data_ptr->kot.entries[curr_hkid].wbinvd_bitmap != 0)
@@ -100,13 +129,40 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
         return_val = TDX_WBCACHE_NOT_COMPLETE;
         goto EXIT;
     }
+    #endif // SOURCE
+
+    #ifdef MODULAR_PROOF
+        __CPROVER_assume(global_data.kot.entries[target_tdr_pa & HKID_MASK].state == KOT_STATE_HKID_FLUSHED);
+        __CPROVER_assume(global_data.kot.entries[target_tdr_pa & HKID_MASK].wbinvd_bitmap == 0);
+    #endif // MODULAR_PROOF
+
+    #ifdef FLOW_PROOF
+        if (global_data.kot.entries[target_tdr_pa & HKID_MASK].state != KOT_STATE_HKID_FLUSHED) {
+            //__CPROVER_assert(global_data_ptr->kot.entries[target_tdr_pa & HKID_MASK].state == KOT_STATE_HKID_FLUSHED, "HKID is flushed");
+            return_val = TDX_WBCACHE_NOT_COMPLETE;
+            goto EXIT; 
+        }
+        if (global_data.kot.entries[target_tdr_pa & HKID_MASK].wbinvd_bitmap != 0) {
+            //__CPROVER_assert(global_data_ptr->kot.entries[target_tdr_pa & HKID_MASK].wbinvd_bitmap == 0, "CACHEWB is complete for this HKID");
+            return_val = TDX_WBCACHE_NOT_COMPLETE;
+            goto EXIT; 
+        }
+    #endif // FLOW_PROOF
 
     // ALL_CHECKS_PASSED: The function is guaranteed to succeed
 
-    global_data_ptr->kot.entries[curr_hkid].state = (uint8_t)KOT_STATE_HKID_FREE;
-    tdr_ptr->management_fields.lifecycle_state = (uint8_t)TD_TEARDOWN;
+    #ifdef FLOW_PROOF
+    #else 
+    global_data.kot.entries[target_tdr_pa & HKID_MASK].state = (uint8_t)KOT_STATE_HKID_FREE;
+    tables[target_tdr_pa & HKID_MASK].tdr.management_fields.lifecycle_state = (uint8_t)TD_TEARDOWN;
+    #endif // FLOW_PROOF
 
+    #ifdef SOURCE
+    #else 
+    return_val = TDX_SUCCESS;
+    #endif // SOURCE
 EXIT:
+    #ifdef SOURCE
     // Release all acquired locks and free keyhole mappings
     if (kot_locked_flag)
     {
@@ -117,6 +173,7 @@ EXIT:
         pamt_unwalk(tdr_pa, tdr_pamt_block, tdr_pamt_entry_ptr, TDX_LOCK_EXCLUSIVE, PT_4KB);
         free_la(tdr_ptr);
     }
+    #endif // SOURCE
 
     return return_val;
 }

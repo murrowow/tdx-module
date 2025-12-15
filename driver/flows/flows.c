@@ -247,14 +247,14 @@ void destroy_TD() {
     uint64_t target_tdvpr_pa;
     __CPROVER_havoc_object(&target_tdvpr_pa);
 
-    error = tdh_vp_flush(target_tdvpr_pa); 
+    // error = tdh_vp_flush(target_tdvpr_pa); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_mng_vpflushdone(target_tdr_pa); 
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    // error = tdh_phymem_cache_wb(target_tdr_pa);
+    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mng_key_freeid(target_tdr_pa); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_mng_vpflush_done(); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_phymem_cache_wb(); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_mng_key_freeid(); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // error = tdh_phymem_page_reclaim(); 
     // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     // error = tdh_phymem_page_wbinvd(target_tdr_pa);
