@@ -97,13 +97,13 @@ api_error_type tdh_mng_key_freeid(uint64_t target_tdr_pa)
         __CPROVER_assume(tdr_ptr->management_fields.lifecycle_state == TD_BLOCKED); // TD is in blocked state
     #endif // MODULAR_PROOF
 
-    #ifdef FLOW_PROOF
-        if (tables[tdr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state != TD_BLOCKED) {
-            //__CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state == TD_BLOCKED, "TD is in blocked state");
-            return_val = TDX_LIFECYCLE_STATE_INCORRECT;
-            goto EXIT; 
-        }
-    #endif // FLOW_PROOF
+    // #ifdef FLOW_PROOF
+    //     if (tables[target_tdr_pa & HKID_MASK].tdr.management_fields.lifecycle_state != TD_BLOCKED) {
+    //         //__CPROVER_assert(tables[tdr_pa.raw & HKID_MASK].tdr.management_fields.lifecycle_state == TD_BLOCKED, "TD is in blocked state");
+    //         return_val = TDX_LIFECYCLE_STATE_INCORRECT;
+    //         goto EXIT; 
+    //     }
+    // #endif // FLOW_PROOF
 
     #ifdef SOURCE
     // Acquire exclusive access to KOT

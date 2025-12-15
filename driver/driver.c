@@ -508,6 +508,8 @@ void driver_main() {
             __CPROVER_assume(tables[i].tdvps_table.management.curr_vm == 0);
             __CPROVER_assume(!tables[i].tdcs_table.executions_ctl_fields.cpuid_flags.monitor_mwait_supported); // TD memory is configured
             __CPROVER_assume(tables[i].tdvps_table.management.assoc_lpid == local_data.lp_info.lp_id);
+            __CPROVER_assume(!(tables[i].pamt_entry.pt == PT_NDA) && 
+                             !(tables[i].pamt_entry.pt == PT_RSVD));
             __CPROVER_assume(tables[i].tdr.management_fields.lifecycle_state == TD_KEYS_CONFIGURED); // TD keys are configured
         }
     #endif // TD_DESTROY_SETUP

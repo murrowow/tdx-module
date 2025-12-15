@@ -221,9 +221,6 @@ void TD_remove_page(uint64_t controller_value, page_info_api_input_t target_page
     uint64_t target_tdr_pa;
 
     __CPROVER_havoc_object(&target_tdr_pa);
-    //uint64_t td_epoch = tables[target_tdr_pa & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.td_epoch;
-    //uint16_t* refcount = tables[target_tdr_pa & HKID_MASK].tdcs_table.epoch_tracking.epoch_and_refcount.refcount;
-    // __CPROVER_assume(refcount[1 - (td_epoch  & 1)] == 0);
     api_error_type error = UNINITIALIZE_ERROR;
 
     error = tdg_vp_vmcall(controller_value); 
@@ -247,17 +244,21 @@ void destroy_TD() {
     uint64_t target_tdvpr_pa;
     __CPROVER_havoc_object(&target_tdvpr_pa);
 
-    // error = tdh_vp_flush(target_tdvpr_pa); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_mng_vpflushdone(target_tdr_pa); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_phymem_cache_wb(target_tdr_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    __CPROVER_assume(is_addr_aligned_pwr_of_2(target_tdr_pa, TDX_PAGE_SIZE_IN_BYTES) &&
+                    is_pa_smaller_than_max_pa(target_tdr_pa) &&
+                    (target_tdr_pa & HKID_MASK != 0));
+
+    error = tdh_vp_flush(target_tdvpr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_mng_vpflushdone(target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_phymem_cache_wb(target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     error = tdh_mng_key_freeid(target_tdr_pa); 
     __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_phymem_page_reclaim(); 
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
-    // error = tdh_phymem_page_wbinvd(target_tdr_pa);
-    // __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_phymem_page_reclaim(target_tdr_pa); 
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
+    error = tdh_phymem_page_wbinvd(target_tdr_pa);
+    __CPROVER_assert(error == TDX_SUCCESS, "seamcall success");
     
 }   
